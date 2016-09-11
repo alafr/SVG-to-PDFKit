@@ -24,7 +24,7 @@ for (var i = 0; i < svgs.length; i++) {
   doc.fontSize(20).text(svgs[i].id, {underline:true});
   SVGtoPDF(doc, svgs[i], 0, doc.y + 50);
   ResetToDefault(doc);
-  doc.addPage();
+  if (i !== svgs.length - 1) {doc.addPage();}
 }
 
 var stream = doc.pipe(blobStream());
