@@ -11,6 +11,10 @@ Parameters:
     svg [SVGElement or string] = the SVG object or XML code
     x, y [number] = the position where the SVG will be added
 
+Demo:
+
+&nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/test.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/test.htm</a>
+
 Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
  - styling with attributes only
