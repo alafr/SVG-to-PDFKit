@@ -380,7 +380,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             addSVGShape(Child, CloneObject(Styles), Tag2);
             doc.restore();
             break;
-          case 'text': case 'tspan':
+          case 'text':
             doc.save();
             addSVGText(Child, CloneObject(Styles), Tag2);
             doc.restore();
@@ -464,7 +464,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
     
     function addSVGText(Obj, Styles, Tag) {
-      var CurrentX = 0, CurrentY = 0, Child, Tag2;
+      var CurrentX = 0, CurrentY = 0, AddedText = '', Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
         if (Obj.hasAttribute('no-export')) {return;}
         findSVGStyles(Obj, Styles);
@@ -515,7 +515,8 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             case '#text':
               var Text = Child.nodeValue;
               if (!Styles.preserveWhiteSpace) {
-                Text = Text.trim().replace(/[\s]{2,}/, ' ');
+                Text = Text.replace(/[\s]+/g, ' ');
+                if (AddedText.match(/[\s]$/)) {Text = Text.replace(/^[\s]/, '');}
               }
               var MeasuredTextWidth = doc.widthOfString(Text);
               if (Anchor === 'end' || Anchor === 'middle' || Length) {
@@ -530,6 +531,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
               }
               doc._fragment(Text, CurrentX, CurrentY, {fill:true, stroke:StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
               CurrentX += Length || MeasuredTextWidth;
+              AddedText += Text;
               break;
           }
         }
