@@ -30,4 +30,4 @@ Unsupported:
  - nested svg elements and foreignElement
  - other things I don't even know they exist
 
-They are many bugs, please send issues and/or pull requests.
+### They are many bugs, please send issues and/or pull requests.
