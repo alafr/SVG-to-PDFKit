@@ -170,7 +170,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
 
     function ParseTranforms(v) { // Convert the value of SVG transform attribute into a matrix
-      var Exp = /([A-Za-z]+)[(]([^(]+)[)](?=\s|$)\s*|(.+)/g, Res = [1, 0, 0, 1, 0, 0], Match, Func, Nums, a;
+      var Exp = /([A-Za-z]+)[(]([^(]+)[)][\s,]*|(.+)/g, Res = [1, 0, 0, 1, 0, 0], Match, Func, Nums, a;
       v = (v || '').trim().toLowerCase();
       while(Match = Exp.exec(v)) {
         if (Match[3]) {return(null);}
@@ -234,8 +234,20 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     function findSVGStyles(Obj, Styles) { // The styles from the attributes, css is unsupported
       var Attributes = Obj.attributes;
       for (var i = 0; i < Attributes.length; i++) {
-        var name = Attributes[i].name, value = Attributes[i].value;
+        var name = Attributes[i].name.toLowerCase(), value0 = Attributes[i].value, value = value0.trim().toLowerCase();
         switch(name) {
+          case 'display':
+            if (value === 'none') {
+              Styles.displayNone = true;
+            }
+            break;
+          case 'visibility':
+            if (value === 'hidden') {
+              Styles.invisible = true;
+            } else if (value === 'visible') {
+              Styles.invisible = false;
+            }
+            break;
           case 'transform':
             if (value = ParseTranforms(value)) {
               doc.transform(value[0], value[1], value[2], value[3], value[4], value[5]);
@@ -266,8 +278,8 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'fill-rule':
-            if (['evenodd', 'nonzero'].indexOf(value.toLowerCase()) !== -1) {
-              Styles.fillRule = value;
+            if (['evenodd', 'nonzero'].indexOf(value) !== -1) {
+              Styles.fillRule = {'nonzero':'non-zero', 'evenodd':'even-odd'}[value];
             }
             break;
           case 'stroke-width':
@@ -289,12 +301,12 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'stroke-linejoin':
-            if (['miter', 'round', 'bevel'].indexOf(value.toLowerCase()) !== -1) {
+            if (['miter', 'round', 'bevel'].indexOf(value) !== -1) {
               Styles.strokeLinejoin = value;
             }
             break;
           case 'stroke-linecap':
-            if (['butt', 'round', 'square'].indexOf(value.toLowerCase()) !== -1) {
+            if (['butt', 'round', 'square'].indexOf(value) !== -1) {
               Styles.strokeLinecap = value;
             }
             break;
@@ -305,28 +317,38 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'font-family':
-            if (value && (value = value.split(',')[0])) {
-              Styles.fontFamily = value;
+            if (value0) {
+              Styles.fontFamily = value0;
             }
             break;
           case 'font-weight':
-            if (['600', '700', '800', '900', 'bold', 'bolder'].indexOf(value.toLowerCase()) !== -1) {
+            if (['600', '700', '800', '900', 'bold', 'bolder'].indexOf(value) !== -1) {
               Styles.bold = true;
-            } else if (['500', '400', '300', '200', '100', 'normal', 'lighter'].indexOf(value.toLowerCase()) !== -1) {
+            } else if (['500', '400', '300', '200', '100', 'normal', 'lighter'].indexOf(value) !== -1) {
               Styles.bold = false;
             }
             break;
           case 'font-style':
-            if (['italic', 'oblique'].indexOf(value.toLowerCase()) !== -1) {
+            if (['italic', 'oblique'].indexOf(value) !== -1) {
               Styles.italic = true;
-            } else if (value.toLowerCase() === 'normal') {
+            } else if (value === 'normal') {
               Styles.italic = false;
             }
             break;
+          case 'text-anchor':
+            if (['start', 'middle', 'end'].indexOf(value) !== -1) {
+              Styles.textAnchor = value;
+            }
+            break;
+          case 'alignment-baseline':
+            if (['auto', 'baseline', 'before-edge', 'text-before-edge', 'middle', 'central', 'after-edge', 'text-after-edge', 'ideographic', 'alphabetic', 'hanging', 'mathematical'].indexOf(value) !== -1) {
+              Styles.alignmentBaseline = {'text-before-edge':'before-edge', 'text-after-edge':'after-edge', 'auto':'baseline', 'ideographic':'after-edge', 'alphabetic':'baseline'}[value] || value;
+            }
+            break;
           case 'xml:space':
-            if (value.toLowerCase() === 'preserve') {
+            if (value === 'preserve') {
               Styles.preserveWhiteSpace = true;
-            } else if (value.toLowerCase() === 'default') {
+            } else if (value === 'default') {
               Styles.preserveWhiteSpace = true;
             }
             break;
@@ -335,9 +357,9 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
 
     function addSVGGroup(Obj, Styles, Tag) {
-      if (Obj.hasAttribute('no-export')) {return;}
       var Child, Tag2;
       findSVGStyles(Obj, Styles);
+      if (Styles.displayNone) {return;}
       for (var i = 0, children = Obj.children; i < children.length; i++) {
         Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
         switch(Tag2) {
@@ -371,12 +393,12 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
 
     function addSVGUseElem(Obj, Styles, Tag) {
-      if (Obj.hasAttribute('no-export')) {return;}
-      var Link = Obj.getAttribute( 'xlink:href').slice(1),
+      findSVGStyles(Obj, Styles);
+      if (Styles.displayNone) {return;}
+      var Link = Obj.getAttribute('xlink:href').slice(1),
           Child = svg.getElementById(Link),
           Tag2 = Child && Child.nodeName.toLowerCase();
       if (Child) {
-        findSVGStyles(Obj, Styles);
         var X = Choose(ParseLength(Obj.getAttribute('x')), 0),
             Y = Choose(ParseLength(Obj.getAttribute('y')), 0);
         doc.translate(X, Y);
@@ -406,20 +428,20 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
     
     function addSVGImage(Obj, Styles, Tag) {
-      if (Obj.hasAttribute('no-export')) {return;}
       findSVGStyles(Obj, Styles);
+      if (Styles.displayNone) {return;}
       var Link = Obj.getAttribute('xlink:href'), 
           Width = Choose(ParseLength(Obj.getAttribute('width')), 0), 
           Height = Choose(ParseLength(Obj.getAttribute('height')), 0),
           X = Choose(ParseLength(Obj.getAttribute('x')), 0),
           Y = Choose(ParseLength(Obj.getAttribute('y')), 0);
       doc.fillOpacity(Choose(Styles.opacity, 1));
-      if (Link) {doc.image(Link, X, Y, {width: Width, height: Height});}
+      if (Link && !Styles.invisible) {doc.image(Link, X, Y, {width: Width, height: Height});}
     }
 
     function addSVGShape(Obj, Styles, Tag) {
-      if (Obj.hasAttribute('no-export')) {return;}
       findSVGStyles(Obj, Styles);
+      if (Styles.displayNone) {return;}
       var FillColor = Choose(Styles.fill, [0, 0, 0, 1]),
           StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]);
       doc.fillColor(FillColor.slice(0,3), Choose(Styles.fillOpacity, 1) * Choose(Styles.opacity, 1) * FillColor[3])
@@ -428,14 +450,16 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
          .miterLimit(Choose(Styles.strokeMiterlimit, 10))
          .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
          .lineCap(Choose(Styles.strokeLinecap, 'butt'));
-      var FillRule = {'nonzero':'non-zero','evenodd':'even-odd'}[Choose(Styles.fillRule, 'nonzero')];
+      var FillRule = Choose(Styles.fillRule, 'non-zero');
       if (Styles.strokeDasharray && Styles.strokeDasharray.length >= 2) {
         doc.dash(Styles.strokeDasharray[0], {space:Styles.strokeDasharray[1]});
       } else {
         doc.undash();
       }
       if (Tag === 'path') {
-        doc.path(Obj.getAttribute('d')).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.path(Obj.getAttribute('d')).fillAndStroke(FillRule);
+        }
       } else if (Tag === 'rect') {
         var PosX = Choose(ParseLength(Obj.getAttribute('x')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('y')), 0),
@@ -443,49 +467,65 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             Height = Choose(ParseLength(Obj.getAttribute('height')), 0), 
             Radius = Choose(ParseLength(Obj.getAttribute('rx')), 0);
         if (Radius) {
-          doc.roundedRect(PosX, PosY, Width, Height, Radius).fillAndStroke(FillRule);
+          if (!Styles.invisible) {
+            doc.roundedRect(PosX, PosY, Width, Height, Radius).fillAndStroke(FillRule);
+          }
         } else {
-          doc.rect(PosX, PosY, Width, Height).fillAndStroke(FillRule);
+          if (!Styles.invisible) {
+            doc.rect(PosX, PosY, Width, Height).fillAndStroke(FillRule);
+          }
         }
       } else if (Tag === 'circle') {
         var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
             Radius = Choose(ParseLength(Obj.getAttribute('r')), 0);
-        doc.circle(PosX, PosY, Radius).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.circle(PosX, PosY, Radius).fillAndStroke(FillRule);
+        }
       } else if (Tag === 'ellipse') {
         var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
             RadiusX = Choose(ParseLength(Obj.getAttribute('rx')), 0),
             RadiusY = Choose(ParseLength(Obj.getAttribute('ry')), 0);
-        doc.ellipse(PosX, PosY, RadiusX, RadiusY).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.ellipse(PosX, PosY, RadiusX, RadiusY).fillAndStroke(FillRule);
+        }
       } else if (Tag === 'line') {
         var StartX = Choose(ParseLength(Obj.getAttribute('x1')), 0),
             StartY = Choose(ParseLength(Obj.getAttribute('y1')), 0),
             EndX = Choose(ParseLength(Obj.getAttribute('x2')), 0),
             EndY = Choose(ParseLength(Obj.getAttribute('y2')), 0);
-        doc.moveTo(StartX, StartY).lineTo(EndX, EndY).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.moveTo(StartX, StartY).lineTo(EndX, EndY).fillAndStroke(FillRule);
+        }
       } else if (Tag === 'polyline') {
         var Points = (Obj.getAttribute('points') || '').split(/\s*,\s*|\s+/);
         Points = Points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ');
-        doc.path(Points).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.path(Points).fillAndStroke(FillRule);
+        }
       } else if (Tag === 'polygon') {
         var Points = (Obj.getAttribute('points') || '').split(/\s*,\s*|\s+/);
         Points = Points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ') + ' Z';
-        doc.path(Points).fillAndStroke(FillRule);
+        if (!Styles.invisible) {
+          doc.path(Points).fillAndStroke(FillRule);
+        }
       }
     }
     
     function addSVGText(Obj, Styles, Tag) {
       var CurrentX = 0, CurrentY = 0, AddedText = '', Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
-        if (Obj.hasAttribute('no-export')) {return;}
         findSVGStyles(Obj, Styles);
+        if (Styles.displayNone) {return;}
         var FillColor = Choose(Styles.fill, [0, 0, 0, 1]),
             FillOpacity = Choose(Styles.fillOpacity, 1) * Choose(Styles.opacity, 1) * FillColor[3], 
             StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]),
             StrokeOpacity = Choose(Styles.strokeOpacity, 1) * Choose(Styles.opacity, 1) * StrokeColor[3],
             LineWidth = Choose(Styles.strokeWidth, 1), 
-            Size = Choose(Styles.fontSize, 16);
+            Size = Choose(Styles.fontSize, 16),
+            Anchor = Choose(Styles.textAnchor, 'start'),
+            Baseline = Choose(Styles.alignmentBaseline, 'baseline');
         doc.miterLimit(Choose(Styles.strokeMiterlimit, 2))
            .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
            .lineCap(Choose(Styles.strokeLinecap, 'butt'))
@@ -495,9 +535,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
         } else {
           doc.undash();
         }
-        var Length = Choose(ParseLength(Obj.getAttribute('textLength')), null),
-            Baseline = Choose(Obj.getAttribute('alignment-baseline'), 'baseline'),
-            Anchor = Choose(Obj.getAttribute('text-anchor'), 'start');
+        var Length = Choose(ParseLength(Obj.getAttribute('textLength')), null);
         CurrentX = Choose(ParseLength(Obj.getAttribute('x')), CurrentX);
         CurrentY = Choose(ParseLength(Obj.getAttribute('y')), CurrentY);
         CurrentX += Choose(ParseLength(Obj.getAttribute('dx')), 0);
@@ -541,7 +579,9 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
                   CurrentX -= 0.5 * MeasuredTextWidth;
                 }
               }
-              doc._fragment(Text, CurrentX, CurrentY, {fill:true, stroke:StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
+              if (!Styles.invisible) {
+                doc._fragment(Text, CurrentX, CurrentY, {fill:true, stroke:StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
+              }
               CurrentX += Length || MeasuredTextWidth;
               AddedText += Text;
               break;
