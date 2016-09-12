@@ -265,6 +265,11 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
               Styles.strokeOpacity = value;
             }
             break;
+          case 'fill-rule':
+            if (['evenodd', 'nonzero'].indexOf(value.toLowerCase()) !== -1) {
+              Styles.fillRule = value;
+            }
+            break;
           case 'stroke-width':
             value = ParseLength(value);
             if (value > -Infinity && value < Infinity) {
@@ -307,15 +312,21 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           case 'font-weight':
             if (['600', '700', '800', '900', 'bold', 'bolder'].indexOf(value.toLowerCase()) !== -1) {
               Styles.bold = true;
+            } else if (['500', '400', '300', '200', '100', 'normal', 'lighter'].indexOf(value.toLowerCase()) !== -1) {
+              Styles.bold = false;
             }
             break;
           case 'font-style':
             if (['italic', 'oblique'].indexOf(value.toLowerCase()) !== -1) {
               Styles.italic = true;
+            } else if (value.toLowerCase() === 'normal') {
+              Styles.italic = false;
             }
             break;
           case 'xml:space':
-            if (value === 'preserve') {
+            if (value.toLowerCase() === 'preserve') {
+              Styles.preserveWhiteSpace = true;
+            } else if (value.toLowerCase() === 'default') {
               Styles.preserveWhiteSpace = true;
             }
             break;
@@ -417,13 +428,14 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
          .miterLimit(Choose(Styles.strokeMiterlimit, 10))
          .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
          .lineCap(Choose(Styles.strokeLinecap, 'butt'));
+      var FillRule = {'nonzero':'non-zero','evenodd':'even-odd'}[Choose(Styles.fillRule, 'nonzero')];
       if (Styles.strokeDasharray && Styles.strokeDasharray.length >= 2) {
         doc.dash(Styles.strokeDasharray[0], {space:Styles.strokeDasharray[1]});
       } else {
         doc.undash();
       }
       if (Tag === 'path') {
-        doc.path(Obj.getAttribute('d')).fillAndStroke();
+        doc.path(Obj.getAttribute('d')).fillAndStroke(FillRule);
       } else if (Tag === 'rect') {
         var PosX = Choose(ParseLength(Obj.getAttribute('x')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('y')), 0),
@@ -431,35 +443,35 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             Height = Choose(ParseLength(Obj.getAttribute('height')), 0), 
             Radius = Choose(ParseLength(Obj.getAttribute('rx')), 0);
         if (Radius) {
-          doc.roundedRect(PosX, PosY, Width, Height, Radius).fillAndStroke();
+          doc.roundedRect(PosX, PosY, Width, Height, Radius).fillAndStroke(FillRule);
         } else {
-          doc.rect(PosX, PosY, Width, Height).fillAndStroke();
+          doc.rect(PosX, PosY, Width, Height).fillAndStroke(FillRule);
         }
       } else if (Tag === 'circle') {
         var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
             Radius = Choose(ParseLength(Obj.getAttribute('r')), 0);
-        doc.circle(PosX, PosY, Radius).fillAndStroke();
+        doc.circle(PosX, PosY, Radius).fillAndStroke(FillRule);
       } else if (Tag === 'ellipse') {
         var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
             PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
             RadiusX = Choose(ParseLength(Obj.getAttribute('rx')), 0),
             RadiusY = Choose(ParseLength(Obj.getAttribute('ry')), 0);
-        doc.ellipse(PosX, PosY, RadiusX, RadiusY).fillAndStroke();
+        doc.ellipse(PosX, PosY, RadiusX, RadiusY).fillAndStroke(FillRule);
       } else if (Tag === 'line') {
         var StartX = Choose(ParseLength(Obj.getAttribute('x1')), 0),
             StartY = Choose(ParseLength(Obj.getAttribute('y1')), 0),
             EndX = Choose(ParseLength(Obj.getAttribute('x2')), 0),
             EndY = Choose(ParseLength(Obj.getAttribute('y2')), 0);
-        doc.moveTo(StartX, StartY).lineTo(EndX, EndY).fillAndStroke();
+        doc.moveTo(StartX, StartY).lineTo(EndX, EndY).fillAndStroke(FillRule);
       } else if (Tag === 'polyline') {
         var Points = (Obj.getAttribute('points') || '').split(/\s*,\s*|\s+/);
         Points = Points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ');
-        doc.path(Points).fillAndStroke();
+        doc.path(Points).fillAndStroke(FillRule);
       } else if (Tag === 'polygon') {
         var Points = (Obj.getAttribute('points') || '').split(/\s*,\s*|\s+/);
         Points = Points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ') + ' Z';
-        doc.path(Points).fillAndStroke();
+        doc.path(Points).fillAndStroke(FillRule);
       }
     }
     
