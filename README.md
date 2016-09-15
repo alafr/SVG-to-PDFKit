@@ -19,15 +19,13 @@ Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
  - styling with attributes only
  - colors: fill & stroke (rgb, rgba, hex or string), fill-opacity, stroke-opacity & opacity
- - transform attribute
  - text: text, tspan and a few of their attributes
+ - transform, viewBox, preserveAspectRatio attributes
 
 Unsupported:
  - css: style element and inline style
- - textPath
- - text: most attributes of text & tspan elements
- - viewBox
- - nested svg elements and foreignElement
+ - text: textPath & most attributes of text & tspan elements
+ - foreignElement, clip paths, gradients
  - other things I don't even know they exist
 
 ### They are many bugs, please send issues and/or pull requests.
