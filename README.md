@@ -1,5 +1,5 @@
 # SVG-to-PDFKit
-Insert SVG into a PDF document created with PDFKit
+Insert SVG into a PDF document created with PDFKit.
 
 Use:
 
@@ -29,5 +29,7 @@ Unsupported:
  - text: textPath & most attributes of text & tspan elements
  - foreignElement, clip paths, gradients
  - other things I don't even know they exist
+
+Warning: some features depend on options not yet commited into PdfKit will only work in the demo.
 
 ### They are many bugs, please send issues and/or pull requests.
