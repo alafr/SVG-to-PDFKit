@@ -663,14 +663,14 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
         if (!bold && !italic) {doc.font('Helvetica');}
       };
     }
-    if (svg.nodeName === 'svg') {
+    if (svg && svg.nodeName === 'svg') {
       doc.save().translate(x || 0, y || 0);
       var ViewportWidth = doc.page.width,
           ViewportHeight = doc.page.height;
       addSVGGroup(svg, {}, 'svg');
       doc.restore();
     } else {
-      console.log('Error: SVGtoPDF: This element can\'t be processed as SVG : ' + svg.nodeName);
+      console.log('Error: SVGtoPDF: This element can\'t be processed as SVG : ' + (svg && svg.nodeName));
     }
 
 }
