@@ -206,13 +206,31 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       return(Res);
     }
 
-    function ParseLength(v) { // Some units are missing, em is wrong and should be computed => use pixels
-      var Units = {'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, '':1, 'em':12};
-      var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|em|)$/)
+    function ParseLength(v, dir) { // 'em' is wrong and should be computed
+      var Units = {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'em':12};
+      var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|em|%|)$/)
       if (temp) {
-        v = (+temp[1]) * Units[temp[2]];
+        if (temp[2] === '%') {
+          if (dir === 'x') {v = (+temp[1]) / 100 * ViewportWidth;}
+          else if (dir === 'y') {v = (+temp[1]) / 100 * ViewportHeight;}
+          else {v = (+temp[1]) / 100 * Math.sqrt(ViewportWidth * ViewportWidth + ViewportHeight * ViewportHeight);}
+        } else {
+          v = (+temp[1]) * Units[temp[2]];
+        }
         if (v > -Infinity && v < Infinity) {return(v);}
       }
+    }
+
+    function ParseAspectRatio(Value) {
+      Value = (Value || '').trim().match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [];
+      var Type = Value[1] || Value[4] || 'meet';
+      var XAlign = {'Min':'left', 'Mid':'center', 'Max':'right'}[Value[2] || 'Mid'];
+      var YAlign = {'Min':'top', 'Mid':'center', 'Max':'bottom'}[Value[3] || 'Mid'];
+      return({type: Type, xAlign: XAlign, yAlign:YAlign});
+    }
+    
+    function ParseNumberList(v) {
+      return((v || '').split(/\s*,\s*|\s+/).map(function(x) {return(parseFloat(x));}));
     }
 
     function Choose(value1, value2) { // Something like the '||' operator but with the 0 and the empty string being accepted
@@ -231,7 +249,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       return(clone);
     }
 
-    function findSVGStyles(Obj, Styles) { // The styles from the attributes, css is unsupported
+    function findSVGStyles(Obj, Styles, Tag) { // The styles from the attributes, css is unsupported
       var Attributes = Obj.attributes;
       for (var i = 0; i < Attributes.length; i++) {
         var name = Attributes[i].name.toLowerCase(), value0 = Attributes[i].value, value = value0.trim().toLowerCase();
@@ -249,7 +267,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'transform':
-            if (value = ParseTranforms(value)) {
+            if ((Tag !== 'svg') && (value = ParseTranforms(value))) {
               doc.transform(value[0], value[1], value[2], value[3], value[4], value[5]);
             }
             break;
@@ -283,19 +301,19 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'stroke-width':
-            value = ParseLength(value);
+            value = ParseLength(value, 'xy');
             if (value > -Infinity && value < Infinity) {
               Styles.strokeWidth = value;
             }
             break;
           case 'stroke-dasharray':
-            value = ((value || '').split(/\s*,\s*|\s+/).map(function(x) {return(parseFloat(x));}));
+            value = ParseNumberList(value);
             if (value.every(function(x) {return(x >= 0 && x < Infinity);})) {
               Styles.strokeDasharray = value;
             }
             break;
           case 'stroke-miterlimit':
-            value = ParseLength(value);
+            value = ParseLength(value, 'xy');
             if (value > -Infinity && value < Infinity) {
               Styles.strokeMiterlimit = value;
             }
@@ -311,7 +329,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             }
             break;
           case 'font-size':
-            value = {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}[value] || ParseLength(value);
+            value = {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}[value] || ParseLength(value, 'xy');
             if (value > 0 && value < Infinity) {
               Styles.fontSize = value;
             }
@@ -356,14 +374,47 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       }
     }
 
-    function addSVGGroup(Obj, Styles, Tag) {
+    function addSVGGroup(Obj, Styles, Tag) { // Elements: g, svg
       var Child, Tag2;
-      findSVGStyles(Obj, Styles);
+      findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
+      if (Tag === 'svg') {
+        var ViewBox = ParseNumberList(Obj.getAttribute('viewBox'));
+        var PreserveRatio = ParseAspectRatio(Obj.getAttribute('preserveAspectRatio'));
+        var Width = Choose(ParseLength(Obj.getAttribute('width'), 'x'), ViewportWidth),
+            Height = Choose(ParseLength(Obj.getAttribute('height'), 'y'), ViewportHeight),
+            X = Choose(ParseLength(Obj.getAttribute('x'), 'x'), 0),
+            Y = Choose(ParseLength(Obj.getAttribute('y'), 'y'), 0),
+            Overflow = ((Obj.getAttribute('overflow') || '').trim().toLowerCase() === 'visible');
+        if (!Overflow) {
+          doc.rect(X, Y, Width, Height).clip();
+          console.log(Obj,Width,Height)
+        }
+        if (ViewBox[0] > -Infinity && ViewBox[0] < Infinity && ViewBox[1] > -Infinity && ViewBox[1] < Infinity &&
+        ViewBox[2] >= 0 && ViewBox[2] < Infinity && ViewBox[3] >= 0 && ViewBox[3] < Infinity) {
+          ViewportWidth = ViewBox[2];
+          ViewportHeight = ViewBox[3];
+          var ScaleX = Width / ViewportWidth, 
+              ScaleY = Height / ViewportHeight, 
+              Dx = 0, 
+              Dy = 0;
+          if (PreserveRatio.type === 'slice') {
+            ScaleY = ScaleX = Math.max(ScaleX, ScaleY);
+          } else if (PreserveRatio.type === 'meet') {
+            ScaleY = ScaleX = Math.min(ScaleX, ScaleY);
+          }
+          Dx = {'left':0, 'center':0.5, 'right':1}[PreserveRatio.xAlign];
+          Dy = {'top':0, 'center':0.5, 'bottom':1}[PreserveRatio.yAlign];
+          doc.transform(ScaleX, 0, 0, ScaleY, X + Dx * (Width - ViewportWidth * ScaleX) - ScaleX * ViewBox[0], Y + Dy * (Height - ViewportHeight * ScaleY) - ScaleY * ViewBox[1]);
+        } else {
+          ViewportWidth = Width;
+          ViewportHeight = Height;
+        }
+      }
       for (var i = 0, children = Obj.children; i < children.length; i++) {
         Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
         switch(Tag2) {
-          case 'g':
+          case 'g': case 'svg':
             doc.save();
             addSVGGroup(Child, CloneObject(Styles), Tag2);
             doc.restore();
@@ -373,7 +424,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             addSVGShape(Child, CloneObject(Styles), Tag2);
             doc.restore();
             break;
-          case 'text': case 'tspan':
+          case 'text':
             doc.save();
             addSVGText(Child, CloneObject(Styles), Tag2);
             doc.restore();
@@ -392,15 +443,15 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       }
     }
 
-    function addSVGUseElem(Obj, Styles, Tag) {
-      findSVGStyles(Obj, Styles);
+    function addSVGUseElem(Obj, Styles, Tag) { // Element: use
+      findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
       var Link = Obj.getAttribute('xlink:href').slice(1),
           Child = svg.getElementById(Link),
           Tag2 = Child && Child.nodeName.toLowerCase();
       if (Child) {
-        var X = Choose(ParseLength(Obj.getAttribute('x')), 0),
-            Y = Choose(ParseLength(Obj.getAttribute('y')), 0);
+        var X = Choose(ParseLength(Obj.getAttribute('x'), 'x'), 0),
+            Y = Choose(ParseLength(Obj.getAttribute('y'), 'y'), 0);
         doc.translate(X, Y);
         switch(Tag2) {
           case 'g':
@@ -427,20 +478,34 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       }
     }
     
-    function addSVGImage(Obj, Styles, Tag) {
-      findSVGStyles(Obj, Styles);
+    function addSVGImage(Obj, Styles, Tag) { // Element: image
+      findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
       var Link = Obj.getAttribute('xlink:href'), 
-          Width = Choose(ParseLength(Obj.getAttribute('width')), 0), 
-          Height = Choose(ParseLength(Obj.getAttribute('height')), 0),
-          X = Choose(ParseLength(Obj.getAttribute('x')), 0),
-          Y = Choose(ParseLength(Obj.getAttribute('y')), 0);
+          Width = Choose(ParseLength(Obj.getAttribute('width'), 'x'), 0), 
+          Height = Choose(ParseLength(Obj.getAttribute('height'), 'y'), 0),
+          X = Choose(ParseLength(Obj.getAttribute('x'), 'x'), 0),
+          Y = Choose(ParseLength(Obj.getAttribute('y'), 'y'), 0),
+          PreserveRatio = ParseAspectRatio(Obj.getAttribute('preserveAspectRatio'));
       doc.fillOpacity(Choose(Styles.opacity, 1));
-      if (Link && !Styles.invisible) {doc.image(Link, X, Y, {width: Width, height: Height});}
+      var Options = {};
+      if (PreserveRatio.type === 'none') {
+        Options.width = Width;
+        Options.height = Height;
+      } else {
+        Options.align = PreserveRatio.xAlign;
+        Options.valign = PreserveRatio.yAlign;
+        if (PreserveRatio.type === 'meet') {
+          Options.fit = [Width, Height];
+        } else if (PreserveRatio.type === 'slice') {
+          Options.cover = [Width, Height]; // This is not yet supported in PdfKit
+        }
+      }
+      if (Link && !Styles.invisible) {doc.image(Link, X, Y, Options);}
     }
 
-    function addSVGShape(Obj, Styles, Tag) {
-      findSVGStyles(Obj, Styles);
+    function addSVGShape(Obj, Styles, Tag) { // Elements: path, rect, polygon, line, polyline, circle, ellipse
+      findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
       var FillColor = Choose(Styles.fill, [0, 0, 0, 1]),
           StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]);
@@ -461,11 +526,11 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           doc.path(Obj.getAttribute('d')).fillAndStroke(FillRule);
         }
       } else if (Tag === 'rect') {
-        var PosX = Choose(ParseLength(Obj.getAttribute('x')), 0),
-            PosY = Choose(ParseLength(Obj.getAttribute('y')), 0),
-            Width = Choose(ParseLength(Obj.getAttribute('width')), 0), 
-            Height = Choose(ParseLength(Obj.getAttribute('height')), 0), 
-            Radius = Choose(ParseLength(Obj.getAttribute('rx')), 0);
+        var PosX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), 0),
+            PosY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), 0),
+            Width = Choose(ParseLength(Obj.getAttribute('width'), 'x'), 0), 
+            Height = Choose(ParseLength(Obj.getAttribute('height'), 'y'), 0), 
+            Radius = Choose(ParseLength(Obj.getAttribute('rx'), 'x'), 0);
         if (Radius) {
           if (!Styles.invisible) {
             doc.roundedRect(PosX, PosY, Width, Height, Radius).fillAndStroke(FillRule);
@@ -476,25 +541,25 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           }
         }
       } else if (Tag === 'circle') {
-        var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
-            PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
-            Radius = Choose(ParseLength(Obj.getAttribute('r')), 0);
+        var PosX = Choose(ParseLength(Obj.getAttribute('cx'), 'x'), 0),
+            PosY = Choose(ParseLength(Obj.getAttribute('cy'), 'y'), 0),
+            Radius = Choose(ParseLength(Obj.getAttribute('r'), 'xy'), 0);
         if (!Styles.invisible) {
           doc.circle(PosX, PosY, Radius).fillAndStroke(FillRule);
         }
       } else if (Tag === 'ellipse') {
-        var PosX = Choose(ParseLength(Obj.getAttribute('cx')), 0),
-            PosY = Choose(ParseLength(Obj.getAttribute('cy')), 0),
-            RadiusX = Choose(ParseLength(Obj.getAttribute('rx')), 0),
-            RadiusY = Choose(ParseLength(Obj.getAttribute('ry')), 0);
+        var PosX = Choose(ParseLength(Obj.getAttribute('cx'), 'x'), 0),
+            PosY = Choose(ParseLength(Obj.getAttribute('cy'), 'y'), 0),
+            RadiusX = Choose(ParseLength(Obj.getAttribute('rx'), 'x'), 0),
+            RadiusY = Choose(ParseLength(Obj.getAttribute('ry'), 'y'), 0);
         if (!Styles.invisible) {
           doc.ellipse(PosX, PosY, RadiusX, RadiusY).fillAndStroke(FillRule);
         }
       } else if (Tag === 'line') {
-        var StartX = Choose(ParseLength(Obj.getAttribute('x1')), 0),
-            StartY = Choose(ParseLength(Obj.getAttribute('y1')), 0),
-            EndX = Choose(ParseLength(Obj.getAttribute('x2')), 0),
-            EndY = Choose(ParseLength(Obj.getAttribute('y2')), 0);
+        var StartX = Choose(ParseLength(Obj.getAttribute('x1'), 'x'), 0),
+            StartY = Choose(ParseLength(Obj.getAttribute('y1'), 'y'), 0),
+            EndX = Choose(ParseLength(Obj.getAttribute('x2'), 'x'), 0),
+            EndY = Choose(ParseLength(Obj.getAttribute('y2'), 'y'), 0);
         if (!Styles.invisible) {
           doc.moveTo(StartX, StartY).lineTo(EndX, EndY).fillAndStroke(FillRule);
         }
@@ -513,10 +578,10 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       }
     }
     
-    function addSVGText(Obj, Styles, Tag) {
+    function addSVGText(Obj, Styles, Tag) { // Elements: text, tspan (children)
       var CurrentX = 0, CurrentY = 0, AddedText = '', Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
-        findSVGStyles(Obj, Styles);
+        findSVGStyles(Obj, Styles, Tag);
         if (Styles.displayNone) {return;}
         var FillColor = Choose(Styles.fill, [0, 0, 0, 1]),
             FillOpacity = Choose(Styles.fillOpacity, 1) * Choose(Styles.opacity, 1) * FillColor[3], 
@@ -535,11 +600,11 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
         } else {
           doc.undash();
         }
-        var Length = Choose(ParseLength(Obj.getAttribute('textLength')), null);
-        CurrentX = Choose(ParseLength(Obj.getAttribute('x')), CurrentX);
-        CurrentY = Choose(ParseLength(Obj.getAttribute('y')), CurrentY);
-        CurrentX += Choose(ParseLength(Obj.getAttribute('dx')), 0);
-        CurrentY += Choose(ParseLength(Obj.getAttribute('dy')), 0);
+        var Length = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), null);
+        CurrentX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), CurrentX);
+        CurrentY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), CurrentY);
+        CurrentX += Choose(ParseLength(Obj.getAttribute('dx'), 'x'), 0);
+        CurrentY += Choose(ParseLength(Obj.getAttribute('dy'), 'y'), 0);
         var FontStylesFound = {};
         fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound)
         if (FontStylesFound.boldFound === false) {
@@ -601,7 +666,9 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       };
     }
     doc.save().translate(x || 0, y || 0);
-    addSVGGroup(svg, {});
+    var ViewportWidth = doc.page.width,
+        ViewportHeight = doc.page.height;
+    addSVGGroup(svg, {}, 'svg');
     doc.restore();
 
 }
