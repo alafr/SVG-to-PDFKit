@@ -73,7 +73,7 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
       return(GetElementById(this, id) || null);
   };
   // Code adapted from this one: https://github.com/segmentio/xml-parser/
-  XmlString = XmlString.replace(/<![\s\S]*?>/g, '').trim(); // Remove comments
+  XmlString = XmlString.replace(/<!--[\s\S]*?-->/g, '').trim(); // Remove comments
   return(RecursiveParse());
   function RecursiveParse() {
     var temp, child, node, attr, value;
@@ -85,7 +85,6 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
       }
       ConsumeMatch(/^>/); // End of opening tag
       if (ConsumeMatch(/^\/>/)) { // Self-closing tag
-        console.log('Tag self-end','/>')
         return(node);
       }
       while (child = RecursiveParse()) {
@@ -94,7 +93,7 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
       }
       temp = ConsumeMatch(/^<\/([\w-:.]+)>/); // Closing tag
       if (!temp || temp[1] !== node.nodeName) {
-        console.log('ParseXml: tag not matching: opening ' + node.nodeName + ' & closing ' + (temp && temp[1]));
+        console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + (temp && temp[1]));
       }
       return(node);
     } else if (temp = ConsumeMatch(/^([^<]+)/)) { // Text node
@@ -388,7 +387,6 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
             Overflow = ((Obj.getAttribute('overflow') || '').trim().toLowerCase() === 'visible');
         if (!Overflow) {
           doc.rect(X, Y, Width, Height).clip();
-          console.log(Obj,Width,Height)
         }
         if (ViewBox[0] > -Infinity && ViewBox[0] < Infinity && ViewBox[1] > -Infinity && ViewBox[1] < Infinity &&
         ViewBox[2] >= 0 && ViewBox[2] < Infinity && ViewBox[3] >= 0 && ViewBox[3] < Infinity) {
@@ -665,10 +663,14 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
         if (!bold && !italic) {doc.font('Helvetica');}
       };
     }
-    doc.save().translate(x || 0, y || 0);
-    var ViewportWidth = doc.page.width,
-        ViewportHeight = doc.page.height;
-    addSVGGroup(svg, {}, 'svg');
-    doc.restore();
+    if (svg.nodeName === 'svg') {
+      doc.save().translate(x || 0, y || 0);
+      var ViewportWidth = doc.page.width,
+          ViewportHeight = doc.page.height;
+      addSVGGroup(svg, {}, 'svg');
+      doc.restore();
+    } else {
+      console.log('Error: SVGtoPDF: This element can\'t be processed as SVG : ' + svg.nodeName);
+    }
 
 }
