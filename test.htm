@@ -13,41 +13,160 @@ function ResetToDefault(doc) {
      .undash()
      .fontSize(12);
 }
+function CreatePdf() {
+  var doc = new PDFDocument();
+  var stream = doc.pipe(blobStream());
 
-window.onload = function() {
-var doc = new PDFDocument();
-var stream = doc.pipe(blobStream());
-
-// load some svg drawings
-var svgs = document.getElementsByTagName('svg');
-for (var i = 0; i < svgs.length; i++) {
-  doc.fontSize(20).text(svgs[i].id, {underline:true});
-  SVGtoPDF(doc, svgs[i], 0, doc.y + 50);
-  ResetToDefault(doc);
-  if (i !== svgs.length - 1) {doc.addPage();}
-}
-
-var stream = doc.pipe(blobStream());
-stream.on('finish', function() {
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('out').setAttribute('src', reader.result);
+  var textarea = document.getElementById('svg-input');
+  if (textarea.value) {
+    // Use the SVG code in the textarea
+    SVGtoPDF(doc, textarea.value, 0, 0);
+    ResetToDefault(doc);
+  } else {
+    // Use all the svg drawings on the page
+    var svgs = document.querySelectorAll('#col1 > svg');
+    for (var i = 0; i < svgs.length; i++) {
+      doc.fontSize(20).text(svgs[i].id, {underline:true});
+      SVGtoPDF(doc, svgs[i], 0, doc.y + 50);
+      ResetToDefault(doc);
+      // var w = parseFloat(getComputedStyle(svgs[i]).width), h = parseFloat(getComputedStyle(svgs[i]).height), border = 6;
+      // doc.rect(-border/2, doc.y + 50 - border/2, w + border, h + border).lineWidth(border).stroke()
+      if (i !== svgs.length - 1) {doc.addPage();}
+    }
   }
-  reader.readAsDataURL(stream.toBlob('application/pdf'));
-});
-doc.end();
+  var stream = doc.pipe(blobStream());
+  stream.on('finish', function() {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('out').setAttribute('src', reader.result);
+    }
+    reader.readAsDataURL(stream.toBlob('application/pdf'));
+  });
+  doc.end();
 }
 </script>
 <style>
 body{margin:0;}
-#col1{position:fixed;height:100%;width:50%;top:0;left:0;overflow:scroll;}
-svg{border:1px dotted green;}
-#col2{position:fixed;height:100%;width:50%;top:0;right:0;}
-#out{position:absolute;right:0;top:0;width:100%;height:100%;box-sizing:border-box;}
+div#col1{position:fixed;height:100%;width:50%;top:0;left:0;overflow:scroll;}
+textarea#svg-input{width:100%;height:120px;box-sizing:border-box;resize:vertical;}
+div#col1 > svg{border:1px dotted green;}
+div#col2{position:fixed;height:100%;width:50%;top:0;right:0;}
+iframe#out{position:absolute;right:0;top:0;width:100%;height:100%;box-sizing:border-box;}
 </style>
 </head>
+<body onload="CreatePdf()">
 <div id="col1">
-<h4>Most of the following SVG files are from https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/</h4>
+<form>
+<textarea id="svg-input" onblur="CreatePdf()" placeholder="Paste svg code here, then click out of this textarea">
+</textarea>
+</form>
+<p>&nbsp;</p><p>&nbsp;</p>
+<svg id="PreserveAspectRatio test © www.w3.org" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="100%" height="50%" viewBox="0 0 480 360">
+  <!--= SVG 1.1 2nd Edition Test Case = Copyright 2009 World Wide Web Consortium, (Massachusetts Institute of Technology, European Research Consortium for Informatics and Mathematics (ERCIM), Keio University). All Rights Reserved. See http://www.w3.org/Consortium/Legal/. =-->
+  <title id="test-title">$RCSfile: coords-viewattr-01-b.svg,v $</title>
+  <g id="test-body-content" font-family="SVGFreeSansASCII,sans-serif" font-size="18">
+    <g font-size="9" transform="translate(0, 30)">
+      <desc>Example PreserveAspectRatio - demonstrate available options</desc>
+      <text text-anchor="middle" x="240" font-size="16">Test available options of preserveAspectRatio</text>
+      <text x="35.5" y="30" text-anchor="middle">SVG to fit</text>
+      <g transform="translate(20,40)"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </g>
+      <text x="35.5" y="110" text-anchor="middle">Viewport 1</text>
+      <g transform="translate(10,120)"><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/></g>
+      <text x="35.5" y="180" text-anchor="middle">Viewport 2</text>
+      <g transform="translate(20,190)"><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/></g>
+      <g id="meet-group-1" transform="translate(120, 50)">
+        <text x="0" y="-20">---------- meet --------------------</text>
+        <g>
+          <text y="-5">xMin*</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(70,0)">
+          <text y="-5">xMid*</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(0,50)">
+          <text y="-5">xMax*</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMaxYMax meet" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+      </g>
+      <g id="meet-group-2" transform="translate(300, 50)">
+        <text x="0" y="-20">---------- meet ------------------------</text>
+        <g>
+          <text y="-5">*YMin</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMinYMin meet" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(50, 0)">
+          <text y="-5">*YMid</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(100, 0)">
+          <text y="-5">*YMax</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMaxYMax meet" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+      </g>
+      <g id="slice-group-1" transform="translate(120, 185)">
+        <text x="0" y="-20">---------- slice -------------------------</text>
+        <g>
+          <text y="-5">xMin*</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMinYMin slice" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(50,0)">
+          <text y="-5">xMid*</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMidYMid slice" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(100,0)">
+          <text y="-5">xMax*</text><rect x=".5" y=".5" width="29" height="59" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMaxYMax slice" viewBox="0 0 30 40" width="30" height="60"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+      </g>
+      <g id="slide-group-2" transform="translate(300, 155) translate(0, 30)">
+        <text x="0" y="-20">---------- slice ---------------------</text>
+        <g>
+          <text y="-5">*YMin</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMinYMin slice" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(70,0)">
+          <text y="-5">*YMid</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMidYMid slice" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+        <g transform="translate(0,50)">
+          <text y="-5">*YMax</text><rect x=".5" y=".5" width="49" height="29" fill="none" stroke="blue"/>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMaxYMax slice" viewBox="0 0 30 40" width="50" height="30"><rect x=".5" y=".5" width="29" height="39" fill="black" stroke="orange" stroke-width="2"/><g transform="translate(0, 5)"><circle cx="15" cy="15" r="10" fill="yellow"/><circle cx="12" cy="12" r="1.5" fill="black"/><circle cx="17" cy="12" r="1.5" fill="black"/><path d="M 10 19 L 15 23 20 19" stroke="black" stroke-width="2"/>
+    </g>
+  </svg>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g font-family="SVGFreeSansASCII,sans-serif" font-size="32">
+    <text id="revision" x="10" y="340" stroke="none" fill="black">$Revision: 1.1 $</text>
+  </g>
+  <rect id="test-frame" x="1" y="1" width="478" height="358" fill="none" stroke="#000000"/>
+</svg>
 <svg id="Shapes with opacity" style="width:400px;height:300px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 	<g transform="translate(200 50) rotate(60)" fill="green">
      <circle cx="100" cy="100" r="50" stroke="red" fill="rgba(125,125,125,0.2)" />
@@ -68,7 +187,7 @@ svg{border:1px dotted green;}
      </g>
    </g>
 </svg>
-<svg id="Text and graphs" style="width:600px;height:400px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<svg id="Text and graphs © www.w3.org" style="width:600px;height:400px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 	<defs>
 		<rect id="bar" width="196" height="21" fill="#88A4B9" stroke-fill="#DEE9EF" stroke-width="1"/>
 		<line id="standard-pointer" x1="0" y1="0" x2="0" y2="14" stroke="black" stroke-width="1"/>
@@ -242,7 +361,7 @@ svg{border:1px dotted green;}
 	</g>
 	<text class="publisher" font-size="9.33" x="440" y="387">THE NEW YORK TIMES</text>
 </svg>
-<svg id="Chemical danger" style="width:600px;height:500px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg id="Chemical danger © www.w3.org" style="width:600px;height:500px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <g transform="scale(0.5) translate(612 0) translate(-532.5 0)" fill="black">
     <path d="M552,598c-5,10-11,20-12,32c8,11,16,7,25,0c-2-12-7-22-13-32"/>
     <path d="M528,7c-17,3-32,13-41,28l-473,820c-10,18-10,39,0,56c10,18,29,29,49,29h947c20,0,39-11,49-29c10-17,10-38,0-56l-473-820c-12-21-35-31-58-28" fill="#fff000"/>
@@ -257,7 +376,7 @@ svg{border:1px dotted green;}
     <path d="M627,609c-7,0-8,3-7,8c1,6,4,9,7,13c12,10,25,13,37,18v3h-47c-2,6-8,10-15,10c-7,0-13-4-15-10h-4c0,4-4,7-9,7c-4,0-8-3-9-7h-42c-8,0-14,5-14,13c0,8,6,14,14,14h118c1,2,2,4,0,6h-140c-7,0-13,6-13,13c0,8,6,13,13,13h125c2,3,2,6,0,8h-112c-7,0-13,5-13,12c0,7,6,12,13,12h136c1,1,2,4,0,6h-94c-6,0-11,5-11,12c0,6,5,12,11,12h95v1c59,10,129,11,173-11v-105c-49-22-102-34-155-44c-6,1-14-2-19,1c-7-6-15-5-23-5"/>
   </g>
 </svg>
-<svg id="Planets" style="width:500px;height:400px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg id="Planets © www.w3.org" style="width:500px;height:400px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <defs>
     <g id="def" transform="translate(50,0) scale(2)">
       <g stroke="#000" fill="none" stroke-width="0.2">
@@ -282,7 +401,7 @@ svg{border:1px dotted green;}
   <use transform="translate(-200 200)" x="200" y="0" xlink:href="#def"/>
   <use x="200" y="200" xlink:href="#def"/>
 </svg>
-<svg id="Tiger (I love this one!)"  style="width:600px;height:600px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg id="Tiger (I love this one!) © www.w3.org"  style="width:600px;height:600px;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
  <g transform="translate(200,200)" fill-opacity="1" fill="none">
  <g fill="#ffffff" stroke="#000000" stroke-width="0.172">
   <path d="M-122.304 84.285C-122.304 84.285 -122.203 86.179 -123.027 86.16C-123.851 86.141 -140.305 38.066 -160.833 40.309C-160.833 40.309 -143.05 32.956 -122.304 84.285z"/>
