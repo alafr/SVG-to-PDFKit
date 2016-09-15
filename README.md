@@ -17,11 +17,12 @@ Demo:
 
 Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
- - styling with attributes only
+ - special elements: use, nested svg
+ - text elements: text, tspan and a few of their attributes
+ - styling: with attributes only
  - colors: fill & stroke (rgb, rgba, hex or string), fill-opacity, stroke-opacity & opacity
  - units: all standard units except em, ex
- - text: text, tspan and a few of their attributes
- - transform, viewBox, preserveAspectRatio attributes
+ - transformations: transform, viewBox & preserveAspectRatio attributes
 
 Unsupported:
  - css: style element and inline style
