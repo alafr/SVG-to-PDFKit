@@ -484,7 +484,11 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           Height = Choose(ParseLength(Obj.getAttribute('height'), 'y'), 0),
           X = Choose(ParseLength(Obj.getAttribute('x'), 'x'), 0),
           Y = Choose(ParseLength(Obj.getAttribute('y'), 'y'), 0),
-          PreserveRatio = ParseAspectRatio(Obj.getAttribute('preserveAspectRatio'));
+          PreserveRatio = ParseAspectRatio(Obj.getAttribute('preserveAspectRatio')),
+          Overflow = ((Obj.getAttribute('overflow') || '').trim().toLowerCase() === 'visible');
+      if (!Overflow) {
+          doc.rect(X, Y, Width, Height).clip();
+      }
       doc.fillOpacity(Choose(Styles.opacity, 1));
       var Options = {};
       if (PreserveRatio.type === 'none') {
@@ -499,7 +503,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           Options.cover = [Width, Height]; // This is not yet supported in PdfKit
         }
       }
-      if (Link && !Styles.invisible) {doc.image(Link, X, Y, Options);}
+      if (Link && !Styles.invisible) {doc.image(Link.replace(/\s+/g, ''), X, Y, Options);}
     }
 
     function addSVGShape(Obj, Styles, Tag) { // Elements: path, rect, polygon, line, polyline, circle, ellipse
