@@ -110,8 +110,8 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
   }
 }
 
-var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
-  
+var SVGtoPDF = function(doc, svg, x, y, options) {
+
     function ParseColor(v) { // Color string, rgba, rgb or hex value
       var NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0], 
            chocolate: [210,105,30], coral: [255,127,80], cornflowerblue: [100,149,237], cornsilk: [255,248,220], crimson: [220,20,60], cyan: [0,255,255], darkblue: [0,0,139], darkcyan: [0,139,139], darkgoldenrod: [184,134,11], darkgray: [169,169,169], darkgrey: [169,169,169], darkgreen: [0,100,0], darkkhaki: [189,183,107], darkmagenta: [139,0,139], darkolivegreen: [85,107,47], 
@@ -210,9 +210,13 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|em|%|)$/)
       if (temp) {
         if (temp[2] === '%') {
-          if (dir === 'x') {v = (+temp[1]) / 100 * ViewportWidth;}
-          else if (dir === 'y') {v = (+temp[1]) / 100 * ViewportHeight;}
-          else {v = (+temp[1]) / 100 * Math.sqrt(ViewportWidth * ViewportWidth + ViewportHeight * ViewportHeight);}
+          if (dir === 'x') {
+            v = (+temp[1]) / 100 * ViewportWidth;
+          } else if (dir === 'y') {
+            v = (+temp[1]) / 100 * ViewportHeight;
+          } else {
+            v = (+temp[1]) / 100 * Math.sqrt(ViewportWidth * ViewportWidth + ViewportHeight * ViewportHeight);
+          }
         } else {
           v = (+temp[1]) * Units[temp[2]];
         }
@@ -229,7 +233,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
     
     function ParseNumberList(v) {
-      return((v || '').split(/\s*,\s*|\s+/).map(function(x) {return(parseFloat(x));}));
+      return((v || '').split(/\s*,\s*|\s+/).map(function(x) {return(ParseLength(x, 'xy'));}));
     }
 
     function Choose(value1, value2) { // Something like the '||' operator but with the 0 and the empty string being accepted
@@ -409,7 +413,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           ViewportHeight = Height;
         }
       }
-      for (var i = 0, children = Obj.children; i < children.length; i++) {
+      for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
         Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
         switch(Tag2) {
           case 'g': case 'svg':
@@ -581,7 +585,7 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
     }
     
     function addSVGText(Obj, Styles, Tag) { // Elements: text, tspan (children)
-      var CurrentX = 0, CurrentY = 0, AddedText = '', Child, Tag2;
+      var CurrentTextX = 0, CurrentTextY = 0, AddedText = '', Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
         findSVGStyles(Obj, Styles, Tag);
         if (Styles.displayNone) {return;}
@@ -603,12 +607,12 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
           doc.undash();
         }
         var Length = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), null);
-        CurrentX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), CurrentX);
-        CurrentY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), CurrentY);
-        CurrentX += Choose(ParseLength(Obj.getAttribute('dx'), 'x'), 0);
-        CurrentY += Choose(ParseLength(Obj.getAttribute('dy'), 'y'), 0);
+        CurrentTextX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), CurrentTextX);
+        CurrentTextY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), CurrentTextY);
+        CurrentTextX += Choose(ParseLength(Obj.getAttribute('dx'), 'x'), 0);
+        CurrentTextY += Choose(ParseLength(Obj.getAttribute('dy'), 'y'), 0);
         var FontStylesFound = {};
-        fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound)
+        options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound)
         if (FontStylesFound.boldFound === false) {
           LineWidth = Choose(Styles.strokeWidth, 0) + Size * 0.03
           if (Styles.stroke === undefined) {
@@ -641,15 +645,15 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
                   doc.transform(Length / MeasuredTextWidth, 0, 0, 1, 0, 0)
                 }
                 if (Anchor === 'end') {
-                  CurrentX -= MeasuredTextWidth;
+                  CurrentTextX -= MeasuredTextWidth;
                 } else if (Anchor === 'middle') {
-                  CurrentX -= 0.5 * MeasuredTextWidth;
+                  CurrentTextX -= 0.5 * MeasuredTextWidth;
                 }
               }
               if (!Styles.invisible) {
-                doc._fragment(Text, CurrentX, CurrentY, {fill:true, stroke:StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
+                doc._fragment(Text, CurrentTextX, CurrentTextY, {fill:true, stroke:!!StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
               }
-              CurrentX += Length || MeasuredTextWidth;
+              CurrentTextX += Length || MeasuredTextWidth;
               AddedText += Text;
               break;
           }
@@ -657,10 +661,13 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       }
       Recursive(Obj, Styles, Tag);
     }
+    
+    var PxToPt = 72/96; // 1px = 72/96pt
+    options = options || {};
 
     if (typeof svg === 'string') {svg = ParseXml(svg);}
-    if (typeof fontCallback !== 'function') {
-      fontCallback = function(family, bold, italic) {
+    if (typeof options.fontCallback !== 'function') {
+      options.fontCallback = function(family, bold, italic) {
         if (bold && italic) {doc.font('Helvetica-BoldOblique');}
         if (bold && !italic) {doc.font('Helvetica-Bold');}
         if (!bold && italic) {doc.font('Helvetica-Oblique');}
@@ -668,9 +675,10 @@ var SVGtoPDF = function(doc, svg, x, y, fontCallback) {
       };
     }
     if (svg && svg.nodeName === 'svg') {
-      doc.save().translate(x || 0, y || 0);
-      var ViewportWidth = doc.page.width,
-          ViewportHeight = doc.page.height;
+      doc.save()
+         .translate(x || 0, y || 0).scale(PxToPt);
+      var ViewportWidth = options.width || doc.page.width / PxToPt,
+          ViewportHeight = options.height || doc.page.height / PxToPt;
       addSVGGroup(svg, {}, 'svg');
       doc.restore();
     } else {
