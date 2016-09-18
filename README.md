@@ -20,7 +20,7 @@ Supported:
  - special elements: use, nested svg
  - text elements: text, tspan and a few of their attributes
  - styling: with attributes only
- - colors: fill & stroke (rgb, rgba, hex or string), fill-opacity, stroke-opacity & opacity
+ - colors: fill, stroke & color (rgb, rgba, hex, string), fill-opacity, stroke-opacity & opacity
  - units: all standard units except em, ex
  - transformations: transform, viewBox & preserveAspectRatio attributes
 
