@@ -225,9 +225,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return(Res);
     }
 
-    function ParseLength(v, dir) { // 'em' is wrong and should be computed
-      var Units = {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'em':12};
-      var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|em|%|)$/)
+    function ParseLength(v, dir) { // 'em' & 'ex' are wrong and should be computed
+      var Units = {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'pc':96/6, 'em':12, 'ex':6};
+      var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|pc|em|ex|%|)$/)
       if (temp) {
         if (temp[2] === '%') {
           if (dir === 'x') {
