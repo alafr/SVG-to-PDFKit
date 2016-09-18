@@ -79,21 +79,23 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
     var temp, child, node, attr, value;
     if (temp = ConsumeMatch(/^<([\w-:.]+)\s*/)) { // Opening tag
       node = new SvgNode(temp[1]);
-      while (temp = ConsumeMatch(/^([\w:-]+)(?:\s*=\s*"([^"]*)"|'([^']*)')?\s*/)) { // Attribute
+      while (temp = ConsumeMatch(/^([\w:-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?\s*/)) { // Attribute
         attr = temp[1]; value = DecodeHtmlEntities(temp[2] || temp[3] || '');
         node._attributes[attr] = value;
       }
-      ConsumeMatch(/^>/); // End of opening tag
-      if (ConsumeMatch(/^\/>/)) { // Self-closing tag
+      if (ConsumeMatch(/^>/)) { // End of opening tag
+        while (child = RecursiveParse()) {
+          node.childNodes.push(child);
+          child.parentNode = node;
+        }
+        temp = ConsumeMatch(/^<\/([\w-:.]+)>/); // Closing tag
+        if (!temp || temp[1] !== node.nodeName) {
+          console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + (temp && temp[1]));
+        }
+      } else if (ConsumeMatch(/^\/>/)) { // Self-closing tag
         return(node);
-      }
-      while (child = RecursiveParse()) {
-        node.childNodes.push(child);
-        child.parentNode = node;
-      }
-      temp = ConsumeMatch(/^<\/([\w-:.]+)>/); // Closing tag
-      if (!temp || temp[1] !== node.nodeName) {
-        console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + (temp && temp[1]));
+      } else {
+        console.log('Error: ParseXml: tag could not be parsed ' + node.nodeName);
       }
       return(node);
     } else if (temp = ConsumeMatch(/^([^<]+)/)) { // Text node
@@ -317,14 +319,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             break;
           case 'fill-opacity':
             value = parseFloat(value)
-            if (value >= 0 && value <= 1) {
-              Styles.fillOpacity = value;
+            if (value > -Infinity && value < Infinity) {
+              Styles.fillOpacity = Math.max(0, Math.min(1, value));
             }
             break;
           case 'stroke-opacity':
             value = parseFloat(value)
-            if (value >= 0 && value <= 1) {
-              Styles.strokeOpacity = value;
+            if (value > -Infinity && value < Infinity) {
+              Styles.strokeOpacity = Math.max(0, Math.min(1, value));
             }
             break;
           case 'fill-rule':
