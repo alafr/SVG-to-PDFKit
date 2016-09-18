@@ -80,7 +80,7 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
     if (temp = ConsumeMatch(/^<([\w-:.]+)\s*/)) { // Opening tag
       node = new SvgNode(temp[1]);
       while (temp = ConsumeMatch(/^([\w:-]+)(?:\s*=\s*"([^"]*)"|'([^']*)')?\s*/)) { // Attribute
-        attr = temp[1]; value = temp[2] || temp[3] || '';
+        attr = temp[1]; value = DecodeHtmlEntities(temp[2] || temp[3] || '');
         node._attributes[attr] = value;
       }
       ConsumeMatch(/^>/); // End of opening tag
@@ -118,7 +118,6 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
          trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744, 
          cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
     return(Str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
-      console.log(mt, m0,m1,m2)
       if (m0) {return(String.fromCharCode(parseInt(m0, 10)));}
       else if (m1) {return(String.fromCharCode(parseInt(m1, 16)));}
       else {return(String.fromCharCode(Entities[m2]) || mt);}
@@ -236,7 +235,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else if (dir === 'y') {
             v = (+temp[1]) / 100 * ViewportHeight;
           } else {
-            v = (+temp[1]) / 100 * Math.sqrt(ViewportWidth * ViewportWidth + ViewportHeight * ViewportHeight);
+            v = (+temp[1]) / 100 * Math.sqrt(0.5 * ViewportWidth * ViewportWidth + 0.5 * ViewportHeight * ViewportHeight);
           }
         } else {
           v = (+temp[1]) * Units[temp[2]];
