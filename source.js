@@ -274,6 +274,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
 
     function findSVGStyles(Obj, Styles, Tag) { // The styles from the attributes, css is unsupported
+      Styles.currentColor = ParseColor(Obj.getAttribute('color')) || Styles.currentColor;
       var Attributes = Obj.attributes;
       for (var i = 0; i < Attributes.length; i++) {
         var name = Attributes[i].name.toLowerCase(), value0 = Attributes[i].value, value = value0.trim().toLowerCase();
@@ -302,10 +303,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
             break;
           case 'fill':
-            Styles.fill = ParseColor(value) || Styles.fill;
+            if (value === 'currentcolor') {
+              Styles.fill = Styles.currentColor;
+            } else {
+              Styles.fill = ParseColor(value) || Styles.fill;
+            }
             break;
           case 'stroke':
-            Styles.stroke = ParseColor(value) || Styles.stroke;
+            if (value === 'currentcolor') {
+              Styles.stroke = Styles.currentColor;
+            } else {
+              Styles.stroke = ParseColor(value) || Styles.stroke;
+            }
             break;
           case 'fill-opacity':
             value = parseFloat(value)
