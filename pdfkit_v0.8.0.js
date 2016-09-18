@@ -19966,9 +19966,15 @@ By Devon Govett
       if (length == null) {
         return this;
       }
-      space = (ref = options.space) != null ? ref : length;
-      phase = options.phase || 0;
-      return this.addContent("[" + length + " " + space + "] " + phase + " d");
+      if (Array.isArray(length)) {
+        length = length.join(' ');
+        phase = options.phase || 0;
+        return this.addContent("[" + length + "] " + phase + " d");
+      } else {
+        space = (ref = options.space) != null ? ref : length;
+        phase = options.phase || 0;
+        return this.addContent("[" + length + " " + space + "] " + phase + " d");
+      }
     },
     undash: function() {
       return this.addContent("[] 0 d");
