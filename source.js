@@ -341,7 +341,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           case 'stroke-dasharray':
             value = ParseNumberList(value);
             if (value.every(function(x) {return(x >= 0 && x < Infinity);})) {
+              if (value.length % 2 === 1) {
+                value = value.concat(value);
+              }
               Styles.strokeDasharray = value;
+            }
+            break;
+          case 'stroke-dashoffset':
+            value = ParseLength(value, 'xy');
+            if (value > -Infinity && value < Infinity) {
+              Styles.strokeDashoffset = value;
             }
             break;
           case 'stroke-miterlimit':
@@ -549,13 +558,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
          .lineWidth(Choose(Styles.strokeWidth, 1))
          .miterLimit(Choose(Styles.strokeMiterlimit, 10))
          .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
-         .lineCap(Choose(Styles.strokeLinecap, 'butt'));
+         .lineCap(Choose(Styles.strokeLinecap, 'butt'))
+         .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)});
       var FillRule = Choose(Styles.fillRule, 'non-zero');
-      if (Styles.strokeDasharray && Styles.strokeDasharray.length >= 2) {
-        doc.dash(Styles.strokeDasharray[0], {space:Styles.strokeDasharray[1]});
-      } else {
-        doc.undash();
-      }
       if (Tag === 'path') {
         if (!Styles.invisible) {
           doc.path(Obj.getAttribute('d')).fillAndStroke(FillRule);
@@ -629,12 +634,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.miterLimit(Choose(Styles.strokeMiterlimit, 2))
            .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
            .lineCap(Choose(Styles.strokeLinecap, 'butt'))
-           .fontSize(Size);
-        if (Styles.strokeDasharray && Styles.strokeDasharray.length >= 2 && Styles.stroke) {
-          doc.dash(Styles.strokeDasharray[0], {space:Styles.strokeDasharray[1]});
-        } else {
-          doc.undash();
-        }
+           .fontSize(Size)
+           .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)});
         var Length = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), null);
         CurrentTextX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), CurrentTextX);
         CurrentTextY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), CurrentTextY);
@@ -643,7 +644,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         var FontStylesFound = {};
         options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound)
         if (FontStylesFound.boldFound === false) {
-          LineWidth = Choose(Styles.strokeWidth, 0) + Size * 0.03
+          LineWidth = Choose(Styles.strokeWidth, 0) + Size * 0.03;
           if (Styles.stroke === undefined) {
             StrokeColor = FillColor;
           }
