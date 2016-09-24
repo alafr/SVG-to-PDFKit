@@ -20,6 +20,7 @@ PDFDocument.prototype.createGroup = function() {
 PDFDocument.prototype.closeGroup = function(group) {
   this.page.xobjects[group.name] = group.xobj;
   group.xobj.end();
+  group.closed = true;
   this._writeTarget = null;
   return(this);
 };
