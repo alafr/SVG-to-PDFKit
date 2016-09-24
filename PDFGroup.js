@@ -30,6 +30,7 @@ PDFDocument.prototype.insertGroup = function(group) {
   return(this);
 };
 PDFDocument.prototype.applyMask = function(group, clip) {
+  if (!group.closed) {this.closeGroup(group);}
   var name = 'M'+ (this._maskCount = (this._maskCount || 0) + 1);
   var gstate = doc.ref({
     Type: 'ExtGState',
