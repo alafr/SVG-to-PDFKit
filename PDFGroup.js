@@ -12,7 +12,7 @@ PDFDocument.prototype.createGroup = function() {
     Subtype: 'Form', 
     FormType: 1, 
     BBox: [0, 0, this.page.width, this.page.height], 
-    Group: {S: 'Transparency', CS: 'DeviceRGB', I: false, K: false}
+    Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
   });
   group.previousGroup = this._currentGroup;
   this._currentGroup = group;
