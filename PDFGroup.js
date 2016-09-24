@@ -14,6 +14,8 @@ PDFDocument.prototype.createGroup = function() {
     BBox: [0, 0, this.page.width, this.page.height], 
     Group: {S: 'Transparency', CS: 'DeviceRGB', I: false, K: false}
   });
+  group.previousGroup = this._currentGroup;
+  this._currentGroup = group;
   this._writeTarget = group.xobj;
   return(group);
 };
@@ -21,12 +23,20 @@ PDFDocument.prototype.closeGroup = function(group) {
   this.page.xobjects[group.name] = group.xobj;
   group.xobj.end();
   group.closed = true;
-  this._writeTarget = null;
+  if (group.previousGroup && !group.previousGroup.closed) {
+    this._currentGroup = group.previousGroup;
+    this._writeTarget = group.previousGroup.xobj;
+  } else {
+    this._currentGroup = null;
+    this._writeTarget = null;
+  }
   return(this);
 };
 PDFDocument.prototype.insertGroup = function(group) {
   if (!group.closed) {this.closeGroup(group);}
-  this.addContent('/' + group.name + ' Do');
+  if (this.page.xobjects[group.name]) {
+    this.addContent('/' + group.name + ' Do');
+  }
   return(this);
 };
 PDFDocument.prototype.applyMask = function(group, clip) {
@@ -42,4 +52,4 @@ PDFDocument.prototype.applyMask = function(group, clip) {
   doc.page.ext_gstates[name] = gstate;
   gstate.end();
   doc.addContent("/" + name + " gs");
-}
+};
