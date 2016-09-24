@@ -29,3 +29,16 @@ PDFDocument.prototype.insertGroup = function(group) {
   this.addContent('/' + group.name + ' Do');
   return(this);
 };
+PDFDocument.prototype.applyMask = function(group, clip) {
+  var name = 'M'+ (this._maskCount = (this._maskCount || 0) + 1);
+  var gstate = doc.ref({
+    Type: 'ExtGState',
+    CA: 1,
+    ca: 1,
+    BM: 'Normal',
+    SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
+  });
+  doc.page.ext_gstates[name] = gstate;
+  gstate.end();
+  doc.addContent("/" + name + " gs");
+}
