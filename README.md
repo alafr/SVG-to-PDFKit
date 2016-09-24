@@ -26,9 +26,9 @@ Supported:
 
 Unsupported:
  - css: style element and inline style
- - text: textPath & most attributes of text & tspan elements
- - foreignElement, clip paths, gradients
- - opacity for groups is incorrect (can't be fixed now)
+ - text: textPath (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/8">#8</a>) & most attributes of text & tspan elements
+ - foreignElement, clip paths (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/7">#7</a>), gradients
+ - opacity for groups is incorrect (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/9">#9</a>)
  - other things I don't even know they exist
 
 Warning: some features depend on options not yet commited into PdfKit will only work in the demo.
