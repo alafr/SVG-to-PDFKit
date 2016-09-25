@@ -15,41 +15,40 @@ PDFDocument.prototype.createGroup = function() {
     Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
   });
   group.previousGroup = this._currentGroup;
-  this._currentGroup = group;
-  this._writeTarget = group.xobj;
+  this.writeToGroup(group);
   return(group);
 };
-PDFDocument.prototype.closeGroup = function(group) {
-  this.page.xobjects[group.name] = group.xobj;
-  group.xobj.end();
-  group.closed = true;
-  if (group.previousGroup && !group.previousGroup.closed) {
-    this._currentGroup = group.previousGroup;
-    this._writeTarget = group.previousGroup.xobj;
+PDFDocument.prototype.writeToGroup = function(group) {
+  if (group && !group.closed) {
+    this._currentGroup = group;
+    this._writeTarget = group.xobj;
   } else {
     this._currentGroup = null;
     this._writeTarget = null;
   }
   return(this);
 };
+PDFDocument.prototype.closeGroup = function(group) {
+  this.page.xobjects[group.name] = group.xobj;
+  group.xobj.end();
+  group.closed = true;
+  this.writeToGroup(group.previousGroup);
+  return(this);
+};
 PDFDocument.prototype.insertGroup = function(group) {
   if (!group.closed) {this.closeGroup(group);}
-  if (this.page.xobjects[group.name]) {
-    this.addContent('/' + group.name + ' Do');
-  }
+  this.addContent('/' + group.name + ' Do');
   return(this);
 };
 PDFDocument.prototype.applyMask = function(group, clip) {
   if (!group.closed) {this.closeGroup(group);}
   var name = 'M'+ (this._maskCount = (this._maskCount || 0) + 1);
-  var gstate = doc.ref({
-    Type: 'ExtGState',
-    CA: 1,
-    ca: 1,
-    BM: 'Normal',
+  var gstate = this.ref({
+    Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
     SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
   });
-  doc.page.ext_gstates[name] = gstate;
+  this.page.ext_gstates[name] = gstate;
   gstate.end();
-  doc.addContent("/" + name + " gs");
+  this.addContent("/" + name + " gs");
+  return(this);
 };
