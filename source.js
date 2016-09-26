@@ -122,7 +122,8 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
     return(Str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
       if (m0) {return(String.fromCharCode(parseInt(m0, 10)));}
       else if (m1) {return(String.fromCharCode(parseInt(m1, 16)));}
-      else {return(String.fromCharCode(Entities[m2]) || mt);}
+      else if (m2 && Entities[m2]) {return(String.fromCharCode(Entities[m2]));}
+      else {return(mt);}
     }));
   }
 };
