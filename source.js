@@ -1128,6 +1128,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     }
 
+    function TextBoundingShape(Obj) {
+      var pathCommands = [];
+      for (var i = 0; i < Obj._pos.length; i++) {
+        var pos = Obj._pos[i];
+        if (!pos.hidden) {
+          var dx1 = - pos.height * Math.sin(pos.rotate), dx2 = pos.width * Math.cos(pos.rotate),
+              dy1 = pos.height * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
+          pathCommands.push(['M', pos.x, pos.y]);
+          pathCommands.push(['L', pos.x + dx2, pos.y + dy2]);
+          pathCommands.push(['M', pos.x + dx1 + dx2, pos.y + dy1 + dy2]);
+          pathCommands.push(['L', pos.x + dx1, pos.y + dy1]);
+        }
+      }
+      return(new SvgShape(pathCommands));
+    }
+
     function ComputeTextPositioning(Obj, Styles, Tag) {
       var ProcessedText = '', RemainingText = Obj.textContent;
       var CurrentChunk = [], CurrentAnchor = undefined;
@@ -1259,6 +1275,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       }
       DoPositioningRecursive(Obj, Styles, Tag, null);
+    //  TextBoundingShape(Obj).insertInDocument(doc); doc.stroke('red'); // Temporary debugging
     //  console.log(Obj._pos); // Temporary debugging
     }
     
