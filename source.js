@@ -445,16 +445,24 @@ var ParseXml = function(XmlString) { // Convert a XML string into an object simu
           node.childNodes.push(child);
           child.parentNode = node;
         }
-        temp = ConsumeMatch(/^<\/([\w-:.]+)>/); // Closing tag
-        if (!temp || temp[1] !== node.nodeName) {
-          console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + (temp && temp[1]));
+        if (temp = ConsumeMatch(/^<\/([\w-:.]+)>/)) { // Closing tag
+          if (temp[1] === node.nodeName) {
+            return(node);
+          } else {
+            console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + temp[1]);
+            node.error = true;
+            return(node);
+          }
+        } else {
+          console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & not closing');
+          node.error = true;
+          return(node);
         }
       } else if (ConsumeMatch(/^\/>/)) { // Self-closing tag
         return(node);
       } else {
         console.log('Error: ParseXml: tag could not be parsed ' + node.nodeName);
       }
-      return(node);
     } else if (temp = ConsumeMatch(/^([^<]+)/)) { // Text node
       node = new SvgNode('#text');
       node.nodeValue = DecodeHtmlEntities(temp[1]);
@@ -1164,15 +1172,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       function DoPositioningRecursive(Obj, Styles, Tag, Parent) {
         findSVGStyles(Obj, Styles, Tag);
-        if (Tag === 'textpath') {
-          Obj._x = Obj._y = Obj._dx = Obj._dy = Obj._rot = [];
-        } else {
-          Obj._x = CombineArrays(ParseLengthList(Obj.getAttribute('x'), 'x'), (Parent ? Parent._x.slice(Parent._pos.length) : []));
-          Obj._y = CombineArrays(ParseLengthList(Obj.getAttribute('y'), 'y'), (Parent ? Parent._y.slice(Parent._pos.length) : []));
-          Obj._dx = CombineArrays(ParseLengthList(Obj.getAttribute('dx'), 'x'), (Parent ? Parent._dx.slice(Parent._pos.length) : []));
-          Obj._dy = CombineArrays(ParseLengthList(Obj.getAttribute('dy'), 'y'), (Parent ? Parent._dy.slice(Parent._pos.length) : []));
-          Obj._rot = CombineArrays(ParseNumberList(Obj.getAttribute('rotate')), (Parent ? Parent._rot.slice(Parent._pos.length) : []));
-        }
+        Obj._x = CombineArrays(ParseLengthList(Obj.getAttribute('x'), 'x'), (Parent ? Parent._x.slice(Parent._pos.length) : []));
+        Obj._y = CombineArrays(ParseLengthList(Obj.getAttribute('y'), 'y'), (Parent ? Parent._y.slice(Parent._pos.length) : []));
+        Obj._dx = CombineArrays(ParseLengthList(Obj.getAttribute('dx'), 'x'), (Parent ? Parent._dx.slice(Parent._pos.length) : []));
+        Obj._dy = CombineArrays(ParseLengthList(Obj.getAttribute('dy'), 'y'), (Parent ? Parent._dy.slice(Parent._pos.length) : []));
+        Obj._rot = CombineArrays(ParseNumberList(Obj.getAttribute('rotate')), (Parent ? Parent._rot.slice(Parent._pos.length) : []));
+        if (Tag === 'textpath') {Obj._y = [];}
         var FontStylesFound = {};
         options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound);
         Obj._pos = [];
@@ -1201,6 +1206,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               break;
             case '#text':
               var rawText = Child.nodeValue, renderedText = rawText;
+              Child._font = Obj._font;
+              Child._pos = [];
               RemainingText = RemainingText.substring(rawText.length);
               if (!Styles.preserveWhiteSpace) {
                 renderedText = renderedText.replace(/[\s]+/g, ' ');
@@ -1210,7 +1217,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               ProcessedText += rawText;
               var pos = getTextPos(Obj._font.font, Obj._font.size, renderedText);
               for (var j = 0; j < pos.length; j++) {
-                var indexInElement = Obj._pos.length + j;
+                var indexInElement = Obj._pos.length;
                 if (Obj._x[indexInElement] !== undefined) {DoAnchoring(); CurrentX = Obj._x[indexInElement];}
                 if (Obj._y[indexInElement] !== undefined) {DoAnchoring(); CurrentY = Obj._y[indexInElement];}
                 pos[j].rotate = Obj._rot[Math.min(indexInElement, Obj._rot.length - 1)] || 0;
@@ -1221,11 +1228,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 pos[j].hidden = false;
                 CurrentX = pos[j].x + pos[j].xAdvance;
                 CurrentY = pos[j].y + pos[j].yAdvance - Baseline;
+                CurrentChunk.push(pos[j]);
+                Child._pos.push(pos[j]);
+                Obj._pos.push(pos[j]);
               }
-              Child._font = Obj._font;
-              Child._pos = pos;
-              Obj._pos = Obj._pos.concat(pos);
-              CurrentChunk = CurrentChunk.concat(pos);
               break;
           }
         }
