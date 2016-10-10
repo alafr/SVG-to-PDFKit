@@ -1,3 +1,360 @@
+"use strict";
+var SvgBezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
+  var solveEquation = function(curve) {
+    if (curve.length > 3) {console.log('Error: Bezier>solveEquation: unsolvable equation ' + curve.join(','));}
+    var a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
+    if (Math.abs(a) < 1e-10 && Math.abs(b) < 1e-10) {
+      return([]);
+    } else if (Math.abs(a) < 1e-10) {
+      return([(-c) / b]);
+    } else {
+      var d = b * b - 4 * a * c;
+      if (d > 0) {
+        return([(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)]);
+      } else if (d === 0) {
+        return([(-b) / (2 * a)]);
+      } else {
+        return([]);
+      }
+    }
+  };
+  var getCurveValue = function(t, curve) {
+    return((curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t);
+  };
+  var divisions = 15; // the accuracy isn't perfect but comparable to the arc-to-bezier conversion
+  var equationX = [p1x, -3*p1x+3*c1x, 3*p1x-6*c1x+3*c2x, -p1x+3*c1x-3*c2x+p2x];
+  var equationY = [p1y, -3*p1y+3*c1y, 3*p1y-6*c1y+3*c2y, -p1y+3*c1y-3*c2y+p2y];
+  var derivativeX = [-3*p1x+3*c1x, 6*p1x-12*c1x+6*c2x, -3*p1x+9*c1x-9*c2x+3*p2x];
+  var derivativeY = [-3*p1y+3*c1y, 6*p1y-12*c1y+6*c2y, -3*p1y+9*c1y-9*c2y+3*p2y];
+  var lengthMap = (function() {
+    var lengthMap = [0];
+    for (var i = 1; i <= divisions; i++) {
+      var t = (i - 0.5) / divisions;
+      var dx = getCurveValue(t, derivativeX) / divisions,
+          dy = getCurveValue(t, derivativeY) / divisions,
+          l = Math.sqrt(dx*dx+dy*dy);
+      lengthMap[i] = lengthMap[i - 1] + l;
+    }
+    return(lengthMap)
+  })();
+  var totalLength = this.totalLength = lengthMap[divisions];
+  var boundingBox = this.boundingBox = (function() {
+    var temp;
+    var minX = getCurveValue(0, equationX), minY = getCurveValue(0, equationY),
+        maxX = getCurveValue(1, equationX), maxY = getCurveValue(1, equationY);
+    if (minX > maxX) {temp = maxX; maxX = minX; minX = temp;}
+    if (minY > maxY) {temp = maxY; maxY = minY; minY = temp;}
+    solveEquation(derivativeX).forEach(function(t) {
+      if (t >= 0 && t <= 1) {
+        var x = getCurveValue(t, equationX);
+        if (x < minX) {minX = x;}
+        if (x > maxX) {maxX = x;}
+      }
+    });
+    solveEquation(derivativeY).forEach(function(t) {
+      if (t >= 0 && t <= 1) {
+        var y = getCurveValue(t, equationY);
+        if (y < minY) {minY = y;}
+        if (y > maxY) {maxY = y;}
+      }
+    });
+    return([minX, minY, maxX, maxY]);
+  })();
+  this.getPointAtLength = function(l) {
+    var i = 0;
+    for (var i = 1; i <= divisions; i++) {
+      var l1 = lengthMap[i-1], l2 = lengthMap[i];
+      if (l1 <= l && l <= l2) {
+        var t = (i - (l2 - l) / (l2 - l1)) / divisions;
+        var x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
+            dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
+        return([x, y, Math.atan2(dy, dx)]);
+      }
+    }
+  }
+}
+var SvgLineSegment = function(p1x, p1y, p2x, p2y) {
+  var totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
+  var boundingBox = this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
+  this.getPointAtLength = function(l) {
+    if (l >= 0 && l <= totalLength) {
+      var r = l / totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
+      return([x, y, Math.atan2(p2y - p1y, p2x - p1x)]);
+    }
+  }
+}
+var SvgPath = function(d) {
+  var RawPath = [];
+  var pathCommands = [];
+  (function Parse() {
+    d = (d || '').trim();
+    var ArgumentsNumber = {A: 7, C: 6, H: 1, L: 2, M: 2, Q: 4, S: 4, T: 2, V: 1, Z: 0}
+    var RegexNumber = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?/, RegexCommand = /^[astvzqmhlcASTVZQMHLC]/, RegexDelim = /^(?:\s*,\s*|\s*)/;
+    function ConsumeMatch(RegExp) {
+      var temp = d.match(RegExp);
+      if (!temp) {return;}
+      d = d.slice(temp[0].length);
+      return(temp);
+    }
+    var Command, Value, Values, ArgsNumber;
+    while (Command = ConsumeMatch(RegexCommand)) {
+      Command = Command[0];
+      ConsumeMatch(RegexDelim);
+      ArgsNumber = ArgumentsNumber[Command.toUpperCase()];
+      Values = [];
+      while (Value = ConsumeMatch(RegexNumber)) {
+        Value = Value[0];
+        ConsumeMatch(RegexDelim);
+        if (Values.length === ArgsNumber) {
+          RawPath.push([Command].concat(Values));
+          Values = [];
+          if (Command === 'M') {Command = 'L';}
+          else if (Command === 'm') {Command = 'l';}
+        }
+        Values.push(Number(Value));
+      }
+      if (Values.length === ArgsNumber) {
+        RawPath.push([Command].concat(Values));
+      } else {
+        console.log('Error: ParseSvgPath: Command ' + Command + ' with ' + Values.length + ' numbers'); break;
+      }
+    }
+    if (d.length !== 0) {
+      console.log('Error: ParseSvgPath: Unexpected string ' + d);
+    }
+  })();
+  (function Normalize() { // convert all path commands to M, L, C, Z
+    function MoveTo(x, y) {
+      pathCommands.push(['M', x, y]);
+      StartX = CurrentX = x; StartY = CurrentY = y; LastCommand = 'M';
+    }
+    function ClosePath() {
+      pathCommands.push(['Z']);
+      CurrentX = StartX; CurrentY = StartY;
+    }
+    function LineTo(x, y) {
+      pathCommands.push(['L', x, y]);
+      CurrentX = x; CurrentY = y; LastCommand = 'L';
+    }
+    function CubicTo(c1x, c1y, c2x, c2y, x, y) {
+      pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
+      CurrentX = x; CurrentY = y; LastCommand = 'C'; LastCtrlX = c2x; LastCtrlY = c2y;
+    }
+    function QuadraticTo(cx, cy, x, y) {
+      var c1x = CurrentX + 2 / 3 * (cx - CurrentX), c1y = CurrentY + 2 / 3 * (cy - CurrentY),
+          c2x = x + 2 / 3 * (cx - x), c2y = y + 2 / 3 * (cy - y);
+      pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
+      CurrentX = x; CurrentY = y; LastCommand = 'Q'; LastCtrlX = cx; LastCtrlY = cy;
+    }
+    function ArcTo(rx, ry, rotAngle, arcLarge, arcSweep, x, y) { // From PDFKit
+      var xInit = CurrentX, yInit = CurrentY, xEnd = x, yEnd = y;
+      rx = Math.abs(rx); ry = Math.abs(ry); arcLarge = 1*!!arcLarge; arcSweep = 1*!!arcSweep;
+      var th = rotAngle * (Math.PI / 180),
+          sin_th = Math.sin(th),
+          cos_th = Math.cos(th);
+      var px = cos_th * (xInit - xEnd) * 0.5 + sin_th * (yInit - yEnd) * 0.5,
+          py = cos_th * (yInit - yEnd) * 0.5 - sin_th * (xInit - xEnd) * 0.5,
+          pl = (px * px) / (rx * rx) + (py * py) / (ry * ry);
+      if (pl > 1) {
+        pl = Math.sqrt(pl);
+        rx *= pl;
+        ry *= pl;
+      }
+      var a00 = cos_th / rx,
+          a01 = sin_th / rx,
+          a10 = -sin_th / ry,
+          a11 = cos_th / ry,
+          _a00 = cos_th * rx,
+          _a01 = -sin_th * ry,
+          _a10 = sin_th * rx,
+          _a11 = cos_th * ry;
+      var x0 = a00 * xInit + a01 * yInit,
+          y0 = a10 * xInit + a11 * yInit,
+          x1 = a00 * xEnd + a01 * yEnd,
+          y1 = a10 * xEnd + a11 * yEnd;
+      var sfactor = Math.sqrt(Math.max(0, 1 / ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) - 0.25));
+      if (arcSweep === arcLarge) {sfactor = -sfactor;}
+      var xc = 0.5 * (x0 + x1) - sfactor * (y1 - y0),
+          yc = 0.5 * (y0 + y1) + sfactor * (x1 - x0);
+      var th0 = Math.atan2(y0 - yc, x0 - xc),
+          th1 = Math.atan2(y1 - yc, x1 - xc),
+          th_arc = th1 - th0;
+      if (th_arc < 0 && arcSweep === 1) {
+        th_arc += 2 * Math.PI;
+      } else if (th_arc > 0 && arcSweep === 0) {
+        th_arc -= 2 * Math.PI;
+      }
+      var segments = Math.ceil(Math.abs(th_arc / (Math.PI * 0.5 + 0.001)));
+      for (var i = 0; i < segments; i++) {
+        var th2 = th0 + i * th_arc / segments,
+            th3 = th0 + (i + 1) * th_arc / segments,
+            th_half = 0.5 * (th3 - th2);
+        var t = 8/3 * Math.sin(th_half * 0.5) * Math.sin(th_half * 0.5) / Math.sin(th_half);
+        var x1 = xc + Math.cos(th2) - t * Math.sin(th2),
+            y1 = yc + Math.sin(th2) + t * Math.cos(th2),
+            x3 = xc + Math.cos(th3),
+            y3 = yc + Math.sin(th3),
+            x2 = x3 + t * Math.sin(th3),
+            y2 = y3 - t * Math.cos(th3);
+        pathCommands.push(['C', _a00 * x1 + _a01 * y1, _a10 * x1 + _a11 * y1, _a00 * x2 + _a01 * y2, _a10 * x2 + _a11 * y2, _a00 * x3 + _a01 * y3, _a10 * x3 + _a11 * y3]);
+      }
+      CurrentX = x; CurrentY = y; LastCommand = 'A';
+    }
+    var StartX = 0, StartY = 0, CurrentX = 0, CurrentY = 0, LastCommand, LastCtrlX, LastCtrlY;
+    for (var i = 0; i < RawPath.length; i++) {
+      var Values = RawPath[i];
+      switch(Values[0]) {
+        case 'M':  MoveTo(Values[1], Values[2]);  break;
+        case 'L':  LineTo(Values[1], Values[2]);  break;
+        case 'H':  LineTo(Values[1], CurrentY);  break;
+        case 'V':  LineTo(CurrentX, Values[1]);  break;
+        case 'Z': case 'z':  ClosePath();  break;
+        case 'm':  MoveTo(Values[1] + CurrentX, Values[2] + CurrentY);  break;
+        case 'l':  LineTo(CurrentX + Values[1], CurrentY + Values[2]);  break;
+        case 'h':  LineTo(CurrentX + Values[1], CurrentY);  break;
+        case 'v':  LineTo(CurrentX, CurrentY + Values[1]);  break;
+        case 'Q':  QuadraticTo(Values[1], Values[2], Values[3], Values[4]);  break;
+        case 'q':  QuadraticTo(CurrentX + Values[1], CurrentY + Values[2], CurrentX + Values[3], CurrentY + Values[4]);  break;
+        case 'T':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3], Values[4]);  break;
+        case 't':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3] + CurrentX, Values[4] + CurrentY);  break;
+        case 'C':  CubicTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]); break;
+        case 'c':  CubicTo(Values[1] + CurrentX, Values[2] + CurrentY, Values[3] + CurrentX, Values[4] + CurrentY, Values[5] + CurrentX, Values[6] + CurrentY); break;
+        case 'S':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2], Values[3], Values[4], Values[5]);  break;
+        case 's':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2] + CurrentX, Values[3] + CurrentY, Values[4] + CurrentX, Values[5] + CurrentX); break;
+        case 'A':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6], Values[7]); break;
+        case 'a':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6] + CurrentX, Values[7] + CurrentY); break;
+      }
+    }
+  })();
+  SvgShape.call(this, pathCommands);
+}
+var SvgRect = function(x, y, w, h, rx, ry) {
+  rx = rx || 0; ry = ry || rx;
+  var pathCommands, k = (4 / 3) * (Math.sqrt(2) - 1);
+  if (rx && ry) {
+    var cx = Math.min(rx, 0.5 * w) * (1.0 - k), cy = Math.min(ry, 0.5 * h) * (1.0 - k);
+    pathCommands = [
+      ['M', x + rx, y],
+      ['L', x + w - rx, y],
+      ['C', x + w - cx, y, x + w, y + cy, x + w, y + ry],
+      ['L', x + w, y + h - ry],
+      ['C', x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h],
+      ['L', x + rx, y + h],
+      ['C', x + cx, y + h, x, y + h - cy, x, y + h - ry],
+      ['L', x, y + ry],
+      ['C', x, y + cy, x + cx, y, x + rx, y],
+      ['Z']];
+  } else {
+    pathCommands = [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['Z']];
+  }
+  SvgShape.call(this, pathCommands);
+}
+var SvgEllipse = function(cx, cy, rx, ry) {
+  var k = (4 / 3) * (Math.sqrt(2) - 1), ox = rx * k, oy = ry * k
+  var pathCommands = [
+    ['M', cx - rx, cy],
+    ['C', cx - rx, cy - oy, cx - ox, cy - ry, cx, cy - ry],
+    ['C', cx + ox, cy - ry, cx + rx, cy - oy, cx + rx, cy],
+    ['C', cx + rx, cy + oy, cx + ox, cy + ry, cx, cy + ry],
+    ['C', cx - ox, cy + ry, cx - rx, cy + oy, cx - rx, cy],
+    ['Z']];
+  SvgShape.call(this, pathCommands);
+}
+var SvgCircle = function(cx, cy, r) {
+  SvgEllipse.call(this, cx, cy, r, r);
+}
+var SvgLine = function(x1, y1, x2, y2) {
+  var pathCommands = [['M', x1, y1], ['L', x2, y1]];
+  SvgShape.call(this, pathCommands);
+}
+var SvgPolyline = function(points) {
+  SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' '));
+}
+var SvgPolygon = function(points) {
+  SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ') + ' Z');
+}
+var SvgShape = function(pathCommands) {
+  this.pathCommands = pathCommands;
+  var transform = this.transform = function(m1, m2, m3, m4, m5, m6) {
+    var newPathCommands = [];
+    for (var i = 0; i < pathCommands.length; i++) {
+      var Values = pathCommands[i].slice();
+      for (var j = 1; j < Values.length; j+=2) {
+        var x = Values[j], y = Values[j+1];
+        Values[j] = m1 * x + m3 * y + m5;
+        Values[j+1] = m2 * x + m4 * y + m6;
+      }
+      newPathCommands.push(Values);
+    }
+    return(new SvgShape(newPathCommands));
+  };
+  var pathSegments = this.pathSegments = (function() {
+    var CurrentX = 0, CurrentY = 0, StartX = 0, StartY = 0, segments = [];
+    for (var i = 0; i < pathCommands.length; i++) {
+      var Values = pathCommands[i];
+      switch(Values[0]) {
+        case 'M':
+          StartX = CurrentX = Values[1]; StartY = CurrentY = Values[2];  break;
+        case 'L':
+          segments.push(new SvgLineSegment(CurrentX, CurrentY, Values[1], Values[2]));
+          CurrentX = Values[1]; CurrentY = Values[2];  break;
+        case 'C':
+          segments.push(new SvgBezierSegment(CurrentX, CurrentY, Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]));
+          CurrentX = Values[5]; CurrentY = Values[6];  break;
+        case 'Z':
+          segments.push(new SvgLineSegment(CurrentX, CurrentY, StartX, StartY));
+          CurrentX = StartX; CurrentY = StartY;  break;
+      }
+    }
+    return(segments);
+  })();
+  var boundingBox = this.boundingBox = (function() {
+    var bbox = [Infinity, Infinity, -Infinity, -Infinity];
+    function AddBounds(bbox1) {
+      if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
+      if (bbox1[2] > bbox[2]) {bbox[2] = bbox1[2];}
+      if (bbox1[1] < bbox[1]) {bbox[1] = bbox1[1];}
+      if (bbox1[3] > bbox[3]) {bbox[3] = bbox1[3];}
+    }
+    for (var i = 0; i < pathSegments.length; i++) {
+      AddBounds(pathSegments[i].boundingBox);
+    }
+    if (bbox[0] === Infinity) {bbox[0] = 0;}
+    if (bbox[1] === Infinity) {bbox[1] = 0;}
+    if (bbox[2] === -Infinity) {bbox[2] = 0;}
+    if (bbox[3] === -Infinity) {bbox[3] = 0;}
+    return(bbox);
+  })();
+  var totalLength = this.totalLength = (function() {
+    var length = 0;
+    for (var i = 0; i < pathSegments.length; i++) {
+      length += pathSegments[i].totalLength;
+    }
+    return(length);
+  })();
+  var getPointAtLength = this.getPointAtLength = function(l) {
+    for (var i = 0; i < pathSegments.length; i++) {
+      if (l > pathSegments[i].totalLength) {
+        l -= pathSegments[i].totalLength;
+      } else {
+        return(pathSegments[i].getPointAtLength(l));
+      }
+    }
+  };
+  var insertInDocument = this.insertInDocument = function(doc) {
+    for (var i = 0; i < pathCommands.length; i++) {
+      var Values = pathCommands[i];
+      switch(Values[0]) {
+        case 'M':  doc.moveTo(Values[1], Values[2]);  break;
+        case 'L':  doc.lineTo(Values[1], Values[2]);  break;
+        case 'C':  doc.bezierCurveTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]);  break;
+        case 'Z':  doc.closePath();  break;
+      }
+    }
+    return(doc);
+  }
+}
+
 var ParseXml = function(XmlString) { // Convert a XML string into an object simulating the DOM nodes
   var SvgNode = function(tag) {
     this.nodeName = tag;
@@ -228,14 +585,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return(Res);
     }
 
-    function ParseLength(v, dir) { // 'em' & 'ex' are wrong and should be computed
+    function ParseLength(v, percent) { // 'em' & 'ex' are wrong and should be computed
       var Units = {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'pc':96/6, 'em':12, 'ex':6};
-      var temp = (v || '').match(/^([+-]?[0-9.]+)(px|pt|cm|mm|in|pc|em|ex|%|)$/)
+      var temp = (v || '').match(/^([-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)(px|pt|cm|mm|in|pc|em|ex|%|)$/)
       if (temp) {
         if (temp[2] === '%') {
-          if (dir === 'x') {
+          if (typeof percent === 'number') {
+            v = (+temp[1]) / 100 * percent;
+          } else if (percent === 'x') {
             v = (+temp[1]) / 100 * ViewportWidth;
-          } else if (dir === 'y') {
+          } else if (percent === 'y') {
             v = (+temp[1]) / 100 * ViewportHeight;
           } else {
             v = (+temp[1]) / 100 * Math.sqrt(0.5 * ViewportWidth * ViewportWidth + 0.5 * ViewportHeight * ViewportHeight);
@@ -254,9 +613,27 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       var YAlign = {'Min':'top', 'Mid':'center', 'Max':'bottom'}[Value[3] || 'Mid'];
       return({type: Type, xAlign: XAlign, yAlign:YAlign});
     }
-    
+
+    function ParseLengthList(v, dir) {
+      var RegexLength = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?(?:px|pt|cm|mm|in|pc|em|ex|%|)/;
+      var temp, values = [];
+      v = (v || '').trim();
+      while (temp = v.match(RegexLength)) {
+        v = v.slice(temp[0].length).replace(/^(?:\s*,\s*|\s*)/, '');
+        values.push(ParseLength(temp[0], dir));
+      }
+      return(values);
+    }
+
     function ParseNumberList(v) {
-      return((v || '').split(/\s*,\s*|\s+/).map(function(x) {return(ParseLength(x, 'xy'));}));
+      var RegexNumber = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?/;
+      var temp, values = [];
+      v = (v || '').trim();
+      while (temp = v.match(RegexNumber)) {
+        v = v.slice(temp[0].length).replace(/^(?:\s*,\s*|\s*)/, '');
+        values.push(Number(temp[0]));
+      }
+      return(values);
     }
 
     function Choose(value1, value2) { // Something like the '||' operator but with the 0 and the empty string being accepted
@@ -294,7 +671,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
             break;
           case 'transform':
-            if ((Tag !== 'svg') && (value = ParseTranforms(value))) {
+            if ((Tag !== 'svg' && Tag !== 'tspan' && Tag !== 'textpath') && (value = ParseTranforms(value))) {
               doc.transform(value[0], value[1], value[2], value[3], value[4], value[5]);
             }
             break;
@@ -342,7 +719,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
             break;
           case 'stroke-dasharray':
-            value = ParseNumberList(value);
+            value = ParseLengthList(value, 'xy');
             if (value.every(function(x) {return(x >= 0 && x < Infinity);})) {
               if (value.length % 2 === 1) {
                 value = value.concat(value);
@@ -489,7 +866,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function addSVGUseElem(Obj, Styles, Tag) { // Element: use
       findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
-      var Link = Obj.getAttribute('xlink:href').slice(1),
+      var Link = (Obj.getAttribute('xlink:href') || '').slice(1),
           Child = svg.getElementById(Link),
           Tag2 = Child && Child.nodeName.toLowerCase();
       if (Child) {
@@ -555,10 +932,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       findSVGStyles(Obj, Styles, Tag);
       if (Styles.displayNone) {return;}
       var FillColor = Choose(Styles.fill, [0, 0, 0, 1]),
-          StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]);
+          StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]),
+          LineWidth = Choose(Styles.strokeWidth, 1);
       doc.fillColor(FillColor.slice(0,3), Choose(Styles.fillOpacity, 1) * Choose(Styles.opacity, 1) * FillColor[3])
-         .strokeColor(StrokeColor.slice(0,3), Choose(Styles.strokeOpacity, 1) * Choose(Styles.opacity, 1) * StrokeColor[3])
-         .lineWidth(Choose(Styles.strokeWidth, 1))
+         .strokeColor(StrokeColor.slice(0,3), (!!LineWidth) * Choose(Styles.strokeOpacity, 1) * Choose(Styles.opacity, 1) * StrokeColor[3])
+         .lineWidth(LineWidth)
          .miterLimit(Choose(Styles.strokeMiterlimit, 10))
          .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
          .lineCap(Choose(Styles.strokeLinecap, 'butt'))
@@ -622,7 +1000,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     
     function addSVGText(Obj, Styles, Tag) { // Elements: text, tspan (children)
-      var CurrentTextX = 0, CurrentTextY = 0, AddedText = '', Child, Tag2;
+      var Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
         findSVGStyles(Obj, Styles, Tag);
         if (Styles.displayNone) {return;}
@@ -639,13 +1017,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
            .lineCap(Choose(Styles.strokeLinecap, 'butt'))
            .fontSize(Size)
            .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)});
-        var Length = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), null);
-        CurrentTextX = Choose(ParseLength(Obj.getAttribute('x'), 'x'), CurrentTextX);
-        CurrentTextY = Choose(ParseLength(Obj.getAttribute('y'), 'y'), CurrentTextY);
-        CurrentTextX += Choose(ParseLength(Obj.getAttribute('dx'), 'x'), 0);
-        CurrentTextY += Choose(ParseLength(Obj.getAttribute('dy'), 'y'), 0);
         var FontStylesFound = {};
-        options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound)
+        options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound);
         if (FontStylesFound.boldFound === false) {
           LineWidth = Choose(Styles.strokeWidth, 0) + Size * 0.03;
           if (Styles.stroke === undefined) {
@@ -655,45 +1028,200 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             StrokeOpacity = FillOpacity;
           }
         }
+        var TextOptions = {fill:true, stroke:!!StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false};
         doc.fillColor(FillColor.slice(0,3), FillOpacity)
            .strokeColor(StrokeColor.slice(0,3), StrokeOpacity)
            .lineWidth(LineWidth);
         for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
           Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
           switch(Tag2) {
-            case 'tspan':
-              doc.save();
+            case 'tspan': case 'textpath':
               Recursive(Child, CloneObject(Styles), Tag2);
-              doc.restore();
               break;
             case '#text':
-              var Text = Child.nodeValue;
-              if (!Styles.preserveWhiteSpace) {
-                Text = Text.replace(/[\s]+/g, ' ');
-                if (AddedText.match(/[\s]$/)) {Text = Text.replace(/^[\s]/, '');}
-              }
-              var MeasuredTextWidth = doc.widthOfString(Text), ScaleX = 1;
-              if (Anchor === 'end' || Anchor === 'middle' || Length) {
-                if (Length && Length !== MeasuredTextWidth) {
-                  ScaleX = Length / MeasuredTextWidth;
-                  doc.transform(ScaleX, 0, 0, 1, 0, 0);
-                }
-                if (Anchor === 'end') {
-                  CurrentTextX -= MeasuredTextWidth;
-                } else if (Anchor === 'middle') {
-                  CurrentTextX -= 0.5 * MeasuredTextWidth;
-                }
-              }
               if (!Styles.invisible) {
-                doc._fragment(Text, CurrentTextX / ScaleX, CurrentTextY, {fill:true, stroke:!!StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false});
+                for (var j = 0; j < Child._pos.length; j++) {
+                  var p = Child._pos[j];
+                  if (!p.hidden) {
+                    doc.save();
+                    doc.translate(p.x, p.y);
+                    if (p.rotate) {doc.rotate(p.rotate * 180 / Math.PI);}
+                    if (p.scale !== 1) {doc.transform(p.scale, 0, 0, 1, 0, 0);}
+                    doc._fragment(p.string, 0, 0, TextOptions);
+                    doc.restore();
+                  }
+                }
               }
-              CurrentTextX += Length || MeasuredTextWidth;
-              AddedText += Text;
               break;
           }
         }
       }
+      doc.save();
+      ComputeTextPositioning(Obj, Styles, Tag);
+      doc.restore();
       Recursive(Obj, Styles, Tag);
+    }
+
+    function getTextPos(doc, text) {
+      var font = doc._font, fonttype = font.constructor.name, fontobject = font.font, 
+          unit = doc._fontSize / (fontobject.unitsPerEm || 1000);
+      text = '' + text;
+      if (fonttype === 'StandardFont') {
+        var glyphs = fontobject.glyphsForString(text), advances = fontobject.advancesForGlyphs(glyphs), data = [];
+        for (var i = 0; i < glyphs.length; i++) {
+          data.push({
+            string: (glyphs[i] !== '.notdef' ? text[i] : ''),
+            width: fontobject.widthOfGlyph(glyphs[i]) * unit,
+            xAdvance: advances[i] * unit,
+            yAdvance: 0
+          });
+        }
+        return(data);
+      } else if (fonttype === 'EmbeddedFont') {
+        var layout = fontobject.layout(text), glyphs = layout.glyphs, positions = layout.positions, data = [];
+        for (var i = 0; i < glyphs.length; i++) {
+          data.push({
+            string: String.fromCharCode.apply(null, glyphs[i].codePoints),
+            width: glyphs[i].advanceWidth * unit,
+            xAdvance: positions[i].xAdvance * unit,
+            yAdvance: positions[i].yAdvance * unit
+          });
+        }
+        return(data);
+      }
+    }
+
+    function ComputeTextPositioning(Obj, Styles, Tag) {
+      var ProcessedText = '', RemainingText = Obj.textContent;
+      var CurrentChunk = [], CurrentAnchor = undefined;
+      var CurrentX = 0, CurrentY = 0;
+      function CombineArrays(Arr1, Arr2) {return(Arr1.concat(Arr2.slice(Arr1.length)));}
+      function DoAnchoring() {
+        if (CurrentChunk.length) {
+          var last = CurrentChunk[CurrentChunk.length - 1];
+          var first = CurrentChunk[0]
+          var width = last.x + last.width - first.x;
+          var anchordx = {'start' : 0, 'middle' : 0.5, 'end' : 1}[CurrentAnchor] * width || 0;
+          for (var i = 0; i < CurrentChunk.length; i++) {
+            CurrentChunk[i].x -= anchordx;
+          }
+          CurrentX -= anchordx;
+        }
+        CurrentChunk = [];
+      }
+      function DoPositioningRecursive(Obj, Styles, Tag, Parent) {
+        findSVGStyles(Obj, Styles, Tag);
+        if (Tag === 'textpath') {
+          Obj._x = Obj._y = Obj._dx = Obj._dy = Obj._rot = [];
+        } else {
+          Obj._x = CombineArrays(ParseLengthList(Obj.getAttribute('x'), 'x'), (Parent ? Parent._x.slice(Parent._pos.length) : []));
+          Obj._y = CombineArrays(ParseLengthList(Obj.getAttribute('y'), 'y'), (Parent ? Parent._y.slice(Parent._pos.length) : []));
+          Obj._dx = CombineArrays(ParseLengthList(Obj.getAttribute('dx'), 'x'), (Parent ? Parent._dx.slice(Parent._pos.length) : []));
+          Obj._dy = CombineArrays(ParseLengthList(Obj.getAttribute('dy'), 'y'), (Parent ? Parent._dy.slice(Parent._pos.length) : []));
+          Obj._rot = CombineArrays(ParseNumberList(Obj.getAttribute('rotate')), (Parent ? Parent._rot.slice(Parent._pos.length) : []));
+        }
+        var TextLength = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), undefined);
+        var WordSpacing = Styles.wordSpacing || ParseLength(Obj.getAttribute('word-spacing'), 'x') || 0;
+        var LetterSpacing = Styles.letterSpacing || ParseLength(Obj.getAttribute('letter-spacing'), 'x') || 0;
+        var TextAnchor = Styles.textAnchor || Obj.getAttribute('text-anchor');
+        doc.fontSize(Choose(Styles.fontSize, 16));
+        var FontStylesFound = {};
+        options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound);
+        Obj._pos = [];
+        if (Tag === 'textpath') {
+          DoAnchoring();
+          CurrentX = CurrentY = 0;
+          CurrentAnchor = undefined;
+        } else if (Obj._x.length || Obj._y.length) {
+          DoAnchoring();
+          CurrentAnchor = undefined;
+        }
+        if (['start', 'middle', 'end'].indexOf(TextAnchor) !== -1 && CurrentAnchor === undefined) {
+          CurrentAnchor = TextAnchor;
+        }
+        for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
+          var Child = children[i], Tag2 = Child.nodeName.toLowerCase();
+          switch(Tag2) {
+            case 'tspan': case 'textpath':
+              DoPositioningRecursive(Child, CloneObject(Styles), Tag2, Obj);
+              break;
+            case '#text':
+              var rawText = Child.nodeValue, renderedText = rawText;
+              RemainingText = RemainingText.substring(rawText.length);
+              if (!Styles.preserveWhiteSpace) {
+                renderedText = renderedText.replace(/[\s]+/g, ' ');
+                if (ProcessedText.match(/[\s]$|^$/)) {renderedText = renderedText.replace(/^[\s]/, '');}
+                if (RemainingText.match(/^[\s]*$/)) {renderedText = renderedText.replace(/[\s]$/, '');}
+              }
+              ProcessedText += rawText;
+              var pos = getTextPos(doc, renderedText);
+              for (var j = 0; j < pos.length; j++) {
+                var indexInElement = Obj._pos.length + j;
+                if (Obj._x[indexInElement] !== undefined) {DoAnchoring(); CurrentX = Obj._x[indexInElement];}
+                if (Obj._y[indexInElement] !== undefined) {DoAnchoring(); CurrentY = Obj._y[indexInElement];}
+                pos[j].dx = Obj._dx[indexInElement] || 0;
+                pos[j].dy = Obj._dy[indexInElement] || 0;
+                pos[j].rotate = Obj._rot[Math.min(indexInElement, Obj._rot.length - 1)] || 0;
+                pos[j].x = CurrentX + pos[j].dx + (indexInElement > 0 ? LetterSpacing : 0) + (pos[j].string.match(/^[\s]$/) ? WordSpacing : 0);
+                pos[j].y = CurrentY + pos[j].dy;
+                pos[j].scale = 1;
+                pos[j].hidden = false;
+                CurrentX = pos[j].x + pos[j].xAdvance;
+                CurrentY = pos[j].y + pos[j].yAdvance;
+              }
+              Child._pos = pos;
+              Obj._pos = Obj._pos.concat(pos);
+              CurrentChunk = CurrentChunk.concat(pos);
+              break;
+          }
+        }
+        if (TextLength && Obj._pos.length) {
+          var FirstChar = Obj._pos[0], LastChar = Obj._pos[Obj._pos.length - 1],
+              StartX = FirstChar.x, EndX = LastChar.x + LastChar.width,
+              TextScale = TextLength / (EndX - StartX);
+          for (var j = 0; j < Obj._pos.length; j++) {
+            Obj._pos[j].x = StartX + TextScale * (Obj._pos[j].x - StartX);
+            Obj._pos[j].scale *= TextScale;
+            Obj._pos[j].width *= TextScale;
+          }
+          CurrentX += TextLength - (EndX - StartX);
+        }
+        if (Tag === 'textpath') {
+          DoAnchoring();
+          var Link = (Obj.getAttribute('xlink:href') || '').slice(1),
+              PathElement = svg.getElementById(Link);
+          if (PathElement) {
+            var Transform = ParseTranforms(PathElement.getAttribute('transform')),
+                PathObject = (new SvgPath(PathElement.getAttribute('d'))).transform(Transform[0], Transform[1], Transform[2], Transform[3], Transform[4], Transform[5]),
+                PathLength = PathObject.totalLength,
+                TextOffset = Choose(ParseLength(Obj.getAttribute('startOffset'), PathLength), 0);
+            for (var j = 0; j < Obj._pos.length; j++) {
+              var CharMidX = TextOffset + Obj._pos[j].x + 0.5 * Obj._pos[j].width
+              if (CharMidX > PathLength || CharMidX < 0) {
+                Obj._pos[j].hidden = true;
+              } else {
+                var PointOnPath = PathObject.getPointAtLength(CharMidX);
+                Obj._pos[j].x = PointOnPath[0] - 0.5 * Obj._pos[j].width * Math.cos(PointOnPath[2]) - Obj._pos[j].y * Math.sin(PointOnPath[2]);
+                Obj._pos[j].y = PointOnPath[1] - 0.5 * Obj._pos[j].width * Math.sin(PointOnPath[2]) + Obj._pos[j].y * Math.cos(PointOnPath[2]);
+                Obj._pos[j].rotate = PointOnPath[2] + Obj._pos[j].rotate;
+              }
+            }
+            var EndPoint = PathObject.getPointAtLength(PathLength);
+            CurrentX = EndPoint[0]; CurrentY = EndPoint[1];
+          } else {
+            for (var j = 0; j < Obj._pos.length; j++) {
+              Obj._pos[j].hidden = true;
+            }
+          }
+        } else if (Tag === 'text') {
+          DoAnchoring();
+        }
+        if (Parent) {
+          Parent._pos = Parent._pos.concat(Obj._pos);
+        }
+      }
+      DoPositioningRecursive(Obj, Styles, Tag, null);
+      console.log(Obj._pos); // Temporary debugging
     }
     
     var PxToPt = 72/96; // 1px = 72/96pt
@@ -719,4 +1247,45 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       console.log('Error: SVGtoPDF: This element can\'t be processed as SVG : ' + (svg && svg.nodeName));
     }
 
+}
+
+function Parser(str) {
+  var parser = this;
+  parser.match = function(exp, all) {
+    var temp = str.match(exp);
+    if (!temp || temp.index !== 0) {return;}
+    str = str.substring(temp[0].length);
+    return(all ? temp : temp[0]);
+  }
+  parser.matchSeparator = function() {
+    return(parser.match(/^(?:\s*,\s*|\s*|)/));
+  }
+  parser.matchSpace = function() {
+    return(parser.match(/^(?:\s*)/));
+  }
+  parser.matchLengthUnit = function() {
+    return(parser.match(/^(?:px|pt|cm|mm|in|pc|em|ex|%|)/));
+  }
+  parser.matchNumber = function() {
+    return(parser.match(/^(?:[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)/));
+  }
+  parser.matchPathCommand = function() {
+    return(parser.match(/^(?:[astvzqmhlcASTVZQMHLC])/));
+  }
+  parser.parseNumberList = function() {
+    var result = [], temp;
+    while(temp = parser.matchNumber()) {
+      result.push(temp);
+      parser.matchSeparator();
+    }
+    return(result);
+  }
+  parser.parseLengthList = function() {
+    var result = [], temp1, temp2;
+    while(typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
+      result.push(temp1 + temp2);
+      parser.matchSeparator();
+    }
+    return(result);
+  }
 }
