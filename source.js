@@ -1026,12 +1026,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]),
             StrokeOpacity = Choose(Styles.strokeOpacity, 1) * Choose(Styles.opacity, 1) * StrokeColor[3],
             LineWidth = Choose(Styles.strokeWidth, 1);
-        doc.miterLimit(Choose(Styles.strokeMiterlimit, 2))
-           .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
-           .lineCap(Choose(Styles.strokeLinecap, 'butt'))
-           .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)});
-        doc._font = Obj._font.font;
-        doc._fontSize = Obj._font.size;
         if (Obj._font.fauxbold) {
           LineWidth = Choose(Styles.strokeWidth, 0) + Obj._font.size * 0.03;
           if (Styles.stroke === undefined) {
@@ -1040,9 +1034,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         }
         var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, oblique:Obj._font.fauxitalic};
-        doc.fillColor(FillColor.slice(0,3), FillOpacity)
-           .strokeColor(StrokeColor.slice(0,3), StrokeOpacity)
-           .lineWidth(LineWidth);
         for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
           Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
           switch(Tag2) {
@@ -1051,6 +1042,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               break;
             case '#text':
               if (!Styles.invisible) {
+                doc.miterLimit(Choose(Styles.strokeMiterlimit, 2))
+                   .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
+                   .lineCap(Choose(Styles.strokeLinecap, 'butt'))
+                   .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)})
+                   .fillColor(FillColor.slice(0,3), FillOpacity)
+                   .strokeColor(StrokeColor.slice(0,3), StrokeOpacity)
+                   .lineWidth(LineWidth);
+                doc._font = Obj._font.font;
+                doc._fontSize = Obj._font.size;
                 var pos = Child._pos;
                 for (var j = 0; j < pos.length; j++) {
                   var posj = pos[j], string = posj.string;
@@ -1200,6 +1200,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 pos[j].x = CurrentX + pos[j].dx + (indexInElement > 0 ? LetterSpacing : 0) + (pos[j].string.match(/^[\s]$/) ? WordSpacing : 0);
                 pos[j].y = CurrentY + pos[j].dy + Baseline;
                 pos[j].scale = 1;
+                pos[j].index = indexInElement;
                 pos[j].hidden = false;
                 CurrentX = pos[j].x + pos[j].xAdvance;
                 CurrentY = pos[j].y + pos[j].yAdvance - Baseline;
