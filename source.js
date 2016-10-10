@@ -637,7 +637,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
 
     function Choose(value1, value2) { // Something like the '||' operator but with the 0 and the empty string being accepted
-      if ((value1 !== undefined) && (value1 !== null) && (value1 !== NaN)) {return(value1);} else {return(value2);}
+      if ((value1 !== undefined) && (value1 !== null) && (!isNaN(value1))) {return(value1);} else {return(value2);}
     }
 
     function CloneObject(original) { // Clone simple object with only one level containing values or arrays
