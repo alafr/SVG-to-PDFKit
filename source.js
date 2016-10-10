@@ -779,9 +779,26 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               Styles.textAnchor = value;
             }
             break;
-          case 'alignment-baseline':
+          case 'dominant-baseline':
             if (['auto', 'baseline', 'before-edge', 'text-before-edge', 'middle', 'central', 'after-edge', 'text-after-edge', 'ideographic', 'alphabetic', 'hanging', 'mathematical'].indexOf(value) !== -1) {
-              Styles.alignmentBaseline = {'text-before-edge':'before-edge', 'text-after-edge':'after-edge', 'auto':'baseline', 'ideographic':'after-edge', 'alphabetic':'baseline'}[value] || value;
+              Styles.baseline = value;
+            }
+            break;
+          case 'baseline-shift':
+            if (['sub', 'super'].indexOf(value) !== -1 || (ParseLength(value) > -Infinity && ParseLength(value) < Infinity)) {
+              Styles.baselineShift = value;
+            }
+            break;
+          case 'word-spacing':
+            value = ParseLength(value, 'x');
+            if (value > -Infinity && value < Infinity) {
+              Styles.wordSpacing = value;
+            }
+            break;
+          case 'letter-spacing':
+            value = ParseLength(value, 'x');
+            if (value > -Infinity && value < Infinity) {
+              Styles.letterSpacing = value;
             }
             break;
           case 'xml:space':
@@ -999,7 +1016,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     }
     
-    function addSVGText(Obj, Styles, Tag) { // Elements: text, tspan (children)
+    function addSVGText(Obj, Styles, Tag) { // Elements: text and the children tspan, textPath
       var Child, Tag2;
       function Recursive(Obj, Styles, Tag) {
         findSVGStyles(Obj, Styles, Tag);
@@ -1008,27 +1025,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             FillOpacity = Choose(Styles.fillOpacity, 1) * Choose(Styles.opacity, 1) * FillColor[3], 
             StrokeColor = Choose(Styles.stroke, [255, 255, 255, 0]),
             StrokeOpacity = Choose(Styles.strokeOpacity, 1) * Choose(Styles.opacity, 1) * StrokeColor[3],
-            LineWidth = Choose(Styles.strokeWidth, 1), 
-            Size = Choose(Styles.fontSize, 16),
-            Anchor = Choose(Styles.textAnchor, 'start'),
-            Baseline = Choose(Styles.alignmentBaseline, 'baseline');
+            LineWidth = Choose(Styles.strokeWidth, 1);
         doc.miterLimit(Choose(Styles.strokeMiterlimit, 2))
            .lineJoin(Choose(Styles.strokeLinejoin, 'miter'))
            .lineCap(Choose(Styles.strokeLinecap, 'butt'))
-           .fontSize(Size)
            .dash(Choose(Styles.strokeDasharray, []), {phase:Choose(Styles.strokeDashoffset, 0)});
-        var FontStylesFound = {};
-        options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound);
-        if (FontStylesFound.boldFound === false) {
-          LineWidth = Choose(Styles.strokeWidth, 0) + Size * 0.03;
+        doc._font = Obj._font.font;
+        doc._fontSize = Obj._font.size;
+        if (Obj._font.fauxbold) {
+          LineWidth = Choose(Styles.strokeWidth, 0) + Obj._font.size * 0.03;
           if (Styles.stroke === undefined) {
             StrokeColor = FillColor;
-          }
-          if (Styles.strokeOpacity === undefined) {
             StrokeOpacity = FillOpacity;
           }
         }
-        var TextOptions = {fill:true, stroke:!!StrokeOpacity, baseline: Baseline, oblique:FontStylesFound.italicFound===false};
+        var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, baseline: 0, oblique:Obj._font.fauxitalic};
         doc.fillColor(FillColor.slice(0,3), FillOpacity)
            .strokeColor(StrokeColor.slice(0,3), StrokeOpacity)
            .lineWidth(LineWidth);
@@ -1040,14 +1051,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               break;
             case '#text':
               if (!Styles.invisible) {
-                for (var j = 0; j < Child._pos.length; j++) {
-                  var p = Child._pos[j];
-                  if (!p.hidden) {
+                var pos = Child._pos;
+                for (var j = 0; j < pos.length; j++) {
+                  var posj = pos[j], string = posj.string;
+                  if (!posj.hidden) {
+                    while (pos[j+1] && (!pos[j+1].hidden) && Math.abs(pos[j].x + pos[j].xAdvance - pos[j+1].x) < 1e-6 && Math.abs(pos[j].y + pos[j].yAdvance - pos[j+1].y) < 1e-6) {
+                      string += pos[++j].string;
+                    }
                     doc.save();
-                    doc.translate(p.x, p.y);
-                    if (p.rotate) {doc.rotate(p.rotate * 180 / Math.PI);}
-                    if (p.scale !== 1) {doc.transform(p.scale, 0, 0, 1, 0, 0);}
-                    doc._fragment(p.string, 0, 0, TextOptions);
+                    doc.translate(posj.x, posj.y);
+                    if (posj.rotate) {doc.rotate(posj.rotate * 180 / Math.PI);}
+                    if (posj.scale !== 1) {doc.transform(posj.scale, 0, 0, 1, 0, 0);}
+                    doc._fragment(string, 0, 0, TextOptions);
                     doc.restore();
                   }
                 }
@@ -1062,9 +1077,28 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       Recursive(Obj, Styles, Tag);
     }
 
-    function getTextPos(doc, text) {
-      var font = doc._font, fonttype = font.constructor.name, fontobject = font.font, 
-          unit = doc._fontSize / (fontobject.unitsPerEm || 1000);
+    function getBaseline(font, size, baseline, shift) {
+      var scale = 0.001 * size, dy1, dy2;
+      switch (baseline) {
+        case 'middle': dy1 = 0.5 * font.xHeight * scale; break;
+        case 'central': dy1 = 0.5 * (font.descender + font.ascender) * scale; break;
+        case 'after-edge': case 'text-after-edge': dy1 = font.descender * scale; break;
+        case 'alphabetic': case 'auto': case 'baseline': dy1 = 0; break;
+        case 'mathematical': dy1 = 0.5 * font.ascender * scale; break;
+        case 'hanging': dy1 = 0.8 * font.ascender * scale; break;
+        case 'before-edge': case 'text-before-edge': dy1 = font.ascender * scale; break;
+        default: dy1 = 0; break;
+      }
+      switch (shift) {
+        case 'super': dy2 = 0.6 * (font.ascender - font.descender) * scale; break;
+        case 'sub': dy2 = -0.6 * (font.ascender - font.descender) * scale; break;
+        default: dy2 = Choose(ParseLength(shift, (font.ascender - font.descender) * scale), 0); break;
+      }
+      return(dy1 - dy2);
+    }
+
+    function getTextPos(font, size, text) {
+      var fonttype = font.constructor.name, fontobject = font.font, unit = size / (fontobject.unitsPerEm || 1000);
       text = '' + text;
       if (fonttype === 'StandardFont') {
         var glyphs = fontobject.glyphsForString(text), advances = fontobject.advancesForGlyphs(glyphs), data = [];
@@ -1120,14 +1154,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           Obj._dy = CombineArrays(ParseLengthList(Obj.getAttribute('dy'), 'y'), (Parent ? Parent._dy.slice(Parent._pos.length) : []));
           Obj._rot = CombineArrays(ParseNumberList(Obj.getAttribute('rotate')), (Parent ? Parent._rot.slice(Parent._pos.length) : []));
         }
-        var TextLength = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), undefined);
-        var WordSpacing = Styles.wordSpacing || ParseLength(Obj.getAttribute('word-spacing'), 'x') || 0;
-        var LetterSpacing = Styles.letterSpacing || ParseLength(Obj.getAttribute('letter-spacing'), 'x') || 0;
-        var TextAnchor = Styles.textAnchor || Obj.getAttribute('text-anchor');
-        doc.fontSize(Choose(Styles.fontSize, 16));
         var FontStylesFound = {};
         options.fontCallback(Styles.fontFamily, Styles.bold, Styles.italic, FontStylesFound);
         Obj._pos = [];
+        Obj._font = {font: doc._font, size: Choose(Styles.fontSize, 16), fauxitalic: FontStylesFound.italicFound===false, fauxbold: FontStylesFound.boldFound===false};
+        var TextLength = Choose(ParseLength(Obj.getAttribute('textLength'), 'x'), undefined),
+            WordSpacing = Choose(Styles.wordSpacing, 0),
+            LetterSpacing = Choose(Styles.letterSpacing, 0),
+            TextAnchor = Styles.textAnchor,
+            Baseline = getBaseline(Obj._font.font, Obj._font.size, Styles.baseline, Styles.baselineShift);
         if (Tag === 'textpath') {
           DoAnchoring();
           CurrentX = CurrentY = 0;
@@ -1136,7 +1171,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           DoAnchoring();
           CurrentAnchor = undefined;
         }
-        if (['start', 'middle', 'end'].indexOf(TextAnchor) !== -1 && CurrentAnchor === undefined) {
+        if (TextAnchor !== undefined && CurrentAnchor === undefined) {
           CurrentAnchor = TextAnchor;
         }
         for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
@@ -1154,7 +1189,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (RemainingText.match(/^[\s]*$/)) {renderedText = renderedText.replace(/[\s]$/, '');}
               }
               ProcessedText += rawText;
-              var pos = getTextPos(doc, renderedText);
+              var pos = getTextPos(Obj._font.font, Obj._font.size, renderedText);
               for (var j = 0; j < pos.length; j++) {
                 var indexInElement = Obj._pos.length + j;
                 if (Obj._x[indexInElement] !== undefined) {DoAnchoring(); CurrentX = Obj._x[indexInElement];}
@@ -1163,12 +1198,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 pos[j].dy = Obj._dy[indexInElement] || 0;
                 pos[j].rotate = Obj._rot[Math.min(indexInElement, Obj._rot.length - 1)] || 0;
                 pos[j].x = CurrentX + pos[j].dx + (indexInElement > 0 ? LetterSpacing : 0) + (pos[j].string.match(/^[\s]$/) ? WordSpacing : 0);
-                pos[j].y = CurrentY + pos[j].dy;
+                pos[j].y = CurrentY + pos[j].dy + Baseline;
                 pos[j].scale = 1;
                 pos[j].hidden = false;
                 CurrentX = pos[j].x + pos[j].xAdvance;
                 CurrentY = pos[j].y + pos[j].yAdvance;
               }
+              Child._font = Obj._font;
               Child._pos = pos;
               Obj._pos = Obj._pos.concat(pos);
               CurrentChunk = CurrentChunk.concat(pos);
@@ -1183,6 +1219,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             Obj._pos[j].x = StartX + TextScale * (Obj._pos[j].x - StartX);
             Obj._pos[j].scale *= TextScale;
             Obj._pos[j].width *= TextScale;
+            Obj._pos[j].dx *= TextScale;
           }
           CurrentX += TextLength - (EndX - StartX);
         }
@@ -1221,7 +1258,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       }
       DoPositioningRecursive(Obj, Styles, Tag, null);
-      console.log(Obj._pos); // Temporary debugging
+    //  console.log(Obj._pos); // Temporary debugging
     }
     
     var PxToPt = 72/96; // 1px = 72/96pt
