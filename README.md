@@ -24,7 +24,7 @@ Supported:
  - text attributes: x, y, dx, dy, rotate, text-anchor, textLength, word-spacing, letter-spacing, font-size
  - styling: with attributes only
  - colors: fill, stroke & color (rgb, rgba, hex, string), fill-opacity, stroke-opacity & opacity
- - units: all standard units except em, ex
+ - units: all standard units except em, ex (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/2">#2</a>)
  - transformations: transform, viewBox & preserveAspectRatio attributes
 
 Unsupported:
