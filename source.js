@@ -1039,7 +1039,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             StrokeOpacity = FillOpacity;
           }
         }
-        var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, baseline: 0, oblique:Obj._font.fauxitalic};
+        var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, oblique:Obj._font.fauxitalic};
         doc.fillColor(FillColor.slice(0,3), FillOpacity)
            .strokeColor(StrokeColor.slice(0,3), StrokeOpacity)
            .lineWidth(LineWidth);
@@ -1094,7 +1094,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'sub': dy2 = -0.6 * (font.ascender - font.descender) * scale; break;
         default: dy2 = Choose(ParseLength(shift, (font.ascender - font.descender) * scale), 0); break;
       }
-      return(dy1 - dy2);
+      return(dy1 - dy2 - font.ascender * scale);
     }
 
     function getTextPos(font, size, text) {
@@ -1202,7 +1202,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 pos[j].scale = 1;
                 pos[j].hidden = false;
                 CurrentX = pos[j].x + pos[j].xAdvance;
-                CurrentY = pos[j].y + pos[j].yAdvance;
+                CurrentY = pos[j].y + pos[j].yAdvance - Baseline;
               }
               Child._font = Obj._font;
               Child._pos = pos;
