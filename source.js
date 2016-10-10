@@ -1100,12 +1100,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function getTextPos(font, size, text) {
       var fonttype = font.constructor.name, fontobject = font.font, unit = size / (fontobject.unitsPerEm || 1000);
       text = '' + text;
+      var fontheight = (font.ascender - font.descender) * size / 1000;
       if (fonttype === 'StandardFont') {
         var glyphs = fontobject.glyphsForString(text), advances = fontobject.advancesForGlyphs(glyphs), data = [];
         for (var i = 0; i < glyphs.length; i++) {
           data.push({
             string: (glyphs[i] !== '.notdef' ? text[i] : ''),
             width: fontobject.widthOfGlyph(glyphs[i]) * unit,
+            height: fontheight,
             xAdvance: advances[i] * unit,
             yAdvance: 0
           });
@@ -1117,6 +1119,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           data.push({
             string: String.fromCharCode.apply(null, glyphs[i].codePoints),
             width: glyphs[i].advanceWidth * unit,
+            height: fontheight,
             xAdvance: positions[i].xAdvance * unit,
             yAdvance: positions[i].yAdvance * unit
           });
@@ -1194,11 +1197,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 var indexInElement = Obj._pos.length + j;
                 if (Obj._x[indexInElement] !== undefined) {DoAnchoring(); CurrentX = Obj._x[indexInElement];}
                 if (Obj._y[indexInElement] !== undefined) {DoAnchoring(); CurrentY = Obj._y[indexInElement];}
-                pos[j].dx = Obj._dx[indexInElement] || 0;
-                pos[j].dy = Obj._dy[indexInElement] || 0;
                 pos[j].rotate = Obj._rot[Math.min(indexInElement, Obj._rot.length - 1)] || 0;
-                pos[j].x = CurrentX + pos[j].dx + (indexInElement > 0 ? LetterSpacing : 0) + (pos[j].string.match(/^[\s]$/) ? WordSpacing : 0);
-                pos[j].y = CurrentY + pos[j].dy + Baseline;
+                pos[j].x = CurrentX + (Obj._dx[indexInElement] || 0) + (indexInElement > 0 ? LetterSpacing : 0) + (pos[j].string.match(/^[\s]$/) ? WordSpacing : 0);
+                pos[j].y = CurrentY + (Obj._dy[indexInElement] || 0) + Baseline;
                 pos[j].scale = 1;
                 pos[j].index = indexInElement;
                 pos[j].hidden = false;
@@ -1220,7 +1221,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             Obj._pos[j].x = StartX + TextScale * (Obj._pos[j].x - StartX);
             Obj._pos[j].scale *= TextScale;
             Obj._pos[j].width *= TextScale;
-            Obj._pos[j].dx *= TextScale;
           }
           CurrentX += TextLength - (EndX - StartX);
         }
