@@ -35,4 +35,4 @@ Unsupported:
 
 Warning: some features depend on options not yet commited into PdfKit will only work in the demo.
 
-### They are bugs, please send issues and/or pull requests.
+### There are bugs, please send issues and/or pull requests.
