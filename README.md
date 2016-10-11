@@ -1,7 +1,7 @@
 # SVG-to-PDFKit
 Insert SVG into a PDF document created with PDFKit.
 
-### This is the branch i'm currently working on, it has more bugs and a lot of unused functions. There is still a lot of work needed here. There are still too many global variables. Please use the master branch.
+### This is the branch I'm currently working on. It has more bugs, please use the master branch.
 
 Use:
 
