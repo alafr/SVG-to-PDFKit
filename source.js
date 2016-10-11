@@ -417,14 +417,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgShape = function(pathCommands) {
       this.pathCommands = pathCommands;
-      var transform = this.transform = function(m1, m2, m3, m4, m5, m6) {
+      var transform = this.transform = function(m) {
         var newPathCommands = [];
         for (var i = 0; i < pathCommands.length; i++) {
           var Values = pathCommands[i].slice();
           for (var j = 1; j < Values.length; j+=2) {
             var x = Values[j], y = Values[j+1];
-            Values[j] = m1 * x + m3 * y + m5;
-            Values[j+1] = m2 * x + m4 * y + m6;
+            Values[j] = m[0] * x + m[2] * y + m[4];
+            Values[j+1] = m[1] * x + m[3] * y + m[5];
           }
           newPathCommands.push(Values);
         }
@@ -1252,8 +1252,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           var Link = (Obj.getAttribute('xlink:href') || '').slice(1),
               PathElement = svg.getElementById(Link);
           if (PathElement) {
-            var Transform = ParseTranforms(PathElement.getAttribute('transform')),
-                PathObject = (new SvgPath(PathElement.getAttribute('d'))).transform(Transform[0], Transform[1], Transform[2], Transform[3], Transform[4], Transform[5]),
+            var PathObject = (new SvgPath(PathElement.getAttribute('d'))).transform(ParseTranforms(PathElement.getAttribute('transform')) || [1, 0, 0, 1, 0, 0]),
                 PathLength = PathObject.totalLength,
                 TextOffset = Choose(ParseLength(Obj.getAttribute('startOffset'), PathLength), 0);
             for (var j = 0; j < Obj._pos.length; j++) {
