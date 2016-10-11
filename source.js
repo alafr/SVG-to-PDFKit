@@ -333,11 +333,12 @@ var SvgShape = function(pathCommands) {
     return(length);
   })();
   var getPointAtLength = this.getPointAtLength = function(l) {
+    var pathlength = 0;
     for (var i = 0; i < pathSegments.length; i++) {
-      if (l > pathSegments[i].totalLength) {
-        l -= pathSegments[i].totalLength;
+      if (l - pathlength > pathSegments[i].totalLength) {
+        pathlength += pathSegments[i].totalLength;
       } else {
-        return(pathSegments[i].getPointAtLength(l));
+        return(pathSegments[i].getPointAtLength(l - pathlength));
       }
     }
   };
@@ -1041,7 +1042,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             StrokeOpacity = FillOpacity;
           }
         }
-        var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, oblique:Obj._font.fauxitalic};
+        var TextOptions = {fill:true, stroke:Obj._font.fauxbold || Styles.stroke !== undefined, oblique:Obj._font.fauxitalic, baseline:0};
         for (var i = 0, children = Obj.childNodes; i < children.length; i++) {
           Child = children[i]; Tag2 = Child.nodeName.toLowerCase();
           switch(Tag2) {
@@ -1102,20 +1103,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'sub': dy2 = -0.6 * (font.ascender - font.descender) * scale; break;
         default: dy2 = Choose(ParseLength(shift, (font.ascender - font.descender) * scale), 0); break;
       }
-      return(dy1 - dy2 - font.ascender * scale);
+      return(dy1 - dy2);
     }
 
     function getTextPos(font, size, text) {
       var fonttype = font.constructor.name, fontobject = font.font, unit = size / (fontobject.unitsPerEm || 1000);
       text = '' + text;
-      var fontheight = (font.ascender - font.descender) * size / 1000;
+      var fontascent = font.bbox[1] * size / 1000, fontdescent = font.bbox[3] * size / 1000;
       if (fonttype === 'StandardFont') {
         var glyphs = fontobject.glyphsForString(text), advances = fontobject.advancesForGlyphs(glyphs), data = [];
         for (var i = 0; i < glyphs.length; i++) {
           data.push({
             string: (glyphs[i] !== '.notdef' ? text[i] : ''),
             width: fontobject.widthOfGlyph(glyphs[i]) * unit,
-            height: fontheight,
+            ascent: fontascent, 
+            descent: fontdescent,
             xAdvance: advances[i] * unit,
             yAdvance: 0
           });
@@ -1127,7 +1129,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           data.push({
             string: String.fromCharCode.apply(null, glyphs[i].codePoints),
             width: glyphs[i].advanceWidth * unit,
-            height: fontheight,
+            ascent: fontascent,
+            descent: fontdescent,
             xAdvance: positions[i].xAdvance * unit,
             yAdvance: positions[i].yAdvance * unit
           });
@@ -1141,10 +1144,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       for (var i = 0; i < Obj._pos.length; i++) {
         var pos = Obj._pos[i];
         if (!pos.hidden) {
-          var dx1 = - pos.height * Math.sin(pos.rotate), dx2 = pos.width * Math.cos(pos.rotate),
-              dy1 = pos.height * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
-          pathCommands.push(['M', pos.x, pos.y]);
-          pathCommands.push(['L', pos.x + dx2, pos.y + dy2]);
+          var dx0 = pos.ascent * Math.sin(pos.rotate), dy0 = -pos.ascent * Math.cos(pos.rotate),
+              dx1 = pos.descent * Math.sin(pos.rotate), dy1 = -pos.descent * Math.cos(pos.rotate),
+              dx2 = pos.width * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
+          pathCommands.push(['M', pos.x + dx0, pos.y + dy0]);
+          pathCommands.push(['L', pos.x + dx0 + dx2, pos.y + dy0 + dy2]);
           pathCommands.push(['M', pos.x + dx1 + dx2, pos.y + dy1 + dy2]);
           pathCommands.push(['L', pos.x + dx1, pos.y + dy1]);
         }
@@ -1242,6 +1246,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           for (var j = 0; j < Obj._pos.length; j++) {
             Obj._pos[j].x = StartX + TextScale * (Obj._pos[j].x - StartX);
             Obj._pos[j].scale *= TextScale;
+            Obj._pos[j].xAdvance *= TextScale;
             Obj._pos[j].width *= TextScale;
           }
           CurrentX += TextLength - (EndX - StartX);
