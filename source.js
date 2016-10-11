@@ -1,500 +1,505 @@
 "use strict";
-var SvgBezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
-  var solveEquation = function(curve) {
-    if (curve.length > 3) {console.log('Error: Bezier>solveEquation: unsolvable equation ' + curve.join(','));}
-    var a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
-    if (Math.abs(a) < 1e-10 && Math.abs(b) < 1e-10) {
-      return([]);
-    } else if (Math.abs(a) < 1e-10) {
-      return([(-c) / b]);
-    } else {
-      var d = b * b - 4 * a * c;
-      if (d > 0) {
-        return([(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)]);
-      } else if (d === 0) {
-        return([(-b) / (2 * a)]);
-      } else {
-        return([]);
-      }
-    }
-  };
-  var getCurveValue = function(t, curve) {
-    return((curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t);
-  };
-  var divisions = 15; // the accuracy isn't perfect but comparable to the arc-to-bezier conversion
-  var equationX = [p1x, -3*p1x+3*c1x, 3*p1x-6*c1x+3*c2x, -p1x+3*c1x-3*c2x+p2x];
-  var equationY = [p1y, -3*p1y+3*c1y, 3*p1y-6*c1y+3*c2y, -p1y+3*c1y-3*c2y+p2y];
-  var derivativeX = [-3*p1x+3*c1x, 6*p1x-12*c1x+6*c2x, -3*p1x+9*c1x-9*c2x+3*p2x];
-  var derivativeY = [-3*p1y+3*c1y, 6*p1y-12*c1y+6*c2y, -3*p1y+9*c1y-9*c2y+3*p2y];
-  var lengthMap = (function() {
-    var lengthMap = [0];
-    for (var i = 1; i <= divisions; i++) {
-      var t = (i - 0.5) / divisions;
-      var dx = getCurveValue(t, derivativeX) / divisions,
-          dy = getCurveValue(t, derivativeY) / divisions,
-          l = Math.sqrt(dx*dx+dy*dy);
-      lengthMap[i] = lengthMap[i - 1] + l;
-    }
-    return(lengthMap)
-  })();
-  var totalLength = this.totalLength = lengthMap[divisions];
-  var boundingBox = this.boundingBox = (function() {
-    var temp;
-    var minX = getCurveValue(0, equationX), minY = getCurveValue(0, equationY),
-        maxX = getCurveValue(1, equationX), maxY = getCurveValue(1, equationY);
-    if (minX > maxX) {temp = maxX; maxX = minX; minX = temp;}
-    if (minY > maxY) {temp = maxY; maxY = minY; minY = temp;}
-    solveEquation(derivativeX).forEach(function(t) {
-      if (t >= 0 && t <= 1) {
-        var x = getCurveValue(t, equationX);
-        if (x < minX) {minX = x;}
-        if (x > maxX) {maxX = x;}
-      }
-    });
-    solveEquation(derivativeY).forEach(function(t) {
-      if (t >= 0 && t <= 1) {
-        var y = getCurveValue(t, equationY);
-        if (y < minY) {minY = y;}
-        if (y > maxY) {maxY = y;}
-      }
-    });
-    return([minX, minY, maxX, maxY]);
-  })();
-  this.getPointAtLength = function(l) {
-    var i = 0;
-    for (var i = 1; i <= divisions; i++) {
-      var l1 = lengthMap[i-1], l2 = lengthMap[i];
-      if (l1 <= l && l <= l2) {
-        var t = (i - (l2 - l) / (l2 - l1)) / divisions;
-        var x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
-            dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
-        return([x, y, Math.atan2(dy, dx)]);
-      }
-    }
-  }
-}
-var SvgLineSegment = function(p1x, p1y, p2x, p2y) {
-  var totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
-  var boundingBox = this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
-  this.getPointAtLength = function(l) {
-    if (l >= 0 && l <= totalLength) {
-      var r = l / totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
-      return([x, y, Math.atan2(p2y - p1y, p2x - p1x)]);
-    }
-  }
-}
-var SvgPath = function(d) {
-  var RawPath = [];
-  var pathCommands = [];
-  (function Parse() {
-    d = (d || '').trim();
-    var ArgumentsNumber = {A: 7, C: 6, H: 1, L: 2, M: 2, Q: 4, S: 4, T: 2, V: 1, Z: 0}
-    var RegexNumber = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?/, RegexCommand = /^[astvzqmhlcASTVZQMHLC]/, RegexDelim = /^(?:\s*,\s*|\s*)/;
-    function ConsumeMatch(RegExp) {
-      var temp = d.match(RegExp);
-      if (!temp) {return;}
-      d = d.slice(temp[0].length);
-      return(temp);
-    }
-    var Command, Value, Values, ArgsNumber;
-    while (Command = ConsumeMatch(RegexCommand)) {
-      Command = Command[0];
-      ConsumeMatch(RegexDelim);
-      ArgsNumber = ArgumentsNumber[Command.toUpperCase()];
-      Values = [];
-      while (Value = ConsumeMatch(RegexNumber)) {
-        Value = Value[0];
-        ConsumeMatch(RegexDelim);
-        if (Values.length === ArgsNumber) {
-          RawPath.push([Command].concat(Values));
-          Values = [];
-          if (Command === 'M') {Command = 'L';}
-          else if (Command === 'm') {Command = 'l';}
-        }
-        Values.push(Number(Value));
-      }
-      if (Values.length === ArgsNumber) {
-        RawPath.push([Command].concat(Values));
-      } else {
-        console.log('Error: ParseSvgPath: Command ' + Command + ' with ' + Values.length + ' numbers'); break;
-      }
-    }
-    if (d.length !== 0) {
-      console.log('Error: ParseSvgPath: Unexpected string ' + d);
-    }
-  })();
-  (function Normalize() { // convert all path commands to M, L, C, Z
-    function MoveTo(x, y) {
-      pathCommands.push(['M', x, y]);
-      StartX = CurrentX = x; StartY = CurrentY = y; LastCommand = 'M';
-    }
-    function ClosePath() {
-      pathCommands.push(['Z']);
-      CurrentX = StartX; CurrentY = StartY;
-    }
-    function LineTo(x, y) {
-      pathCommands.push(['L', x, y]);
-      CurrentX = x; CurrentY = y; LastCommand = 'L';
-    }
-    function CubicTo(c1x, c1y, c2x, c2y, x, y) {
-      pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
-      CurrentX = x; CurrentY = y; LastCommand = 'C'; LastCtrlX = c2x; LastCtrlY = c2y;
-    }
-    function QuadraticTo(cx, cy, x, y) {
-      var c1x = CurrentX + 2 / 3 * (cx - CurrentX), c1y = CurrentY + 2 / 3 * (cy - CurrentY),
-          c2x = x + 2 / 3 * (cx - x), c2y = y + 2 / 3 * (cy - y);
-      pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
-      CurrentX = x; CurrentY = y; LastCommand = 'Q'; LastCtrlX = cx; LastCtrlY = cy;
-    }
-    function ArcTo(rx, ry, rotAngle, arcLarge, arcSweep, x, y) { // From PDFKit
-      var xInit = CurrentX, yInit = CurrentY, xEnd = x, yEnd = y;
-      rx = Math.abs(rx); ry = Math.abs(ry); arcLarge = 1*!!arcLarge; arcSweep = 1*!!arcSweep;
-      var th = rotAngle * (Math.PI / 180),
-          sin_th = Math.sin(th),
-          cos_th = Math.cos(th);
-      var px = cos_th * (xInit - xEnd) * 0.5 + sin_th * (yInit - yEnd) * 0.5,
-          py = cos_th * (yInit - yEnd) * 0.5 - sin_th * (xInit - xEnd) * 0.5,
-          pl = (px * px) / (rx * rx) + (py * py) / (ry * ry);
-      if (pl > 1) {
-        pl = Math.sqrt(pl);
-        rx *= pl;
-        ry *= pl;
-      }
-      var a00 = cos_th / rx,
-          a01 = sin_th / rx,
-          a10 = -sin_th / ry,
-          a11 = cos_th / ry,
-          _a00 = cos_th * rx,
-          _a01 = -sin_th * ry,
-          _a10 = sin_th * rx,
-          _a11 = cos_th * ry;
-      var x0 = a00 * xInit + a01 * yInit,
-          y0 = a10 * xInit + a11 * yInit,
-          x1 = a00 * xEnd + a01 * yEnd,
-          y1 = a10 * xEnd + a11 * yEnd;
-      var sfactor = Math.sqrt(Math.max(0, 1 / ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) - 0.25));
-      if (arcSweep === arcLarge) {sfactor = -sfactor;}
-      var xc = 0.5 * (x0 + x1) - sfactor * (y1 - y0),
-          yc = 0.5 * (y0 + y1) + sfactor * (x1 - x0);
-      var th0 = Math.atan2(y0 - yc, x0 - xc),
-          th1 = Math.atan2(y1 - yc, x1 - xc),
-          th_arc = th1 - th0;
-      if (th_arc < 0 && arcSweep === 1) {
-        th_arc += 2 * Math.PI;
-      } else if (th_arc > 0 && arcSweep === 0) {
-        th_arc -= 2 * Math.PI;
-      }
-      var segments = Math.ceil(Math.abs(th_arc / (Math.PI * 0.5 + 0.001)));
-      for (var i = 0; i < segments; i++) {
-        var th2 = th0 + i * th_arc / segments,
-            th3 = th0 + (i + 1) * th_arc / segments,
-            th_half = 0.5 * (th3 - th2);
-        var t = 8/3 * Math.sin(th_half * 0.5) * Math.sin(th_half * 0.5) / Math.sin(th_half);
-        var x1 = xc + Math.cos(th2) - t * Math.sin(th2),
-            y1 = yc + Math.sin(th2) + t * Math.cos(th2),
-            x3 = xc + Math.cos(th3),
-            y3 = yc + Math.sin(th3),
-            x2 = x3 + t * Math.sin(th3),
-            y2 = y3 - t * Math.cos(th3);
-        pathCommands.push(['C', _a00 * x1 + _a01 * y1, _a10 * x1 + _a11 * y1, _a00 * x2 + _a01 * y2, _a10 * x2 + _a11 * y2, _a00 * x3 + _a01 * y3, _a10 * x3 + _a11 * y3]);
-      }
-      CurrentX = x; CurrentY = y; LastCommand = 'A';
-    }
-    var StartX = 0, StartY = 0, CurrentX = 0, CurrentY = 0, LastCommand, LastCtrlX, LastCtrlY;
-    for (var i = 0; i < RawPath.length; i++) {
-      var Values = RawPath[i];
-      switch(Values[0]) {
-        case 'M':  MoveTo(Values[1], Values[2]);  break;
-        case 'L':  LineTo(Values[1], Values[2]);  break;
-        case 'H':  LineTo(Values[1], CurrentY);  break;
-        case 'V':  LineTo(CurrentX, Values[1]);  break;
-        case 'Z': case 'z':  ClosePath();  break;
-        case 'm':  MoveTo(Values[1] + CurrentX, Values[2] + CurrentY);  break;
-        case 'l':  LineTo(CurrentX + Values[1], CurrentY + Values[2]);  break;
-        case 'h':  LineTo(CurrentX + Values[1], CurrentY);  break;
-        case 'v':  LineTo(CurrentX, CurrentY + Values[1]);  break;
-        case 'Q':  QuadraticTo(Values[1], Values[2], Values[3], Values[4]);  break;
-        case 'q':  QuadraticTo(CurrentX + Values[1], CurrentY + Values[2], CurrentX + Values[3], CurrentY + Values[4]);  break;
-        case 'T':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3], Values[4]);  break;
-        case 't':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3] + CurrentX, Values[4] + CurrentY);  break;
-        case 'C':  CubicTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]); break;
-        case 'c':  CubicTo(Values[1] + CurrentX, Values[2] + CurrentY, Values[3] + CurrentX, Values[4] + CurrentY, Values[5] + CurrentX, Values[6] + CurrentY); break;
-        case 'S':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2], Values[3], Values[4], Values[5]);  break;
-        case 's':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2] + CurrentX, Values[3] + CurrentY, Values[4] + CurrentX, Values[5] + CurrentX); break;
-        case 'A':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6], Values[7]); break;
-        case 'a':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6] + CurrentX, Values[7] + CurrentY); break;
-      }
-    }
-  })();
-  SvgShape.call(this, pathCommands);
-}
-var SvgRect = function(x, y, w, h, rx, ry) {
-  rx = rx || 0; ry = ry || rx;
-  var pathCommands, k = (4 / 3) * (Math.sqrt(2) - 1);
-  if (rx && ry) {
-    var cx = Math.min(rx, 0.5 * w) * (1.0 - k), cy = Math.min(ry, 0.5 * h) * (1.0 - k);
-    pathCommands = [
-      ['M', x + rx, y],
-      ['L', x + w - rx, y],
-      ['C', x + w - cx, y, x + w, y + cy, x + w, y + ry],
-      ['L', x + w, y + h - ry],
-      ['C', x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h],
-      ['L', x + rx, y + h],
-      ['C', x + cx, y + h, x, y + h - cy, x, y + h - ry],
-      ['L', x, y + ry],
-      ['C', x, y + cy, x + cx, y, x + rx, y],
-      ['Z']];
-  } else {
-    pathCommands = [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['Z']];
-  }
-  SvgShape.call(this, pathCommands);
-}
-var SvgEllipse = function(cx, cy, rx, ry) {
-  var k = (4 / 3) * (Math.sqrt(2) - 1), ox = rx * k, oy = ry * k
-  var pathCommands = [
-    ['M', cx - rx, cy],
-    ['C', cx - rx, cy - oy, cx - ox, cy - ry, cx, cy - ry],
-    ['C', cx + ox, cy - ry, cx + rx, cy - oy, cx + rx, cy],
-    ['C', cx + rx, cy + oy, cx + ox, cy + ry, cx, cy + ry],
-    ['C', cx - ox, cy + ry, cx - rx, cy + oy, cx - rx, cy],
-    ['Z']];
-  SvgShape.call(this, pathCommands);
-}
-var SvgCircle = function(cx, cy, r) {
-  SvgEllipse.call(this, cx, cy, r, r);
-}
-var SvgLine = function(x1, y1, x2, y2) {
-  var pathCommands = [['M', x1, y1], ['L', x2, y1]];
-  SvgShape.call(this, pathCommands);
-}
-var SvgPolyline = function(points) {
-  SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' '));
-}
-var SvgPolygon = function(points) {
-  SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ') + ' Z');
-}
-var SvgShape = function(pathCommands) {
-  this.pathCommands = pathCommands;
-  var transform = this.transform = function(m1, m2, m3, m4, m5, m6) {
-    var newPathCommands = [];
-    for (var i = 0; i < pathCommands.length; i++) {
-      var Values = pathCommands[i].slice();
-      for (var j = 1; j < Values.length; j+=2) {
-        var x = Values[j], y = Values[j+1];
-        Values[j] = m1 * x + m3 * y + m5;
-        Values[j+1] = m2 * x + m4 * y + m6;
-      }
-      newPathCommands.push(Values);
-    }
-    return(new SvgShape(newPathCommands));
-  };
-  var pathSegments = this.pathSegments = (function() {
-    var CurrentX = 0, CurrentY = 0, StartX = 0, StartY = 0, segments = [];
-    for (var i = 0; i < pathCommands.length; i++) {
-      var Values = pathCommands[i];
-      switch(Values[0]) {
-        case 'M':
-          StartX = CurrentX = Values[1]; StartY = CurrentY = Values[2];  break;
-        case 'L':
-          segments.push(new SvgLineSegment(CurrentX, CurrentY, Values[1], Values[2]));
-          CurrentX = Values[1]; CurrentY = Values[2];  break;
-        case 'C':
-          segments.push(new SvgBezierSegment(CurrentX, CurrentY, Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]));
-          CurrentX = Values[5]; CurrentY = Values[6];  break;
-        case 'Z':
-          segments.push(new SvgLineSegment(CurrentX, CurrentY, StartX, StartY));
-          CurrentX = StartX; CurrentY = StartY;  break;
-      }
-    }
-    return(segments);
-  })();
-  var boundingBox = this.boundingBox = (function() {
-    var bbox = [Infinity, Infinity, -Infinity, -Infinity];
-    function AddBounds(bbox1) {
-      if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
-      if (bbox1[2] > bbox[2]) {bbox[2] = bbox1[2];}
-      if (bbox1[1] < bbox[1]) {bbox[1] = bbox1[1];}
-      if (bbox1[3] > bbox[3]) {bbox[3] = bbox1[3];}
-    }
-    for (var i = 0; i < pathSegments.length; i++) {
-      AddBounds(pathSegments[i].boundingBox);
-    }
-    if (bbox[0] === Infinity) {bbox[0] = 0;}
-    if (bbox[1] === Infinity) {bbox[1] = 0;}
-    if (bbox[2] === -Infinity) {bbox[2] = 0;}
-    if (bbox[3] === -Infinity) {bbox[3] = 0;}
-    return(bbox);
-  })();
-  var totalLength = this.totalLength = (function() {
-    var length = 0;
-    for (var i = 0; i < pathSegments.length; i++) {
-      length += pathSegments[i].totalLength;
-    }
-    return(length);
-  })();
-  var getPointAtLength = this.getPointAtLength = function(l) {
-    var pathlength = 0;
-    for (var i = 0; i < pathSegments.length; i++) {
-      if (l - pathlength > pathSegments[i].totalLength) {
-        pathlength += pathSegments[i].totalLength;
-      } else {
-        return(pathSegments[i].getPointAtLength(l - pathlength));
-      }
-    }
-  };
-  var insertInDocument = this.insertInDocument = function(doc) {
-    for (var i = 0; i < pathCommands.length; i++) {
-      var Values = pathCommands[i];
-      switch(Values[0]) {
-        case 'M':  doc.moveTo(Values[1], Values[2]);  break;
-        case 'L':  doc.lineTo(Values[1], Values[2]);  break;
-        case 'C':  doc.bezierCurveTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]);  break;
-        case 'Z':  doc.closePath();  break;
-      }
-    }
-    return(doc);
-  }
-}
+var SVGtoPDF = function(doc, svg, x, y, options) {
 
-var ParseXml = function(XmlString) { // Convert a XML string into an object simulating the DOM nodes
-  var SvgNode = function(tag) {
-    this.nodeName = tag;
-    this._attributes = {};
-    this.childNodes = [];
-    this.parentNode = null;
-    this.nodeValue = null;
-    if (tag === '#text') {this.nodeType = 3;} else {this.nodeType = 1;}
-  };
-  Object.defineProperty(SvgNode.prototype, 'attributes', { get: function() {
-      if (this.nodeType === 1) {
-        var temp = [], keys = Object.keys(this._attributes);
-        for (var i = 0; i < keys.length; i++) { 
-          temp.push({name:keys[i], value:this._attributes[keys[i]]})
-        }
-        return(temp);
-      } else {return(undefined);}
-  }});
-  Object.defineProperty(SvgNode.prototype, 'children', { get: function() {
-      if (this.nodeType === 1) {
-        var temp = [];
-        for (var i = 0; i < this.childNodes.length; i++) {
-          if (this.childNodes[i].nodeType === 1) {temp.push(this.childNodes[i]);}
-        }
-        return(temp);
-      } else {return(undefined);}
-  }});
-  Object.defineProperty(SvgNode.prototype, 'parentElement', { get: function() {
-      return(this.parentNode);
-  }});
-  Object.defineProperty(SvgNode.prototype, 'tagName', { get: function() {
-      if (this.nodeType === 1) {
-        return(this.nodeName);
-      } else {return(undefined);}
-  }});
-  Object.defineProperty(SvgNode.prototype, 'id', { get: function() {
-      if (this.nodeType === 1) {
-        return(this.getAttribute('id') || '');
-      } else {return(undefined);}
-  }});
-  Object.defineProperty(SvgNode.prototype, 'name', { get: function() {
-      if (this.nodeType === 1) {
-        return(this.getAttribute('name') || '');
-      } else {return(undefined);}
-  }});
-  Object.defineProperty(SvgNode.prototype, 'textContent', { get: function() {
-      function TextContent(node) {
-        if (node.nodeType === 3) {return(node.nodeValue);}
-        var temp = '';
-        for (var i = 0; i < node.childNodes.length; i++) {
-          temp += TextContent(node.childNodes[i]);
-        }
-        return(temp);
+    var StringParser = function(str) {
+      var parser = this;
+      parser.match = function(exp, all) {
+        var temp = str.match(exp);
+        if (!temp || temp.index !== 0) {return;}
+        str = str.substring(temp[0].length);
+        return(all ? temp : temp[0]);
       }
-      return(TextContent(this));
-  }});
-  SvgNode.prototype.getAttribute = function(attr) {
-      return((this.hasAttribute(attr) || null) && this._attributes[attr]);
-  };
-  SvgNode.prototype.hasAttribute = function(attr) {
-      return(this._attributes.hasOwnProperty(attr));
-  };
-  SvgNode.prototype.getElementById = function(id) {
-      function GetElementById(node, id) {
-        var temp;
-        if (node.nodeType === 1) {
-          if (node._attributes.id === id) {return(node);}
-          for (var i = 0; i < node.childNodes.length; i++) {
-            if (temp = GetElementById(node.childNodes[i], id)) {return(temp);}
+      parser.matchSeparator = function() {
+        return(parser.match(/^(?:\s*,\s*|\s*|)/));
+      }
+      parser.matchSpace = function() {
+        return(parser.match(/^(?:\s*)/));
+      }
+      parser.matchLengthUnit = function() {
+        return(parser.match(/^(?:px|pt|cm|mm|in|pc|em|ex|%|)/));
+      }
+      parser.matchNumber = function() {
+        return(parser.match(/^(?:[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)/));
+      }
+    };
+
+    function ParseXml(Xml) { // Convert a XML string into an object simulating the DOM nodes
+      var SvgNode = function(tag) {
+        this.nodeName = tag;
+        this._attributes = {};
+        this.childNodes = [];
+        this.parentNode = null;
+        this.nodeValue = null;
+        if (tag === '#text') {this.nodeType = 3;} else {this.nodeType = 1;}
+      };
+      Object.defineProperty(SvgNode.prototype, 'attributes', { get: function() {
+          if (this.nodeType === 1) {
+            var temp = [], keys = Object.keys(this._attributes);
+            for (var i = 0; i < keys.length; i++) { 
+              temp.push({name:keys[i], value:this._attributes[keys[i]]})
+            }
+            return(temp);
+          } else {return(undefined);}
+      }});
+      Object.defineProperty(SvgNode.prototype, 'children', { get: function() {
+          if (this.nodeType === 1) {
+            var temp = [];
+            for (var i = 0; i < this.childNodes.length; i++) {
+              if (this.childNodes[i].nodeType === 1) {temp.push(this.childNodes[i]);}
+            }
+            return(temp);
+          } else {return(undefined);}
+      }});
+      Object.defineProperty(SvgNode.prototype, 'parentElement', { get: function() {
+          return(this.parentNode);
+      }});
+      Object.defineProperty(SvgNode.prototype, 'tagName', { get: function() {
+          if (this.nodeType === 1) {
+            return(this.nodeName);
+          } else {return(undefined);}
+      }});
+      Object.defineProperty(SvgNode.prototype, 'id', { get: function() {
+          if (this.nodeType === 1) {
+            return(this.getAttribute('id') || '');
+          } else {return(undefined);}
+      }});
+      Object.defineProperty(SvgNode.prototype, 'name', { get: function() {
+          if (this.nodeType === 1) {
+            return(this.getAttribute('name') || '');
+          } else {return(undefined);}
+      }});
+      Object.defineProperty(SvgNode.prototype, 'textContent', { get: function() {
+          function TextContent(node) {
+            if (node.nodeType === 3) {return(node.nodeValue);}
+            var temp = '';
+            for (var i = 0; i < node.childNodes.length; i++) {
+              temp += TextContent(node.childNodes[i]);
+            }
+            return(temp);
           }
-        }
-      }
-      return(GetElementById(this, id) || null);
-  };
-  // Code adapted from this one: https://github.com/segmentio/xml-parser/
-  XmlString = XmlString.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').trim(); // Remove comments
-  return(RecursiveParse());
-  function RecursiveParse() {
-    var temp, child, node, attr, value;
-    if (temp = ConsumeMatch(/^<([\w-:.]+)\s*/)) { // Opening tag
-      node = new SvgNode(temp[1]);
-      while (temp = ConsumeMatch(/^([\w:-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?\s*/)) { // Attribute
-        attr = temp[1]; value = DecodeHtmlEntities(temp[2] || temp[3] || '');
-        node._attributes[attr] = value;
-      }
-      if (ConsumeMatch(/^>/)) { // End of opening tag
-        while (child = RecursiveParse()) {
-          node.childNodes.push(child);
-          child.parentNode = node;
-        }
-        if (temp = ConsumeMatch(/^<\/([\w-:.]+)>/)) { // Closing tag
-          if (temp[1] === node.nodeName) {
+          return(TextContent(this));
+      }});
+      SvgNode.prototype.getAttribute = function(attr) {
+          return((this.hasAttribute(attr) || null) && this._attributes[attr]);
+      };
+      SvgNode.prototype.hasAttribute = function(attr) {
+          return(this._attributes.hasOwnProperty(attr));
+      };
+      SvgNode.prototype.getElementById = function(id) {
+          function GetElementById(node, id) {
+            var temp;
+            if (node.nodeType === 1) {
+              if (node._attributes.id === id) {return(node);}
+              for (var i = 0; i < node.childNodes.length; i++) {
+                if (temp = GetElementById(node.childNodes[i], id)) {return(temp);}
+              }
+            }
+          }
+          return(GetElementById(this, id) || null);
+      };
+      var Parser = new StringParser(Xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').trim());
+      return((function RecursiveParse() {
+        var temp, child, node, attr, value;
+        if (temp = Parser.match(/^<([\w-:.]+)\s*/, true)) { // Opening tag
+          node = new SvgNode(temp[1]);
+          while (temp = Parser.match(/^([\w:-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?\s*/, true)) { // Attribute
+            attr = temp[1]; value = DecodeHtmlEntities(temp[2] || temp[3] || '');
+            node._attributes[attr] = value;
+          }
+          if (Parser.match(/^>/)) { // End of opening tag
+            while (child = RecursiveParse()) {
+              node.childNodes.push(child);
+              child.parentNode = node;
+            }
+            if (temp = Parser.match(/^<\/([\w-:.]+)>/, true)) { // Closing tag
+              if (temp[1] === node.nodeName) {
+                return(node);
+              } else {
+                console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + temp[1]);
+                node.error = true;
+                return(node);
+              }
+            } else {
+              console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & not closing');
+              node.error = true;
+              return(node);
+            }
+          } else if (Parser.match(/^\/>/)) { // Self-closing tag
             return(node);
           } else {
-            console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + temp[1]);
-            node.error = true;
-            return(node);
+            console.log('Error: ParseXml: tag could not be parsed ' + node.nodeName);
           }
-        } else {
-          console.log('Error: ParseXml: tag not matching, opening ' + node.nodeName + ' & not closing');
-          node.error = true;
+        } else if (temp = Parser.match(/^([^<]+)/, true)) { // Text node
+          node = new SvgNode('#text');
+          node.nodeValue = DecodeHtmlEntities(temp[1]);
           return(node);
         }
-      } else if (ConsumeMatch(/^\/>/)) { // Self-closing tag
-        return(node);
-      } else {
-        console.log('Error: ParseXml: tag could not be parsed ' + node.nodeName);
+      })());
+      function DecodeHtmlEntities(Str) {
+        var Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249, 
+             rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190, 
+             iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221, 
+             THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252, 
+             yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949, 
+             zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476, 
+             trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744, 
+             cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
+        return(Str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
+          if (m0) {return(String.fromCharCode(parseInt(m0, 10)));}
+          else if (m1) {return(String.fromCharCode(parseInt(m1, 16)));}
+          else if (m2 && Entities[m2]) {return(String.fromCharCode(Entities[m2]));}
+          else {return(mt);}
+        }));
       }
-    } else if (temp = ConsumeMatch(/^([^<]+)/)) { // Text node
-      node = new SvgNode('#text');
-      node.nodeValue = DecodeHtmlEntities(temp[1]);
-      return(node);
-    }
-  }
-  function ConsumeMatch(RegExp) {
-    var temp = XmlString.match(RegExp);
-    if (!temp) {return;}
-    XmlString = XmlString.slice(temp[0].length);
-    return(temp);
-  }
-  function DecodeHtmlEntities(Str) {
-    var Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249, 
-         rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190, 
-         iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221, 
-         THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252, 
-         yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949, 
-         zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476, 
-         trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744, 
-         cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
-    return(Str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
-      if (m0) {return(String.fromCharCode(parseInt(m0, 10)));}
-      else if (m1) {return(String.fromCharCode(parseInt(m1, 16)));}
-      else if (m2 && Entities[m2]) {return(String.fromCharCode(Entities[m2]));}
-      else {return(mt);}
-    }));
-  }
-};
+    };
 
-var SVGtoPDF = function(doc, svg, x, y, options) {
+    var BezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
+      var solveEquation = function(curve) {
+        if (curve.length > 3) {console.log('Error: Bezier>solveEquation: unsolvable equation ' + curve.join(','));}
+        var a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
+        if (Math.abs(a) < 1e-10 && Math.abs(b) < 1e-10) {
+          return([]);
+        } else if (Math.abs(a) < 1e-10) {
+          return([(-c) / b]);
+        } else {
+          var d = b * b - 4 * a * c;
+          if (d > 0) {
+            return([(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)]);
+          } else if (d === 0) {
+            return([(-b) / (2 * a)]);
+          } else {
+            return([]);
+          }
+        }
+      };
+      var getCurveValue = function(t, curve) {
+        return((curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t);
+      };
+      var divisions = 15; // the accuracy isn't perfect but comparable to the arc-to-bezier conversion
+      var equationX = [p1x, -3*p1x+3*c1x, 3*p1x-6*c1x+3*c2x, -p1x+3*c1x-3*c2x+p2x];
+      var equationY = [p1y, -3*p1y+3*c1y, 3*p1y-6*c1y+3*c2y, -p1y+3*c1y-3*c2y+p2y];
+      var derivativeX = [-3*p1x+3*c1x, 6*p1x-12*c1x+6*c2x, -3*p1x+9*c1x-9*c2x+3*p2x];
+      var derivativeY = [-3*p1y+3*c1y, 6*p1y-12*c1y+6*c2y, -3*p1y+9*c1y-9*c2y+3*p2y];
+      var lengthMap = (function() {
+        var lengthMap = [0];
+        for (var i = 1; i <= divisions; i++) {
+          var t = (i - 0.5) / divisions;
+          var dx = getCurveValue(t, derivativeX) / divisions,
+              dy = getCurveValue(t, derivativeY) / divisions,
+              l = Math.sqrt(dx*dx+dy*dy);
+          lengthMap[i] = lengthMap[i - 1] + l;
+        }
+        return(lengthMap)
+      })();
+      var totalLength = this.totalLength = lengthMap[divisions];
+      var boundingBox = this.boundingBox = (function() {
+        var temp;
+        var minX = getCurveValue(0, equationX), minY = getCurveValue(0, equationY),
+            maxX = getCurveValue(1, equationX), maxY = getCurveValue(1, equationY);
+        if (minX > maxX) {temp = maxX; maxX = minX; minX = temp;}
+        if (minY > maxY) {temp = maxY; maxY = minY; minY = temp;}
+        solveEquation(derivativeX).forEach(function(t) {
+          if (t >= 0 && t <= 1) {
+            var x = getCurveValue(t, equationX);
+            if (x < minX) {minX = x;}
+            if (x > maxX) {maxX = x;}
+          }
+        });
+        solveEquation(derivativeY).forEach(function(t) {
+          if (t >= 0 && t <= 1) {
+            var y = getCurveValue(t, equationY);
+            if (y < minY) {minY = y;}
+            if (y > maxY) {maxY = y;}
+          }
+        });
+        return([minX, minY, maxX, maxY]);
+      })();
+      this.getPointAtLength = function(l) {
+        var i = 0;
+        for (var i = 1; i <= divisions; i++) {
+          var l1 = lengthMap[i-1], l2 = lengthMap[i];
+          if (l1 <= l && l <= l2) {
+            var t = (i - (l2 - l) / (l2 - l1)) / divisions;
+            var x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
+                dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
+            return([x, y, Math.atan2(dy, dx)]);
+          }
+        }
+      };
+    };
+
+    var LineSegment = function(p1x, p1y, p2x, p2y) {
+      var totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
+      var boundingBox = this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
+      this.getPointAtLength = function(l) {
+        if (l >= 0 && l <= totalLength) {
+          var r = l / totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
+          return([x, y, Math.atan2(p2y - p1y, p2x - p1x)]);
+        }
+      };
+    };
+
+    var SvgPath = function(d) {
+      var RawPath = [];
+      var pathCommands = [];
+      (function Parse() {
+        var Parser = new StringParser((d || '').trim());
+        var ArgumentsNumber = {A: 7, C: 6, H: 1, L: 2, M: 2, Q: 4, S: 4, T: 2, V: 1, Z: 0}
+        var Command, Value, Values, ArgsNumber;
+        while (Command = Parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
+          Parser.matchSeparator();
+          ArgsNumber = ArgumentsNumber[Command.toUpperCase()];
+          Values = [];
+          while (Value = Parser.matchNumber()) {
+            Parser.matchSeparator();
+            if (Values.length === ArgsNumber) {
+              RawPath.push([Command].concat(Values));
+              Values = [];
+              if (Command === 'M') {Command = 'L';}
+              else if (Command === 'm') {Command = 'l';}
+            }
+            Values.push(Number(Value));
+          }
+          if (Values.length === ArgsNumber) {
+            RawPath.push([Command].concat(Values));
+          } else {
+            console.log('Error: ParseSvgPath: Command ' + Command + ' with ' + Values.length + ' numbers'); break;
+          }
+        }
+        if (d.length !== 0) {
+          console.log('Error: ParseSvgPath: Unexpected string ' + d);
+        }
+      })();
+      (function Normalize() { // convert all path commands to M, L, C, Z
+        function MoveTo(x, y) {
+          pathCommands.push(['M', x, y]);
+          StartX = CurrentX = x; StartY = CurrentY = y; LastCommand = 'M';
+        }
+        function ClosePath() {
+          pathCommands.push(['Z']);
+          CurrentX = StartX; CurrentY = StartY;
+        }
+        function LineTo(x, y) {
+          pathCommands.push(['L', x, y]);
+          CurrentX = x; CurrentY = y; LastCommand = 'L';
+        }
+        function CubicTo(c1x, c1y, c2x, c2y, x, y) {
+          pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
+          CurrentX = x; CurrentY = y; LastCommand = 'C'; LastCtrlX = c2x; LastCtrlY = c2y;
+        }
+        function QuadraticTo(cx, cy, x, y) {
+          var c1x = CurrentX + 2 / 3 * (cx - CurrentX), c1y = CurrentY + 2 / 3 * (cy - CurrentY),
+              c2x = x + 2 / 3 * (cx - x), c2y = y + 2 / 3 * (cy - y);
+          pathCommands.push(['C', c1x, c1y, c2x, c2y, x, y])
+          CurrentX = x; CurrentY = y; LastCommand = 'Q'; LastCtrlX = cx; LastCtrlY = cy;
+        }
+        function ArcTo(rx, ry, rotAngle, arcLarge, arcSweep, x, y) { // From PDFKit
+          var xInit = CurrentX, yInit = CurrentY, xEnd = x, yEnd = y;
+          rx = Math.abs(rx); ry = Math.abs(ry); arcLarge = 1*!!arcLarge; arcSweep = 1*!!arcSweep;
+          var th = rotAngle * (Math.PI / 180), sin_th = Math.sin(th), cos_th = Math.cos(th);
+          var px = cos_th * (xInit - xEnd) * 0.5 + sin_th * (yInit - yEnd) * 0.5,
+              py = cos_th * (yInit - yEnd) * 0.5 - sin_th * (xInit - xEnd) * 0.5,
+              pl = (px * px) / (rx * rx) + (py * py) / (ry * ry);
+          if (pl > 1) {pl = Math.sqrt(pl); rx *= pl; ry *= pl;}
+          var a00 = cos_th / rx, a01 = sin_th / rx, a10 = -sin_th / ry, a11 = cos_th / ry,
+              _a00 = cos_th * rx, _a01 = -sin_th * ry, _a10 = sin_th * rx, _a11 = cos_th * ry;
+          var x0 = a00 * xInit + a01 * yInit,
+              y0 = a10 * xInit + a11 * yInit,
+              x1 = a00 * xEnd + a01 * yEnd,
+              y1 = a10 * xEnd + a11 * yEnd;
+          var sfactor = Math.sqrt(Math.max(0, 1 / ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) - 0.25));
+          if (arcSweep === arcLarge) {sfactor = -sfactor;}
+          var xc = 0.5 * (x0 + x1) - sfactor * (y1 - y0),
+              yc = 0.5 * (y0 + y1) + sfactor * (x1 - x0);
+          var th0 = Math.atan2(y0 - yc, x0 - xc),
+              th1 = Math.atan2(y1 - yc, x1 - xc),
+              th_arc = th1 - th0;
+          if (th_arc < 0 && arcSweep === 1) {
+            th_arc += 2 * Math.PI;
+          } else if (th_arc > 0 && arcSweep === 0) {
+            th_arc -= 2 * Math.PI;
+          }
+          var segments = Math.ceil(Math.abs(th_arc / (Math.PI * 0.5 + 0.001)));
+          for (var i = 0; i < segments; i++) {
+            var th2 = th0 + i * th_arc / segments,
+                th3 = th0 + (i + 1) * th_arc / segments,
+                th_half = 0.5 * (th3 - th2);
+            var t = 8/3 * Math.sin(th_half * 0.5) * Math.sin(th_half * 0.5) / Math.sin(th_half);
+            var x1 = xc + Math.cos(th2) - t * Math.sin(th2),
+                y1 = yc + Math.sin(th2) + t * Math.cos(th2),
+                x3 = xc + Math.cos(th3),
+                y3 = yc + Math.sin(th3),
+                x2 = x3 + t * Math.sin(th3),
+                y2 = y3 - t * Math.cos(th3);
+            pathCommands.push(['C', _a00 * x1 + _a01 * y1, _a10 * x1 + _a11 * y1, _a00 * x2 + _a01 * y2, _a10 * x2 + _a11 * y2, _a00 * x3 + _a01 * y3, _a10 * x3 + _a11 * y3]);
+          }
+          CurrentX = x; CurrentY = y; LastCommand = 'A';
+        }
+        var StartX = 0, StartY = 0, CurrentX = 0, CurrentY = 0, LastCommand, LastCtrlX, LastCtrlY;
+        for (var i = 0; i < RawPath.length; i++) {
+          var Values = RawPath[i];
+          switch(Values[0]) {
+            case 'M':  MoveTo(Values[1], Values[2]);  break;
+            case 'L':  LineTo(Values[1], Values[2]);  break;
+            case 'H':  LineTo(Values[1], CurrentY);  break;
+            case 'V':  LineTo(CurrentX, Values[1]);  break;
+            case 'Z': case 'z':  ClosePath();  break;
+            case 'm':  MoveTo(Values[1] + CurrentX, Values[2] + CurrentY);  break;
+            case 'l':  LineTo(CurrentX + Values[1], CurrentY + Values[2]);  break;
+            case 'h':  LineTo(CurrentX + Values[1], CurrentY);  break;
+            case 'v':  LineTo(CurrentX, CurrentY + Values[1]);  break;
+            case 'Q':  QuadraticTo(Values[1], Values[2], Values[3], Values[4]);  break;
+            case 'q':  QuadraticTo(CurrentX + Values[1], CurrentY + Values[2], CurrentX + Values[3], CurrentY + Values[4]);  break;
+            case 'T':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3], Values[4]);  break;
+            case 't':  QuadraticTo(CurrentX + (LastCommand === 'Q' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'Q' ? CurrentY - LastCtrlY : 0), Values[3] + CurrentX, Values[4] + CurrentY);  break;
+            case 'C':  CubicTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]); break;
+            case 'c':  CubicTo(Values[1] + CurrentX, Values[2] + CurrentY, Values[3] + CurrentX, Values[4] + CurrentY, Values[5] + CurrentX, Values[6] + CurrentY); break;
+            case 'S':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2], Values[3], Values[4], Values[5]);  break;
+            case 's':  CubicTo(CurrentX + (LastCommand === 'C' ? CurrentX - LastCtrlX : 0), CurrentY + (LastCommand === 'C' ? CurrentY - LastCtrlY : 0), Values[2] + CurrentX, Values[3] + CurrentY, Values[4] + CurrentX, Values[5] + CurrentX); break;
+            case 'A':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6], Values[7]); break;
+            case 'a':  ArcTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6] + CurrentX, Values[7] + CurrentY); break;
+          }
+        }
+      })();
+      SvgShape.call(this, pathCommands);
+    };
+
+    var SvgRect = function(x, y, w, h, rx, ry) {
+      rx = rx || 0; ry = ry || rx;
+      var pathCommands, k = (4 / 3) * (Math.sqrt(2) - 1);
+      if (rx && ry) {
+        var cx = Math.min(rx, 0.5 * w) * (1.0 - k), cy = Math.min(ry, 0.5 * h) * (1.0 - k);
+        pathCommands = [
+          ['M', x + rx, y],
+          ['L', x + w - rx, y],
+          ['C', x + w - cx, y, x + w, y + cy, x + w, y + ry],
+          ['L', x + w, y + h - ry],
+          ['C', x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h],
+          ['L', x + rx, y + h],
+          ['C', x + cx, y + h, x, y + h - cy, x, y + h - ry],
+          ['L', x, y + ry],
+          ['C', x, y + cy, x + cx, y, x + rx, y],
+          ['Z']];
+      } else {
+        pathCommands = [['M', x, y], ['L', x + w, y], ['L', x + w, y + h], ['L', x, y + h], ['Z']];
+      }
+      SvgShape.call(this, pathCommands);
+    };
+
+    var SvgEllipse = function(cx, cy, rx, ry) {
+      var k = (4 / 3) * (Math.sqrt(2) - 1), ox = rx * k, oy = ry * k
+      var pathCommands = [
+        ['M', cx - rx, cy],
+        ['C', cx - rx, cy - oy, cx - ox, cy - ry, cx, cy - ry],
+        ['C', cx + ox, cy - ry, cx + rx, cy - oy, cx + rx, cy],
+        ['C', cx + rx, cy + oy, cx + ox, cy + ry, cx, cy + ry],
+        ['C', cx - ox, cy + ry, cx - rx, cy + oy, cx - rx, cy],
+        ['Z']];
+      SvgShape.call(this, pathCommands);
+    };
+
+    var SvgCircle = function(cx, cy, r) {
+      SvgEllipse.call(this, cx, cy, r, r);
+    };
+
+    var SvgLine = function(x1, y1, x2, y2) {
+      var pathCommands = [['M', x1, y1], ['L', x2, y1]];
+      SvgShape.call(this, pathCommands);
+    };
+
+    var SvgPolyline = function(points) {
+      SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' '));
+    };
+
+    var SvgPolygon = function(points) {
+      SvgPath.call(this, points.map(function(x, i) {return((i===0?'M':(['L',''])[i%2]) + x);}).join(' ') + ' Z');
+    };
+
+    var SvgShape = function(pathCommands) {
+      this.pathCommands = pathCommands;
+      var transform = this.transform = function(m1, m2, m3, m4, m5, m6) {
+        var newPathCommands = [];
+        for (var i = 0; i < pathCommands.length; i++) {
+          var Values = pathCommands[i].slice();
+          for (var j = 1; j < Values.length; j+=2) {
+            var x = Values[j], y = Values[j+1];
+            Values[j] = m1 * x + m3 * y + m5;
+            Values[j+1] = m2 * x + m4 * y + m6;
+          }
+          newPathCommands.push(Values);
+        }
+        return(new SvgShape(newPathCommands));
+      };
+      var mergeShape = this.mergeShape = function(shape) {
+        return(new SvgShape(pathCommands.concat(shape.pathCommands)));
+      };
+      var pathSegments = this.pathSegments = (function() {
+        var CurrentX = 0, CurrentY = 0, StartX = 0, StartY = 0, segments = [];
+        for (var i = 0; i < pathCommands.length; i++) {
+          var Values = pathCommands[i];
+          switch(Values[0]) {
+            case 'M':
+              StartX = CurrentX = Values[1]; StartY = CurrentY = Values[2];  break;
+            case 'L':
+              segments.push(new LineSegment(CurrentX, CurrentY, Values[1], Values[2]));
+              CurrentX = Values[1]; CurrentY = Values[2];  break;
+            case 'C':
+              segments.push(new BezierSegment(CurrentX, CurrentY, Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]));
+              CurrentX = Values[5]; CurrentY = Values[6];  break;
+            case 'Z':
+              segments.push(new LineSegment(CurrentX, CurrentY, StartX, StartY));
+              CurrentX = StartX; CurrentY = StartY;  break;
+          }
+        }
+        return(segments);
+      })();
+      var boundingBox = this.boundingBox = (function() {
+        var bbox = [Infinity, Infinity, -Infinity, -Infinity];
+        function AddBounds(bbox1) {
+          if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
+          if (bbox1[2] > bbox[2]) {bbox[2] = bbox1[2];}
+          if (bbox1[1] < bbox[1]) {bbox[1] = bbox1[1];}
+          if (bbox1[3] > bbox[3]) {bbox[3] = bbox1[3];}
+        }
+        for (var i = 0; i < pathSegments.length; i++) {
+          AddBounds(pathSegments[i].boundingBox);
+        }
+        if (bbox[0] === Infinity) {bbox[0] = 0;}
+        if (bbox[1] === Infinity) {bbox[1] = 0;}
+        if (bbox[2] === -Infinity) {bbox[2] = 0;}
+        if (bbox[3] === -Infinity) {bbox[3] = 0;}
+        return(bbox);
+      })();
+      var totalLength = this.totalLength = (function() {
+        var length = 0;
+        for (var i = 0; i < pathSegments.length; i++) {
+          length += pathSegments[i].totalLength;
+        }
+        return(length);
+      })();
+      var getPointAtLength = this.getPointAtLength = function(l) {
+        var pathlength = 0;
+        for (var i = 0; i < pathSegments.length; i++) {
+          if (l - pathlength > pathSegments[i].totalLength) {
+            pathlength += pathSegments[i].totalLength;
+          } else {
+            return(pathSegments[i].getPointAtLength(l - pathlength));
+          }
+        }
+      };
+      var insertInDocument = this.insertInDocument = function(doc) {
+        for (var i = 0; i < pathCommands.length; i++) {
+          var Values = pathCommands[i];
+          switch(Values[0]) {
+            case 'M':  doc.moveTo(Values[1], Values[2]);  break;
+            case 'L':  doc.lineTo(Values[1], Values[2]);  break;
+            case 'C':  doc.bezierCurveTo(Values[1], Values[2], Values[3], Values[4], Values[5], Values[6]);  break;
+            case 'Z':  doc.closePath();  break;
+          }
+        }
+        return(doc);
+      };
+    };
 
     function ParseColor(v) { // Color string, rgba, rgb or hex value
       var NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0], 
@@ -536,25 +541,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return(null);
     }
 
-    function MatrixMultiply(a, b) { // Multiplication of 3x3 matrices
-      return([
-        a[0]*b[0]+a[1]*b[3]+a[2]*b[6], a[0]*b[1]+a[1]*b[4]+a[2]*b[7], a[0]*b[2]+a[1]*b[5]+a[2]*b[8],
-        a[3]*b[0]+a[4]*b[3]+a[5]*b[6], a[3]*b[1]+a[4]*b[4]+a[5]*b[7], a[3]*b[2]+a[4]*b[5]+a[5]*b[8],
-        a[6]*b[0]+a[7]*b[3]+a[8]*b[6], a[6]*b[1]+a[7]*b[4]+a[8]*b[7], a[6]*b[2]+a[7]*b[5]+a[8]*b[8]
-      ]);
-    }
-
-    // Mathematical matrices have 9 elements but SVG transforms have only 6, conversion functions are needed
-    function MatrixToMath(m) {return([m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1]);}
-
-    function MatrixToSvg(m) {return([m[0], m[3], m[1], m[4], m[2], m[5]]);}
-
-    function MatrixMultiplySvg () { // Combining the above function into one
-      var result = MatrixToMath(arguments[0]);
-      for (var i = 1; i < arguments.length; i++) {
-        result = MatrixMultiply(result, MatrixToMath(arguments[i]));
+    function MatrixMultiplySvg() {
+      function Multiply(a, b) {
+        return([ a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1], a[0]*b[2]+a[2]*b[3],
+                 a[1]*b[2]+a[3]*b[3], a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5] ]);
       }
-      return(MatrixToSvg(result));
+      var result = arguments[0];
+      for (var i = 1; i < arguments.length; i++) {
+        result = Multiply(result, arguments[i]);
+      }
+      return(result);
     }
 
     function ParseTranforms(v) { // Convert the value of SVG transform attribute into a matrix
@@ -1289,7 +1285,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     //  TextBoundingShape(Obj).insertInDocument(doc); doc.stroke('red'); // Temporary debugging
     //  console.log(Obj._pos); // Temporary debugging
     }
-    
+
     var PxToPt = 72/96; // 1px = 72/96pt
     options = options || {};
 
@@ -1313,45 +1309,4 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       console.log('Error: SVGtoPDF: This element can\'t be processed as SVG : ' + (svg && svg.nodeName));
     }
 
-}
-
-function Parser(str) {
-  var parser = this;
-  parser.match = function(exp, all) {
-    var temp = str.match(exp);
-    if (!temp || temp.index !== 0) {return;}
-    str = str.substring(temp[0].length);
-    return(all ? temp : temp[0]);
-  }
-  parser.matchSeparator = function() {
-    return(parser.match(/^(?:\s*,\s*|\s*|)/));
-  }
-  parser.matchSpace = function() {
-    return(parser.match(/^(?:\s*)/));
-  }
-  parser.matchLengthUnit = function() {
-    return(parser.match(/^(?:px|pt|cm|mm|in|pc|em|ex|%|)/));
-  }
-  parser.matchNumber = function() {
-    return(parser.match(/^(?:[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)/));
-  }
-  parser.matchPathCommand = function() {
-    return(parser.match(/^(?:[astvzqmhlcASTVZQMHLC])/));
-  }
-  parser.parseNumberList = function() {
-    var result = [], temp;
-    while(temp = parser.matchNumber()) {
-      result.push(temp);
-      parser.matchSeparator();
-    }
-    return(result);
-  }
-  parser.parseLengthList = function() {
-    var result = [], temp1, temp2;
-    while(typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
-      result.push(temp1 + temp2);
-      parser.matchSeparator();
-    }
-    return(result);
-  }
-}
+};
