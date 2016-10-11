@@ -69,15 +69,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else {return(undefined);}
       }});
       Object.defineProperty(SvgNode.prototype, 'textContent', { get: function() {
-          function TextContent(node) {
+          return((function TextContent(node) {
             if (node.nodeType === 3) {return(node.nodeValue);}
             var temp = '';
             for (var i = 0; i < node.childNodes.length; i++) {
               temp += TextContent(node.childNodes[i]);
             }
             return(temp);
-          }
-          return(TextContent(this));
+          })(this));
       }});
       SvgNode.prototype.getAttribute = function(attr) {
           return((this.hasAttribute(attr) || null) && this._attributes[attr]);
@@ -86,7 +85,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return(this._attributes.hasOwnProperty(attr));
       };
       SvgNode.prototype.getElementById = function(id) {
-          function GetElementById(node, id) {
+          return((function GetElementById(node, id) {
             var temp;
             if (node.nodeType === 1) {
               if (node._attributes.id === id) {return(node);}
@@ -94,8 +93,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (temp = GetElementById(node.childNodes[i], id)) {return(temp);}
               }
             }
-          }
-          return(GetElementById(this, id) || null);
+          })(this, id) || null);
       };
       var Parser = new StringParser(Xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').trim());
       return((function RecursiveParse() {
@@ -245,7 +243,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       (function Parse() {
         var Parser = new StringParser((d || '').trim());
         var ArgumentsNumber = {A: 7, C: 6, H: 1, L: 2, M: 2, Q: 4, S: 4, T: 2, V: 1, Z: 0}
-        var Command, Value, Values, ArgsNumber;
+        var Command, Value, Values, ArgsNumber, temp;
         while (Command = Parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
           Parser.matchSeparator();
           ArgsNumber = ArgumentsNumber[Command.toUpperCase()];
@@ -266,8 +264,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             console.log('Error: ParseSvgPath: Command ' + Command + ' with ' + Values.length + ' numbers'); break;
           }
         }
-        if (d.length !== 0) {
-          console.log('Error: ParseSvgPath: Unexpected string ' + d);
+        if (temp = Parser.match(/^.+/)) {
+          console.log('Error: ParseSvgPath: Unexpected string ' + temp);
         }
       })();
       (function Normalize() { // convert all path commands to M, L, C, Z
