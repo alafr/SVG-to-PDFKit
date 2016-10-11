@@ -553,92 +553,92 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return(result);
     }
 
-    function ParseTranforms(v) { // Convert the value of SVG transform attribute into a matrix
-      var Exp = /([A-Za-z]+)[(]([^(]+)[)][\s,]*|(.+)/g, Res = [1, 0, 0, 1, 0, 0], Match, Func, Nums, a;
-      v = (v || '').trim().toLowerCase();
-      while(Match = Exp.exec(v)) {
-        if (Match[3]) {return(null);}
-        Func = Match[1];
-        Nums = Match[2].split(/\s*,\s*|\s+/).map(function(x) {return(parseFloat(x));});
-        if (!Nums.every(Number.isFinite)) {return(null);}
-        if (Func === 'matrix' && Nums.length === 6) {
-          Res = MatrixMultiplySvg(Res, [Nums[0], Nums[1], Nums[2], Nums[3], Nums[4], Nums[5]]);
-        } else if (Func === 'translate' && Nums.length === 2) {
-          Res = MatrixMultiplySvg(Res, [1, 0, 0, 1, Nums[0], Nums[1]]);
-        } else if (Func === 'translate' && Nums.length === 1) {
-          Res = MatrixMultiplySvg(Res, [1, 0, 0, 1, Nums[0], 0]);
-        } else if (Func === 'scale' && Nums.length === 2) {
-          Res = MatrixMultiplySvg(Res, [Nums[0], 0, 0, Nums[1], 0, 0]);
-        } else if (Func === 'scale' && Nums.length === 1) {
-          Res = MatrixMultiplySvg(Res, [Nums[0], 0, 0, Nums[0], 0, 0]);
-        } else if (Func === 'rotate' && Nums.length === 3) {
-          a = Nums[0] * Math.PI / 180;
-          Res = MatrixMultiplySvg(Res, [1, 0, 0, 1, Nums[1], Nums[2]], [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0], [1, 0, 0, 1, -Nums[1], -Nums[2]]);
-        } else if (Func === 'rotate' && Nums.length === 1) {
-          a = Nums[0] * Math.PI / 180;
-          Res = MatrixMultiplySvg(Res, [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0]);
-        } else if (Func === 'skewx' && Nums.length === 1) {
-          a = Nums[0] * Math.PI / 180;
-          Res = MatrixMultiplySvg(Res, [1, 0, Math.tan(a), 1, 0, 0]);
-        } else if (Func === 'skewy' && Nums.length === 1) {
-          a = Nums[0] * Math.PI / 180;
-          Res = MatrixMultiplySvg(Res, [1, Math.tan(a), 0, 1, 0, 0]);
+    function ParseTranforms(string) { // Convert the value of SVG transform attribute into a matrix
+      var parser = new StringParser((string || '').trim().toLowerCase()), result = [1, 0, 0, 1, 0, 0], temp, func, nums, a;
+      while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
+        func = temp[1];
+        nums = ParseNumberList(temp[2]);
+        if (func === 'matrix' && nums.length === 6) {
+          result = MatrixMultiplySvg(result, [nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]]);
+        } else if (func === 'translate' && nums.length === 2) {
+          result = MatrixMultiplySvg(result, [1, 0, 0, 1, nums[0], nums[1]]);
+        } else if (func === 'translate' && nums.length === 1) {
+          result = MatrixMultiplySvg(result, [1, 0, 0, 1, nums[0], 0]);
+        } else if (func === 'scale' && nums.length === 2) {
+          result = MatrixMultiplySvg(result, [nums[0], 0, 0, nums[1], 0, 0]);
+        } else if (func === 'scale' && nums.length === 1) {
+          result = MatrixMultiplySvg(result, [nums[0], 0, 0, nums[0], 0, 0]);
+        } else if (func === 'rotate' && nums.length === 3) {
+          a = nums[0] * Math.PI / 180;
+          result = MatrixMultiplySvg(result, [1, 0, 0, 1, nums[1], nums[2]], [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0], [1, 0, 0, 1, -nums[1], -nums[2]]);
+        } else if (func === 'rotate' && nums.length === 1) {
+          a = nums[0] * Math.PI / 180;
+          result = MatrixMultiplySvg(result, [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), 0, 0]);
+        } else if (func === 'skewx' && nums.length === 1) {
+          a = nums[0] * Math.PI / 180;
+          result = MatrixMultiplySvg(result, [1, 0, Math.tan(a), 1, 0, 0]);
+        } else if (func === 'skewy' && nums.length === 1) {
+          a = nums[0] * Math.PI / 180;
+          result = MatrixMultiplySvg(result, [1, Math.tan(a), 0, 1, 0, 0]);
         } else {
           return(null);
         }
+        parser.matchSpace();
       }
-      return(Res);
+      if (parser.match(/^[.]/)) {return(null);}
+      return(result);
     }
 
-    function ParseLength(v, percent) { // 'em' & 'ex' are wrong and should be computed
+    function ComputeLength(value, unit, percent) { // 'em' & 'ex' are wrong and should be computed
       var Units = {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'pc':96/6, 'em':12, 'ex':6};
-      var temp = (v || '').match(/^([-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)(px|pt|cm|mm|in|pc|em|ex|%|)$/)
-      if (temp) {
-        if (temp[2] === '%') {
-          if (typeof percent === 'number') {
-            v = (+temp[1]) / 100 * percent;
-          } else if (percent === 'x') {
-            v = (+temp[1]) / 100 * ViewportWidth;
-          } else if (percent === 'y') {
-            v = (+temp[1]) / 100 * ViewportHeight;
-          } else {
-            v = (+temp[1]) / 100 * Math.sqrt(0.5 * ViewportWidth * ViewportWidth + 0.5 * ViewportHeight * ViewportHeight);
-          }
+      var result
+      if (unit === '%') {
+        if (typeof percent === 'number') {
+          result = value / 100 * percent;
+        } else if (percent === 'x') {
+          result = value / 100 * ViewportWidth;
+        } else if (percent === 'y') {
+          result = value / 100 * ViewportHeight;
         } else {
-          v = (+temp[1]) * Units[temp[2]];
+          result = value / 100 * Math.sqrt(0.5 * ViewportWidth * ViewportWidth + 0.5 * ViewportHeight * ViewportHeight);
         }
-        if (v > -Infinity && v < Infinity) {return(v);}
+      } else {
+        result = value * Units[unit];
+      }
+      return(result)
+    }
+
+    function ParseLength(string, percent) {
+      var parser = new StringParser((string || '').trim()), temp1, temp2;
+      if (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
+        return(ComputeLength(temp1, temp2, percent));
       }
     }
 
-    function ParseAspectRatio(Value) {
-      Value = (Value || '').trim().match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [];
-      var Type = Value[1] || Value[4] || 'meet';
-      var XAlign = {'Min':'left', 'Mid':'center', 'Max':'right'}[Value[2] || 'Mid'];
-      var YAlign = {'Min':'top', 'Mid':'center', 'Max':'bottom'}[Value[3] || 'Mid'];
+    function ParseAspectRatio(string) {
+      var temp = (string || '').trim().match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [];
+      var Type = temp[1] || temp[4] || 'meet';
+      var XAlign = {'Min':'left', 'Mid':'center', 'Max':'right'}[temp[2] || 'Mid'];
+      var YAlign = {'Min':'top', 'Mid':'center', 'Max':'bottom'}[temp[3] || 'Mid'];
       return({type: Type, xAlign: XAlign, yAlign:YAlign});
     }
 
-    function ParseLengthList(v, dir) {
-      var RegexLength = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?(?:px|pt|cm|mm|in|pc|em|ex|%|)/;
-      var temp, values = [];
-      v = (v || '').trim();
-      while (temp = v.match(RegexLength)) {
-        v = v.slice(temp[0].length).replace(/^(?:\s*,\s*|\s*)/, '');
-        values.push(ParseLength(temp[0], dir));
+    function ParseLengthList(string, percent) {
+      var parser = new StringParser((string || '').trim()), result = [], temp1, temp2;
+      while (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
+        result.push(ComputeLength(temp1, temp2, percent));
+        parser.matchSeparator();
       }
-      return(values);
+      return(result);
     }
 
-    function ParseNumberList(v) {
-      var RegexNumber = /^[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?/;
-      var temp, values = [];
-      v = (v || '').trim();
-      while (temp = v.match(RegexNumber)) {
-        v = v.slice(temp[0].length).replace(/^(?:\s*,\s*|\s*)/, '');
-        values.push(Number(temp[0]));
+    function ParseNumberList(string) {
+      var parser = new StringParser((string || '').trim()), result = [], temp;
+      while (temp = parser.matchNumber()) {
+        result.push(Number(temp));
+        parser.matchSeparator();
       }
-      return(values);
+      return(result);
     }
 
     function Choose(value1, value2) { // Something like the '||' operator but with the 0 and the empty string being accepted
