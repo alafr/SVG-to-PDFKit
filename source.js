@@ -581,7 +581,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         } else {
           return(null);
         }
-        parser.matchSpace();
+        parser.matchSeparator();
       }
       if (parser.match(/^[.]/)) {return(null);}
       return(result);
