@@ -1,17 +1,16 @@
 # SVG-to-PDFKit
 Insert SVG into a PDF document created with PDFKit.
 
-### This is the branch I'm currently working on. It has more bugs, please use the master branch.
-
 Use:
 
-    SVGtoPDF(doc, svg, x, y);
+    SVGtoPDF(doc, svg, x, y, options);
 
 Parameters:
 
     doc [PDFDocument] = the PDF document created with PDFKit
     svg [SVGElement or string] = the SVG object or XML code
     x, y [number] = the position where the SVG will be added
+    options [Object] = not used yet
 
 Demo:
 
