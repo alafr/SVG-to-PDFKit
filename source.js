@@ -3,23 +3,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     doc.addContent = function(data) {
       (this._writeTarget || this.page).write(data);
-      return(this);
+      return this;
     };
     doc.createGroup = function() {
       let group = new (function PDFGroup() {})();
-      let maxInt = 2147483647;
       group.name = 'G' + (this._groupCount = (this._groupCount || 0) + 1);
       group.closed = false;
       group.xobj = this.ref({
         Type: 'XObject', 
         Subtype: 'Form', 
         FormType: 1, 
-        BBox: [-maxInt, -maxInt, maxInt, maxInt], 
+        BBox: [-1000000, -1000000, 1000000, 1000000], 
         Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
       });
       group.previousGroup = this._currentGroup;
       this.writeToGroup(group);
-      return(group);
+      return group;
     };
     doc.writeToGroup = function(group) {
       if (group && !group.closed) {
@@ -29,19 +28,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this._currentGroup = null;
         this._writeTarget = null;
       }
-      return(this);
+      return this;
     };
     doc.closeGroup = function(group) {
       this.page.xobjects[group.name] = group.xobj;
       group.xobj.end();
       group.closed = true;
       this.writeToGroup(group.previousGroup);
-      return(this);
+      return this;
     };
     doc.insertGroup = function(group) {
       if (!group.closed) {this.closeGroup(group);}
       this.addContent('/' + group.name + ' Do');
-      return(this);
+      return this;
     };
     doc.applyMask = function(group, clip) {
       if (!group.closed) {this.closeGroup(group);}
@@ -53,24 +52,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.page.ext_gstates[name] = gstate;
       gstate.end();
       this.addContent("/" + name + " gs");
-      return(this);
+      return this;
     };
     doc.beginText = function(font, size) {
       this._font = font; this._fontSize = size;
       if (!this.page.fonts[font.id]) {this.page.fonts[font.id] = font.ref();}
-      this.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
+      return this.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
     };
     doc.setTextMatrix = function(a, b, c, d, e, f) {
-      this.addContent(this.number(a) + ' ' + this.number(b) + ' ' + this.number(-c) + ' '  + this.number(-d) + ' ' + this.number(e) + ' ' + this.number(f) + ' Tm');
+      return this.addContent(this.number(a) + ' ' + this.number(b) + ' ' + this.number(-c) + ' '  + this.number(-d) + ' ' + this.number(e) + ' ' + this.number(f) + ' Tm');
     };
     doc.setTextMode = function(fill, stroke) {
-      this.addContent((2 * (!!stroke) + 1 * (!!fill) - 1) + ' Tr');
+      return this.addContent((2 * (!!stroke) + 1 * (!!fill) - 1) + ' Tr');
     };
     doc.writeGlyph = function(glyphid) {
-      this.addContent('<' + glyphid + '> Tj');
+      return this.addContent('<' + glyphid + '> Tj');
     };
     doc.endText = function() {
-      this.addContent('ET');
+      return this.addContent('ET');
     };
 
     function warningMessage(str) {
@@ -157,7 +156,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               node.childNodes.push(child);
               child.parentNode = node;
             }
-            if (temp = parser.match(/^<\/([\w:.-]+)>/, true)) { // Closing tag
+            if (temp = parser.match(/^<\/([\w:.-]+)\s*>/, true)) { // Closing tag
               if (temp[1] === node.nodeName) {
                 return node;
               } else {
@@ -244,6 +243,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         result = multiply(result, arguments[i]);
       }
       return result;
+    }
+    function inverseMatrix(m) {
+      let dt = m[0] * m[3] - m[1] * m[2];
+      return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -420,7 +423,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     };
     var SvgShape = function(commands) {
-      let pathCommands = [], StartX = 0, StartY = 0, CurrX = 0, CurrY = 0, LastCom, LastCtrlX, LastCtrlY;
+      let pathCommands = this.pathCommands = [], StartX = 0, StartY = 0, CurrX = 0, CurrY = 0, LastCom, LastCtrlX, LastCtrlY;
       if (commands && commands.length) {
         for (let i = 0; i < commands.length; i++) {
           pathCommands.push(commands[i].slice());
@@ -698,13 +701,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         'fill-opacity':     {inherit: true, initial: 1},
         'stroke-opacity':   {inherit: true, initial: 1},
         'fill-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
+        'clip-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
         'stroke-width':     {inherit: true, initial: 1},
         'stroke-dasharray': {inherit: true, initial: []},
         'stroke-dashoffset':{inherit: true, initial: 0},
         'stroke-miterlimit':{inherit: true, initial: 4},
         'stroke-linejoin':  {inherit: true, initial: 'miter', values: {'miter':'miter', 'round':'round', 'bevel':'bevel'}},
         'stroke-linecap':   {inherit: true, initial: 'butt', values: {'butt':'butt', 'round':'round', 'square':'square'}},
-        'font-size':        {inherit: true, initial: 12, values: {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}},
+        'font-size':        {inherit: true, initial: 16, values: {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}},
         'font-family':      {inherit: true, initial: 'sans-serif'},
         'font-weight':      {inherit: true, initial: 'normal', values: {'600':'bold', '700':'bold', '800':'bold', '900':'bold', 'bold':'bold', 'bolder':'bold', '500':'normal', '400':'normal', '300':'normal', '200':'normal', '100':'normal', 'normal':'normal', 'lighter':'normal'}},
         'font-style':       {inherit: true, initial: 'normal', values: {'italic':'italic', 'oblique':'italic', 'normal':'normal'}},
@@ -720,9 +724,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         'marker-end':       {inherit: true, initial: null},
         'opacity':          {inherit: false, initial: 1},
         'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-        'display':          {inherit: false, initial: 'block', values: {'none': 'none', 'block':'block'}},
+        'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block'}},
         'clip-path':        {inherit: false, initial: null},
-        'mask':             {inherit: false, initial: null}
+        'mask':             {inherit: false, initial: null},
+        'overflow':         {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
       };
       this.attr = function(key) {
         return obj.getAttribute(key);
@@ -851,6 +856,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             result = (function() {
               if (value === 'none' || value === 'transparent') {return 'none';}
               if (value === 'currentColor') {return this.get('color');}
+              if (this.resolveUrl(value)) {warningMessage('Gradients and patterns not implemented'); return 'none';}
               return parseColor(value);
             }).call(this);
             break;
@@ -921,59 +927,68 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return cache['<viewport>'] = Math.sqrt(0.5 * this.getVWidth() * this.getVWidth() + 0.5 * this.getVHeight() * this.getVHeight());
       };
       this.getBoundingBox = function() {
-        return this.getBoundingShape().boundingBox;
+        let shape = this.getBoundingShape();
+        return shape.boundingBox;
       };
     };
 
-    var SvgElemContainer = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
-      this.getTransformation = function() {return [1, 0, 0, 1, 0, 0];};
-      this.getTransformationAfterClip = function() {return [1, 0, 0, 1, 0, 0];};
-      this.getClipRect = function() {};
+    var SvgElemMaskable = function(obj) {
+      this.transform = function() {
+        doc.transform.apply(doc, this.getTransformation());
+      };
+      this.clip = function() {
+        if (this.get('clip-path')) {
+          let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
+          clipPath.drawInDocument();
+        }
+      };
+      this.mask = function() {
+        if (this.get('mask')) {
+          let mask = new SvgElemMask(this.get('mask'), null, this.getBoundingBox());
+          mask.drawInDocument();
+        }
+      };
+    };
+
+    var SvgElemHasChildren = function(obj) {
       this.getBoundingShape = function() {
         let shape = new SvgShape(),
             children = this.getChildren();
         for (let i = 0; i < children.length; i++) {
-          if (typeof children[i].getBoundingShape === 'function') {
-            shape.mergeShape(children[i].getBoundingShape());
+          if (children[i].get('display') !== 'none') {
+            if (typeof children[i].getBoundingShape === 'function') {
+              let childShape = children[i].getBoundingShape()
+              if (typeof children[i].getTransformation === 'function') {
+                childShape.transform(children[i].getTransformation());
+              }
+              shape.mergeShape(childShape);
+            }
           }
         }
-        return shape.transform(this.getTransformation()).transform(this.getTransformationAfterClip());
+        return shape;
       };
-      this.drawInDocument = function(isClip) {
-        doc.save();
-        doc.transform.apply(doc, this.getTransformation());
-        let rect = this.getClipRect();
-        if (rect) {
-          doc.rect(rect[0], rect[1], rect[2], rect[3]).clip();
-        }
-        doc.transform.apply(doc, this.getTransformationAfterClip());
-        let group;
-        if (this.get('opacity') < 1 && !isClip) {
-          group = doc.createGroup();
-        }
+      this.drawChildren = function(isClip) {
         let children = this.getChildren();
         for (let i = 0; i < children.length; i++) {
-          if (typeof children[i].drawInDocument === 'function' && children[i].get('display') !== 'none') {
-            children[i].drawInDocument(isClip);
+          if (children[i].get('display') !== 'none') {
+            if (typeof children[i].drawInDocument === 'function') {
+              children[i].drawInDocument(isClip);
+            }
           }
         }
-        if (group) {
-          doc.closeGroup(group);
-          doc.fillOpacity(this.get('opacity'));
-          doc.insertGroup(group);
-        }
-        doc.restore();
       };
     };
 
     var SvgElemUse = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
+      SvgElemMaskable.call(this, obj);
       let x = this.computeLength(this.attr('x'), this.getVWidth(), 0),
           y = this.computeLength(this.attr('y'), this.getVHeight(), 0),
           child = this.resolveUrl(this.attr('xlink:href'));
       if (child) {child = new SvgElem(child, this);}
+      this.getChildren  = function() {
+        return [child];
+      };
       this.getTransformation = function() {
         return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
       };
@@ -984,9 +999,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return new SvgShape();
       };
       this.drawInDocument = function(isClip) {
-        if (child && typeof child.drawInDocument === 'function') {
+        if (child && typeof child.drawInDocument === 'function' && child.get('display') !== 'none') {
           doc.save();
-          doc.transform.apply(doc, this.getTransformation());
+          this.transform();
+          this.clip();
+          this.mask();
           let group;
           if (this.get('opacity') < 1 && !isClip) {
             group = doc.createGroup();
@@ -1003,75 +1020,56 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemGroup = function(obj, inherits) {
-      SvgElemContainer.call(this, obj, inherits);
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      SvgElemMaskable.call(this, obj);
+      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         return this.get('transform');
-      }
+      };
+      this.drawInDocument = function(isClip) {
+        doc.save();
+        this.transform();
+        this.clip();
+        this.mask();
+        let group;
+        if (this.get('opacity') < 1 && !isClip) {
+          group = doc.createGroup();
+        }
+        this.drawChildren(isClip);
+        if (group) {
+          doc.closeGroup(group);
+          doc.fillOpacity(this.get('opacity'));
+          doc.insertGroup(group);
+        }
+        doc.restore();
+      };
     };
 
     var SvgElemSvg = function(obj, inherits) {
-      SvgElemContainer.call(this, obj, inherits);
-      let viewBox = this.getNumberList(this.attr('viewBox')),
-          width = this.computeLength(this.attr('width'), this.getParentVWidth(), this.getVWidth()),
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      SvgElemMaskable.call(this, obj);
+      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
+      let width = this.computeLength(this.attr('width'), this.getParentVWidth(), this.getVWidth()),
           height = this.computeLength(this.attr('height'), this.getParentVHeight(), this.getVHeight()),
+          viewBox = this.computeViewbox(this.attr('viewBox'), [0, 0, width, height]),
           x = this.computeLength(this.attr('x'), this.getParentVWidth(), 0),
           y = this.computeLength(this.attr('y'), this.getParentVHeight(), 0);
       this.getVWidth = function() {
-        return (viewBox.length === 4 ? viewBox[2] : width);
+        return viewBox[2];
       };
       this.getVHeight = function() {
-        return (viewBox.length === 4 ? viewBox[3] : height);
+        return viewBox[3];
       };
       this.getTransformation = function() {
-        return [1, 0, 0, 1, x, y];
-      };
-      this.getTransformationAfterClip = function() {
-        if (viewBox.length === 4) {
-          let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
-              temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
-              ratioType = temp[1] || temp[4] || 'meet',
-              xAlign = temp[2] || 'Mid',
-              yAlign = temp[3] || 'Mid',
-              scaleX = width / viewBox[2],
-              scaleY = height / viewBox[3],
-              dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign],
-              dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign];
-          if (ratioType === 'slice') {
-            scaleY = scaleX = Math.max(scaleX, scaleY);
-          } else if (ratioType === 'meet') {
-            scaleY = scaleX = Math.min(scaleX, scaleY);
-          }
-          return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX) - scaleX * viewBox[0], dy * (height - viewBox[3] * scaleY) - scaleY * viewBox[1]];
-        } else {
-          return [1, 0, 0, 1, 0, 0];
-        }
-      };
-      this.getClipRect = function() {
-        if (this.attr('overflow') !== 'visible') {
-          return [0, 0, width, height];
-        }
-      };
-    };
-
-    var SVGElemImage = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      let link = (this.attr('xlink:href') || '').replace(/\s+/g, '');
-      let width = this.computeLength(this.attr('width'), this.getVWidth(), 0);
-      let height = this.computeLength(this.attr('height'), this.getVHeight(), 0);
-      let x = this.computeLength(this.attr('x'), this.getVWidth(), 0);
-      let y = this.computeLength(this.attr('y'), this.getVHeight(), 0);
-      let image = doc.openImage(link);
-      this.getTransformation = function() {
-        return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
-      };
-      this.getTransformationAfterClip = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
             yAlign = temp[3] || 'Mid',
-            scaleX = width / image.width,
-            scaleY = height / image.height,
+            scaleX = width / viewBox[2],
+            scaleY = height / viewBox[3],
             dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign],
             dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign];
         if (ratioType === 'slice') {
@@ -1079,32 +1077,77 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         } else if (ratioType === 'meet') {
           scaleY = scaleX = Math.min(scaleX, scaleY);
         }
-        return [scaleX, 0, 0, scaleY, dx * (width - image.width * scaleX) - scaleX * 0, dy * (height - image.height * scaleY) - scaleY * 0];
-      };
-      this.getClipRect = function() {
-        if (this.attr('overflow') !== 'visible') {
-          return [0, 0, width, height];
-        }
-      };
-      this.getBoundingShape = function() {
-        let shape = new SvgShape();
-        shape.M(0, 0).L(image.width, 0).L(image.width, image.height).L(0, image.height).Z();
-        return shape.transform(this.getTransformation()).transform(this.getTransformationAfterClip());
+        return [scaleX, 0, 0, scaleY, x + dx * (width - viewBox[2] * scaleX) - scaleX * viewBox[0], y + dy * (height - viewBox[3] * scaleY) - scaleY * viewBox[1]];
       };
       this.drawInDocument = function(isClip) {
-        if (this.get('visibility') === 'hidden') {return;}
         doc.save();
-        doc.transform.apply(doc, this.getTransformation());
-        let rect = this.getClipRect();
-        if (rect) {
-          doc.rect(rect[0], rect[1], rect[2], rect[3]).clip();
+        if (this.get('overflow') === 'hidden') {
+          doc.rect(x, y, width, height).clip();
         }
-        doc.transform.apply(doc, this.getTransformationAfterClip());
+        this.transform();
+        this.clip();
+        this.mask();
+        let group;
+        if (this.get('opacity') < 1 && !isClip) {
+          group = doc.createGroup();
+        }
+        this.drawChildren(isClip);
+        if (group) {
+          doc.closeGroup(group);
+          doc.fillOpacity(this.get('opacity'));
+          doc.insertGroup(group);
+        }
+        doc.restore();
+      };
+    };
+
+    var SVGElemImage = function(obj, inherits) {
+      SvgElem.call(this, obj, inherits);
+      SvgElemMaskable.call(this, obj);
+      let link = (this.attr('xlink:href') || '').replace(/\s+/g, '');
+      let width = this.computeLength(this.attr('width'), this.getVWidth(), 0);
+      let height = this.computeLength(this.attr('height'), this.getVHeight(), 0);
+      let x = this.computeLength(this.attr('x'), this.getVWidth(), 0);
+      let y = this.computeLength(this.attr('y'), this.getVHeight(), 0);
+      let image = (function() {if (!link) {return;} try {return doc.openImage(link);} catch(e) {warningMessage('SvgElemImage: failed to open image \'' + link.slice(0, 50) + '\' in PDFKit'); return;}})();
+      this.getTransformation2 = function() {
+        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+            temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
+            ratioType = temp[1] || temp[4] || 'meet',
+            xAlign = temp[2] || 'Mid',
+            yAlign = temp[3] || 'Mid',
+            scaleX = (image ? width / image.width : 1),
+            scaleY = (image ? height / image.height : 1),
+            dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign],
+            dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign];
+        if (ratioType === 'slice') {
+          scaleY = scaleX = Math.max(scaleX, scaleY);
+        } else if (ratioType === 'meet') {
+          scaleY = scaleX = Math.min(scaleX, scaleY);
+        }
+        return [scaleX, 0, 0, scaleY, x + dx * (width - (image ? image.width : width) * scaleX) - scaleX * 0, y + dy * (height - (image ? image.height : height) * scaleY) - scaleY * 0];
+      };
+      this.getTransformation = function() {
+        return this.get('transform');
+      };
+      this.getBoundingShape = function() {
+        return new SvgShape().M(x, y).L(x + width, y).L(x + width, y + height).L(x, y + height).Z();
+      };
+      this.drawInDocument = function(isClip) {
+        if (this.get('visibility') === 'hidden' || !image) {return;}
+        doc.save();
+        this.transform();
+        this.clip();
+        this.mask();
+        if (this.get('overflow') === 'hidden') {
+          doc.rect(x, y, width, height).clip();
+        }
+        doc.transform.apply(doc, this.getTransformation2());
         if (!isClip) {
           doc.fillOpacity(this.get('opacity'));
           doc.image(image, 0, 0);
         } else {
-          doc.rect(0, 0, image.width, image.height).fill('black');
+          doc.rect(0, 0, image.width, image.height).fill('white');
         }
         doc.restore();
       };
@@ -1112,177 +1155,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemBasicShape = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
+      SvgElemMaskable.call(this, obj);
       this.getBoundingShape = function() {
-        return this.shape.clone().transform(this.get('transform'));
+        return this.shape.clone();
+      };
+      this.getTransformation = function() {
+        return this.get('transform');
       };
       this.drawInDocument = function(isClip) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
         doc.save();
-        doc.transform.apply(doc, this.get('transform'));
-        if (!isClip) {
-          if (this.get('fill') !== 'none' || this.get('stroke') !== 'none') {
-            if (this.get('fill') !== 'none') {
-              doc.fillColor(this.get('fill').slice(0, 3), this.get('fill-opacity') * this.get('fill')[3] * this.get('opacity'))
-            }
-            if (this.get('stroke') !== 'none' && this.get('stroke-width')) {
-              doc.strokeColor(this.get('stroke').slice(0, 3), this.get('stroke-opacity') * this.get('stroke')[3] * this.get('opacity'))
-                 .lineWidth(this.get('stroke-width'))
-                 .miterLimit(this.get('stroke-miterlimit'))
-                 .lineJoin(this.get('stroke-linejoin'))
-                 .lineCap(this.get('stroke-linecap'))
-                 .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
-            }
-            this.shape.insertInDocument();
-            if (this.get('fill') !== 'none' && this.get('stroke') !== 'none') {
-              doc.fillAndStroke(this.get('fill-rule'));
-            } else if (this.get('fill') !== 'none') {
-              doc.fill(this.get('fill-rule'));
-            } else if (this.get('stroke') !== 'none') {
-              doc.stroke();
-            }
-          }
-          let MarkersPos = this.shape.getMarkers();
-          if (this.get('marker-start')) {
-            let marker = new SvgElemMarker(this.get('marker-start'), null, MarkersPos[0], this.get('stroke-width'));
-            marker.drawInDocument();
-          }
-          if (this.get('marker-mid')) {
-            for (let i = 1; i < MarkersPos.length - 1; i++) {
-              let marker = new SvgElemMarker(this.get('marker-mid'), null, MarkersPos[i], this.get('stroke-width'));
-              marker.drawInDocument();
-            }
-          }
-          if (this.get('marker-end')) {
-            let marker = new SvgElemMarker(this.get('marker-end'), null, MarkersPos[MarkersPos.length - 1], this.get('stroke-width'));
-            marker.drawInDocument();
-          }
-        } else {
-          this.shape.insertInDocument();
-          doc.fill('black');
-        }
-        doc.restore();
-      };
-    };
-
-    var SvgElemRect = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let x = this.computeLength(this.attr('x'), this.getVWidth(), 0),
-          y = this.computeLength(this.attr('y'), this.getVHeight(), 0),
-          w = this.computeLength(this.attr('width'), this.getVWidth(), 0),
-          h = this.computeLength(this.attr('height'), this.getVHeight(), 0),
-          rx = this.computeLength(this.attr('rx'), this.getVWidth()),
-          ry = this.computeLength(this.attr('ry'), this.getVHeight());
-      if (rx === undefined && ry === undefined) {rx = ry = 0;}
-      else if (rx === undefined && ry !== undefined) {rx = ry;}
-      else if (rx !== undefined && ry === undefined) {ry = rx;}
-      this.shape = new SvgShape()
-      if (rx && ry) {
-        rx = Math.min(rx, 0.5 * w);
-        ry = Math.min(ry, 0.5 * h);
-        let k = (4 / 3) * (Math.sqrt(2) - 1), cx = rx * (1.0 - k), cy = ry * (1.0 - k);
-        this.shape = new SvgShape()
-                      .M(x + rx, y)
-                      .L(x + w - rx, y)
-                      .C(x + w - cx, y, x + w, y + cy, x + w, y + ry)
-                      .L(x + w, y + h - ry)
-                      .C(x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h)
-                      .L(x + rx, y + h)
-                      .C(x + cx, y + h, x, y + h - cy, x, y + h - ry)
-                      .L(x, y + ry)
-                      .C(x, y + cy, x + cx, y, x + rx, y)
-                      .Z();
-      } else {
-        this.shape = new SvgShape()
-                      .M(x, y)
-                      .L(x + w, y)
-                      .L(x + w, y + h)
-                      .L(x, y + h)
-                      .Z();
-      }
-    };
-
-    var SvgElemCircle = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let cx = this.computeLength(this.attr('cx'), this.getVWidth(), 0),
-          cy = this.computeLength(this.attr('cy'), this.getVHeight(), 0),
-          r = this.computeLength(this.attr('r'), this.getViewport(), 0),
-          k = (4 / 3) * (Math.sqrt(2) - 1); 
-      this.shape = new SvgShape()
-                    .M(cx + r, cy)
-                    .C(cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r)
-                    .C(cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy)
-                    .C(cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r)
-                    .C(cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy)
-                    .Z();
-    };
-
-    var SvgElemEllipse = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let cx = this.computeLength(this.attr('cx'), this.getVWidth(), 0),
-          cy = this.computeLength(this.attr('cy'), this.getVHeight(), 0),
-          rx = this.computeLength(this.attr('rx'), this.getVWidth(), 0),
-          ry = this.computeLength(this.attr('ry'), this.getVHeight(), 0),
-          k = (4 / 3) * (Math.sqrt(2) - 1); 
-      this.shape = new SvgShape()
-                    .M(cx + rx, cy)
-                    .C(cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry)
-                    .C(cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy)
-                    .C(cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry)
-                    .C(cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy)
-                    .Z();
-    };
-
-    var SvgElemLine = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let x1 = this.computeLength(this.attr('x1'), this.getVWidth(), 0),
-          y1 = this.computeLength(this.attr('y1'), this.getVHeight(), 0),
-          x2 = this.computeLength(this.attr('x2'), this.getVWidth(), 0),
-          y2 = this.computeLength(this.attr('y2'), this.getVHeight(), 0);
-      this.shape = new SvgShape().M(x1, y1).L(x2, y2);
-    };
-
-    var SvgElemPolyline = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let points = this.parseLengthList(this.attr('points'));
-      this.shape = new SvgShape();
-      for (let i = 0; i < points.length - 1; i+=2) {
-        let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
-            y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
-        if (i === 0) {
-          this.shape.M(x, y);          
-        } else {
-          this.shape.L(x, y);
-        }
-      }
-    };
-
-    var SvgElemPolygon = function(obj, inherits) {
-      SvgElemBasicShape.call(this, obj, inherits);
-      let points = this.parseLengthList(this.attr('points'));
-      this.shape = new SvgShape();
-      for (let i = 0; i < points.length - 1; i+=2) {
-        let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
-            y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
-        if (i === 0) {
-          this.shape.M(x, y);          
-        } else {
-          this.shape.L(x, y);
-        }
-      }
-      this.shape.Z();
-    };
-
-    var SvgElemPath = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      this.shape = new SvgPath(obj.getAttribute('d'));
-      this.pathLength = this.computeLength(this.attr('pathLength'), this.getViewport(), undefined);
-      this.getBoundingShape = function() {
-        return this.shape.clone().transform(this.get('transform'));
-      };
-      this.drawInDocument = function(isClip) {
-        if (this.get('visibility') === 'hidden' || !this.shape) {return;}
-        doc.save();
-        doc.transform.apply(doc, this.get('transform'));
+        this.transform();
+        this.clip();
+        this.mask();
         if (!isClip) {
           let subPaths = this.shape.getSubPaths();
           for (let j = 0; j < subPaths.length; j++) {
@@ -1343,14 +1228,141 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         } else {
           this.shape.insertInDocument();
-          doc.fill('black');
+          doc.fillColor('white')
+             .fill(this.get('clip-rule'));
         }
         doc.restore();
       };
     };
 
+    var SvgElemRect = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let x = this.computeLength(this.attr('x'), this.getVWidth(), 0),
+          y = this.computeLength(this.attr('y'), this.getVHeight(), 0),
+          w = this.computeLength(this.attr('width'), this.getVWidth(), 0),
+          h = this.computeLength(this.attr('height'), this.getVHeight(), 0),
+          rx = this.computeLength(this.attr('rx'), this.getVWidth()),
+          ry = this.computeLength(this.attr('ry'), this.getVHeight());
+      if (rx === undefined && ry === undefined) {rx = ry = 0;}
+      else if (rx === undefined && ry !== undefined) {rx = ry;}
+      else if (rx !== undefined && ry === undefined) {ry = rx;}
+      if (w > 0 && h > 0) {
+        if (rx && ry) {
+          rx = Math.min(rx, 0.5 * w);
+          ry = Math.min(ry, 0.5 * h);
+          let k = (4 / 3) * (Math.sqrt(2) - 1), cx = rx * (1.0 - k), cy = ry * (1.0 - k);
+          this.shape = new SvgShape()
+                        .M(x + rx, y)
+                        .L(x + w - rx, y)
+                        .C(x + w - cx, y, x + w, y + cy, x + w, y + ry)
+                        .L(x + w, y + h - ry)
+                        .C(x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h)
+                        .L(x + rx, y + h)
+                        .C(x + cx, y + h, x, y + h - cy, x, y + h - ry)
+                        .L(x, y + ry)
+                        .C(x, y + cy, x + cx, y, x + rx, y)
+                        .Z();
+        } else {
+          this.shape = new SvgShape()
+                        .M(x, y)
+                        .L(x + w, y)
+                        .L(x + w, y + h)
+                        .L(x, y + h)
+                        .Z();
+        }
+      } else {
+        this.shape = new SvgShape();
+      }
+    };
+
+    var SvgElemCircle = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let cx = this.computeLength(this.attr('cx'), this.getVWidth(), 0),
+          cy = this.computeLength(this.attr('cy'), this.getVHeight(), 0),
+          r = this.computeLength(this.attr('r'), this.getViewport(), 0),
+          k = (4 / 3) * (Math.sqrt(2) - 1);
+      if (r > 0) {
+        this.shape = new SvgShape()
+                      .M(cx + r, cy)
+                      .C(cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r)
+                      .C(cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy)
+                      .C(cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r)
+                      .C(cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy)
+                      .Z();
+      } else {
+        this.shape = new SvgShape();
+      }
+    };
+
+    var SvgElemEllipse = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let cx = this.computeLength(this.attr('cx'), this.getVWidth(), 0),
+          cy = this.computeLength(this.attr('cy'), this.getVHeight(), 0),
+          rx = this.computeLength(this.attr('rx'), this.getVWidth(), 0),
+          ry = this.computeLength(this.attr('ry'), this.getVHeight(), 0),
+          k = (4 / 3) * (Math.sqrt(2) - 1);
+      if (rx > 0 && ry > 0) {
+        this.shape = new SvgShape()
+                      .M(cx + rx, cy)
+                      .C(cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry)
+                      .C(cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy)
+                      .C(cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry)
+                      .C(cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy)
+                      .Z();
+      } else {
+        this.shape = new SvgShape();
+      }
+    };
+
+    var SvgElemLine = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let x1 = this.computeLength(this.attr('x1'), this.getVWidth(), 0),
+          y1 = this.computeLength(this.attr('y1'), this.getVHeight(), 0),
+          x2 = this.computeLength(this.attr('x2'), this.getVWidth(), 0),
+          y2 = this.computeLength(this.attr('y2'), this.getVHeight(), 0);
+      this.shape = new SvgShape().M(x1, y1).L(x2, y2);
+    };
+
+    var SvgElemPolyline = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let points = this.parseLengthList(this.attr('points'));
+      this.shape = new SvgShape();
+      for (let i = 0; i < points.length - 1; i+=2) {
+        let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
+            y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
+        if (i === 0) {
+          this.shape.M(x, y);          
+        } else {
+          this.shape.L(x, y);
+        }
+      }
+    };
+
+    var SvgElemPolygon = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      let points = this.parseLengthList(this.attr('points'));
+      this.shape = new SvgShape();
+      for (let i = 0; i < points.length - 1; i+=2) {
+        let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
+            y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
+        if (i === 0) {
+          this.shape.M(x, y);          
+        } else {
+          this.shape.L(x, y);
+        }
+      }
+      this.shape.Z();
+    };
+
+    var SvgElemPath = function(obj, inherits) {
+      SvgElemBasicShape.call(this, obj, inherits);
+      this.shape = new SvgPath(obj.getAttribute('d'));
+    };
+
     var SvgElemMarker = function(obj, inherits, posArray, strokeWidth) {
-      SvgElemContainer.call(this, obj, inherits);
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       let width = this.computeLength(obj.getAttribute('markerWidth'), this.getParentVWidth(), 3),
           height = this.computeLength(obj.getAttribute('markerHeight'), this.getParentVHeight(), 3),
           viewBox = this.computeViewbox(this.attr('viewBox'), [0, 0, width, height]);
@@ -1360,11 +1372,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getVHeight = function() {
         return viewBox[3];
       };
-      this.getClipRect = function() {
-        if (this.attr('overflow') !== 'visible') {
-          return [-width/2, -height/2, width, height];
-        }
-      };
       this.getTransformation = function() {
         let orient = this.attr('orient'),
             units = this.attr('markerUnits'),
@@ -1372,7 +1379,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             scale = (units === 'userSpaceOnUse' ? 1 : strokeWidth);
         return [ Math.cos(rotate)*scale, Math.sin(rotate)*scale, -Math.sin(rotate)*scale, Math.cos(rotate)*scale, posArray[0], posArray[1] ];
       };
-      this.getTransformationAfterClip = function() {
+      this.getTransformation2 = function() {
         let refX = this.computeLength(obj.getAttribute('refX'), this.getVWidth(), 0),
             refY = this.computeLength(obj.getAttribute('refY'), this.getVHeight(), 0),
             aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
@@ -1390,6 +1397,92 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           scaleY = scaleX = Math.min(scaleX, scaleY);
         }
         return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX) - scaleX * refX, dy * (height - viewBox[3] * scaleY) - scaleY * refY];
+      };
+      this.drawInDocument = function(isClip) {
+        doc.save();
+        doc.transform.apply(doc, this.getTransformation());
+        if (this.get('overflow') === 'hidden') {
+          doc.rect(-width/2, -height/2, width, height).clip();;
+        }
+        doc.transform.apply(doc, this.getTransformation2());
+        let group;
+        if (this.get('opacity') < 1 && !isClip) {
+          group = doc.createGroup();
+        }
+        this.drawChildren(isClip);
+        if (group) {
+          doc.closeGroup(group);
+          doc.fillOpacity(this.get('opacity'));
+          doc.insertGroup(group);
+        }
+        doc.restore();
+      };
+    };
+
+    var SvgElemClipPath = function(obj, inherits, bBox) {
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      SvgElemMaskable.call(this, obj);
+      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
+      this.getTransformation = function() {
+        if (this.attr('clipPathUnits') === 'objectBoundingBox') {
+          return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
+        } else {
+          return [1, 0, 0, 1, 0, 0];
+        }
+      };
+      this.drawInDocument = function() {
+        let group = doc.createGroup();
+        doc.save();
+        doc.transform.apply(doc, this.getTransformation());
+        this.clip();
+        this.drawChildren(true);
+        doc.restore();
+        if (group) {
+          doc.closeGroup(group);
+          doc.applyMask(group, true);
+        }
+      };
+    };
+
+    var SvgElemMask = function(obj, inherits, bBox) {
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
+      this.getTransformation = function() {
+        if (this.attr('maskContentUnits') === 'objectBoundingBox') {
+          return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
+        } else {
+          return [1, 0, 0, 1, 0, 0];
+        }
+      };
+      this.drawInDocument = function() {
+        let group = doc.createGroup();
+        doc.save();
+        let x, y, w, h;
+        if (this.attr('maskUnits') === 'userSpaceOnUse') {
+          x = this.computeLength(this.attr('x'), this.getVWidth(), -0.1 * (bBox[2] - bBox[0]) + bBox[0]);
+          y = this.computeLength(this.attr('y'), this.getVHeight(), -0.1 * (bBox[3] - bBox[1]) + bBox[1]);
+          w = this.computeLength(this.attr('width'), this.getVWidth(), 1.2 * (bBox[2] - bBox[0]));
+          h = this.computeLength(this.attr('height'), this.getVHeight(), 1.2 * (bBox[3] - bBox[1]));
+        } else {
+          x = this.computeLength(this.attr('x'), this.getVWidth(), -0.1) * (bBox[2] - bBox[0]) + bBox[0];
+          y = this.computeLength(this.attr('y'), this.getVHeight(), -0.1) * (bBox[3] - bBox[1]) + bBox[1];
+          w = this.computeLength(this.attr('width'), this.getVWidth(), 1.2) * (bBox[2] - bBox[0]);
+          h = this.computeLength(this.attr('height'), this.getVHeight(), 1.2) * (bBox[3] - bBox[1]);
+        }
+        doc.rect(x, y, w, h).clip();
+        doc.transform.apply(doc, this.getTransformation());
+        if (this.get('clip-path')) {
+          let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
+          clipPath.drawInDocument();
+        }
+        this.drawChildren(false);
+        doc.restore()
+        if (group) {
+          doc.closeGroup(group);
+          doc.applyMask(group, true);
+        }
       };
     };
 
@@ -1415,6 +1508,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemText = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
+      SvgElemMaskable.call(this, obj);
       this.allowedChildren = ['textPath', 'tspan', '#text'];
       (function (textParentElem) {
         let ProcessedText = '', RemainingText = obj.textContent, CurrentChunk = [], CurrentAnchor, CurrentDirection, CurrentX = 0, CurrentY = 0;
@@ -1574,6 +1668,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
                   pathComputedLength = pathObject.totalLength,
                   textOffset = currentElem.computeLength(currentElem.attr('startOffset'), pathComputedLength, 0),
+                  pathLength = pathElem.computeLength(pathElem.attr('pathLength'), pathElem.getViewport(), undefined),
                   pathLengthScale = (pathElem.pathLength !== undefined ? pathComputedLength / pathElem.pathLength : 1);
               for (let j = 0; j < currentElem._pos.length; j++) {
                 if (pathLengthScale !== 1) {
@@ -1619,7 +1714,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                  .M(pos.x + dx1 + dx2, pos.y + dy1 + dy2).L(pos.x + dx1, pos.y + dy1);
           }
         }
-        return shape.transform(this.get('transform'));
+        return shape;
+      };
+      this.getTransformation = function() {
+        return this.get('transform');
       };
       this.drawInDocument = function(isClip) {
         function recursive(elem) {
@@ -1661,7 +1759,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                     }
                   }
                 } else {
-                  doc.fillColor('black');
+                  doc.fillColor('white');
                 }
                 doc.beginText(elem._font.font, elem._font.size);
                 if (!isClip) {
@@ -1682,7 +1780,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         }
         doc.save();
-        doc.transform.apply(doc, this.get('transform'));
+        doc.transform.apply(doc, this.getTransformation());
+        this.clip();
+        this.mask();
         recursive(this);
         doc.restore();
       };
