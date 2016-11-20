@@ -28,8 +28,8 @@ PDFDocument.prototype.writeToGroup = function(group) {
     this._currentGroup = null;
     this._writeTarget = null;
   }
-  if (prevGroup) {prevGroup.matrix = doc._ctm.slice();}
-  if (nextGroup) {doc._ctm = nextGroup.matrix.slice();}
+  if (prevGroup) {prevGroup.matrix = this._ctm.slice();}
+  if (nextGroup) {this._ctm = nextGroup.matrix.slice();}
   return this;
 };
 PDFDocument.prototype.closeGroup = function(group) {
