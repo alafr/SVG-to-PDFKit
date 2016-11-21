@@ -1431,9 +1431,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return [ Math.cos(rotate)*scale, Math.sin(rotate)*scale, -Math.sin(rotate)*scale, Math.cos(rotate)*scale, posArray[0], posArray[1] ];
       };
       this.getTransformation2 = function() {
-        let refX = this.getLength('refX', this.getVWidth(), 0),
-            refY = this.getLength('refY', this.getVHeight(), 0),
-            aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
@@ -1447,17 +1445,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         } else if (ratioType === 'meet') {
           scaleY = scaleX = Math.min(scaleX, scaleY);
         }
-        return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX) - scaleX * refX, dy * (height - viewBox[3] * scaleY) - scaleY * refY];
+        return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX), dy * (height - viewBox[3] * scaleY)];
       };
       this.drawInDocument = function(isClip) {
         let refX = this.getLength('refX', this.getVWidth(), 0),
-            refY = this.getLength('refY', this.getVHeight(), 0);
+            refY = this.getLength('refY', this.getVHeight(), 0),
+            transform2 = this.getTransformation2();
         doc.save();
         doc.transform.apply(doc, this.getTransformation());
         if (this.get('overflow') === 'hidden') {
-          doc.rect(-width/2, -height/2, width, height).clip(); // TODO: fix this - it's sometimes buggy
+          doc.rect(-width/2 + transform2[0] * (viewBox[0] + viewBox[2]/2 - refX), -height/2 + transform2[3] * (viewBox[1] + viewBox[3]/2 - refY), width, height).clip();
         }
-        doc.transform.apply(doc, this.getTransformation2());
+        doc.transform.apply(doc, transform2);
+        doc.translate(-refX, -refY);
         let group;
         if (this.get('opacity') < 1 && !isClip) {
           group = doc.createGroup();
