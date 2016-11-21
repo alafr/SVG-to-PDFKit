@@ -1,6 +1,8 @@
 "use strict";
 var SVGtoPDF = function(doc, svg, x, y, options) {
 
+    if (typeof doc.number !== 'function') {doc.number = function(n) {return n;}} // compatibility with current PDFKit version https://git.io/vXbSB
+
     doc.addContent = function(data) {
       (this._writeTarget || this.page).write(data);
       return this;
@@ -9,6 +11,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let group = new (function PDFGroup() {})();
       group.name = 'G' + (this._groupCount = (this._groupCount || 0) + 1);
       group.closed = false;
+      group.matrix = [1, 0, 0, 1, 0, 0];
       group.xobj = this.ref({
         Type: 'XObject', 
         Subtype: 'Form', 
@@ -21,13 +24,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return group;
     };
     doc.writeToGroup = function(group) {
-      if (group && !group.closed) {
-        this._currentGroup = group;
-        this._writeTarget = group.xobj;
+      let prevGroup = this._currentGroup,
+          nextGroup = group && (!group.closed) && group || null;
+      if (nextGroup) {
+        this._currentGroup = nextGroup;
+        this._writeTarget = nextGroup.xobj;
       } else {
         this._currentGroup = null;
         this._writeTarget = null;
       }
+      if (prevGroup) {prevGroup.matrix = doc._ctm.slice();}
+      if (nextGroup) {doc._ctm = nextGroup.matrix.slice();}
       return this;
     };
     doc.closeGroup = function(group) {
@@ -49,8 +56,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
         SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
       });
-      this.page.ext_gstates[name] = gstate;
       gstate.end();
+      this.page.ext_gstates[name] = gstate;
       this.addContent("/" + name + " gs");
       return this;
     };
@@ -761,8 +768,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return result;
       };
       this.resolveUrl = function(value) {
-        let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|#(.*))\s*$/) || [];
-        let id = temp[1] || temp[2];
+        let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
+        let id = temp[1] || temp[2] || temp[3] || temp[4];
         if (id) {
           let svgObj = svg.getElementById(id);
           if (this.stack.indexOf(svgObj) === -1) {return svgObj;}
@@ -856,8 +863,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             result = (function() {
               if (value === 'none' || value === 'transparent') {return 'none';}
               if (value === 'currentColor') {return this.get('color');}
-              if (this.resolveUrl(value)) {warningMessage('Gradients and patterns not implemented'); return 'none';}
-              return parseColor(value);
+              let color = parseColor(value);
+              if (color) {return color;}
+              let ref = this.resolveUrl(value);
+              if (ref) {
+                if (ref.nodeName === 'linearGradient') {
+                  // return new SvgElemLinearGradient(ref, null).getGradient();
+                  warningMessage('Gradients are not implemented');
+                } else if (ref.nodeName === 'radialGradient') {
+                  // return new SvgElemRadialGradient(ref, null).getGradient();
+                  warningMessage('Gradients are not implemented');
+                } else if (ref.nodeName === 'pattern') {
+                  warningMessage('Patterns are not implemented');
+                }
+                return 'none';
+              }
             }).call(this);
             break;
           case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
@@ -1503,7 +1523,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      this.path = new SvgElemPath(svg.getElementById((this.attr('xlink:href') || '').slice(1)), this);
+      this.path = new SvgElemPath(this.resolveUrl(this.attr('xlink:href')), this);
     };
 
     var SvgElemText = function(obj, inherits) {
