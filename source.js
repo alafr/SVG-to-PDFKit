@@ -1844,6 +1844,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var PxToPt = 72/96, ViewportWidth, ViewportHeight, ElementStack = []; // 1px = 72/96pt
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
+    if (options.inlineCSS ){
+      if(!document) throw( "inline CSS in browser only");
+      if(svg.tagName !== "svg" ) throw( "inline CSS on svg DOM elements only");
+      inlineCSSAttributes(svg);
+    }
     if (typeof options.fontCallback !== 'function') {
       options.fontCallback = function(family, bold, italic) {
         family = family || '';
@@ -1877,6 +1882,87 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
 };
 
+var baseStyles = null;
+
+/**
+ * whitelist of attributes to copy from style.  we're whitelisting,
+ * instead of blacklisting, for safety reasons.  this list is probably
+ * incomplete.
+ */
+var whitelist = [
+  "font-family",
+  "font-size",
+  "stroke-linecap",
+  "stroke-width",
+  "stroke-dasharray",
+  "stroke",
+  "fill"
+];
+
+/**
+ * given an svg element, map selected css attributes -> node attributes.
+ * based on code from https://github.com/NYTimes/svg-crowbar
+ */
+var explicitlySetStyle = function(element) {
+  
+  var computed = getComputedStyle(element);
+  var i, len, key, value;
+  var attrs = {};
+
+  for (i = 0, len = computed.length; i<len; i++) {
+    key = computed[i];
+    value = computed.getPropertyValue(key);
+    if (value !== baseStyles.getPropertyValue(key)){
+      attrs[key] = value;
+    }
+  }
+
+  whitelist.forEach( function( key ){
+    if( (typeof attrs[key]) !== 'undefined' ) element.setAttribute( key, attrs[key] );
+  });
+
+};
+
+/**
+ * traverse element tree and return a flat list of elements.
+ * originally from https://github.com/NYTimes/svg-crowbar
+ */
+var traverse = function(obj){
+  var tree = [];
+  tree.push(obj);
+  visit(obj);
+  function visit(node) {
+    if (node && node.hasChildNodes()) {
+      var child = node.firstChild;
+      while (child) {
+        if (child.nodeType === 1 && child.nodeName != 'SCRIPT'){
+          tree.push(child);
+          visit(child);
+        }
+        child = child.nextSibling;
+      }
+    }
+  }
+  return tree;
+}
+
+/**
+ * calculate css attributes and apply as node attributes before 
+ * converting.  argument: svg node
+ */
+var inlineCSSAttributes = function(svg){
+
+ if( !baseStyles ){
+    var node = window.document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(node);
+    baseStyles = getComputedStyle(node);
+  }
+
+  traverse(svg).forEach( function( element ){ 
+    explicitlySetStyle(element);
+  });
+
+};
 
 if (typeof module !== 'undefined' && module && typeof module.exports !== 'undefined') {
   module.exports = SVGtoPDF;
