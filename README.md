@@ -10,7 +10,10 @@ Insert SVG into a PDF document created with PDFKit.
     doc [PDFDocument] = the PDF document created with PDFKit
     svg [SVGElement or string] = the SVG object or XML code
     x, y [number] = the position where the SVG will be added
-    options [Object] = not documented yet
+    options [Object] = >
+      - width, height [number] = initial viewport, by default it's the page dimensions
+      - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
+      - fontCallback [function] = function called to get the fonts, see source code
 
 ####Demo:
 
