@@ -13,10 +13,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       group.closed = false;
       group.matrix = [1, 0, 0, 1, 0, 0];
       group.xobj = this.ref({
-        Type: 'XObject', 
-        Subtype: 'Form', 
-        FormType: 1, 
-        BBox: [-1000000, -1000000, 1000000, 1000000], 
+        Type: 'XObject',
+        Subtype: 'Form',
+        FormType: 1,
+        BBox: [-1000000, -1000000, 1000000, 1000000],
         Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
       });
       group.previousGroup = this._currentGroup;
@@ -155,7 +155,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             if (!node.attributes.hasOwnProperty(attr)) {
               node.attributes[attr] = value;
             } else {
-              warningMessage('parseXml: duplicate attribute ' + attr);
+              warningMessage('parseXml: duplicate attribute "' + attr + '"');
             }
           }
           if (parser.match(/^>/)) { // End of opening tag
@@ -167,19 +167,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (temp[1] === node.nodeName) {
                 return node;
               } else {
-                warningMessage('parseXml: tag not matching, opening ' + node.nodeName + ' & closing ' + temp[1]);
+                warningMessage('parseXml: tag not matching, opening "' + node.nodeName + '" & closing "' + temp[1] + '"');
                 node.error = true;
                 return node;
               }
             } else {
-              warningMessage('parseXml: tag not matching, opening ' + node.nodeName + ' & not closing');
+              warningMessage('parseXml: tag not matching, opening "' + node.nodeName + '" & not closing');
               node.error = true;
               return node;
             }
           } else if (parser.match(/^\/>/)) { // Self-closing tag
             return node;
           } else {
-            warningMessage('parseXml: tag could not be parsed ' + node.nodeName);
+            warningMessage('parseXml: tag could not be parsed "' + node.nodeName + '"');
           }
         } else if (temp = parser.match(/^([^<]+)/, true)) { // Text node
           node = new SvgNode('#text');
@@ -188,13 +188,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       })();
       function decodeEntities(Str) {
-        let Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249, 
-             rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190, 
-             iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221, 
-             THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252, 
-             yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949, 
-             zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476, 
-             trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744, 
+        let Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249,
+             rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190,
+             iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221,
+             THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252,
+             yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949,
+             zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476,
+             trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744,
              cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
         return(Str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
           if (m0) {return String.fromCharCode(parseInt(m0, 10));}
@@ -205,15 +205,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     };
     function parseColor(v) {
-      let NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0], 
-           chocolate: [210,105,30], coral: [255,127,80], cornflowerblue: [100,149,237], cornsilk: [255,248,220], crimson: [220,20,60], cyan: [0,255,255], darkblue: [0,0,139], darkcyan: [0,139,139], darkgoldenrod: [184,134,11], darkgray: [169,169,169], darkgrey: [169,169,169], darkgreen: [0,100,0], darkkhaki: [189,183,107], darkmagenta: [139,0,139], darkolivegreen: [85,107,47], 
-           darkorange: [255,140,0], darkorchid: [153,50,204], darkred: [139,0,0], darksalmon: [233,150,122], darkseagreen: [143,188,143], darkslateblue: [72,61,139], darkslategray: [47,79,79], darkslategrey: [47,79,79], darkturquoise: [0,206,209], darkviolet: [148,0,211], deeppink: [255,20,147], deepskyblue: [0,191,255], dimgray: [105,105,105], dimgrey: [105,105,105], 
-           dodgerblue: [30,144,255], firebrick: [178,34,34], floralwhite: [255,250,240], forestgreen: [34,139,34], fuchsia: [255,0,255], gainsboro: [220,220,220], ghostwhite: [248,248,255], gold: [255,215,0], goldenrod: [218,165,32], gray: [128,128,128], grey: [128,128,128], green: [0,128,0], greenyellow: [173,255,47], honeydew: [240,255,240], hotpink: [255,105,180], 
-           indianred: [205,92,92], indigo: [75,0,130], ivory: [255,255,240], khaki: [240,230,140], lavender: [230,230,250], lavenderblush: [255,240,245], lawngreen: [124,252,0], lemonchiffon: [255,250,205], lightblue: [173,216,230], lightcoral: [240,128,128], lightcyan: [224,255,255], lightgoldenrodyellow: [250,250,210], lightgray: [211,211,211], lightgrey: [211,211,211], 
-           lightgreen: [144,238,144], lightpink: [255,182,193], lightsalmon: [255,160,122], lightseagreen: [32,178,170], lightskyblue: [135,206,250], lightslategray: [119,136,153], lightslategrey: [119,136,153], lightsteelblue: [176,196,222], lightyellow: [255,255,224], lime: [0,255,0], limegreen: [50,205,50], linen: [250,240,230], magenta: [255,0,255], maroon: [128,0,0], 
-           mediumaquamarine: [102,205,170], mediumblue: [0,0,205], mediumorchid: [186,85,211], mediumpurple: [147,112,219], mediumseagreen: [60,179,113], mediumslateblue: [123,104,238], mediumspringgreen: [0,250,154], mediumturquoise: [72,209,204], mediumvioletred: [199,21,133], midnightblue: [25,25,112], mintcream: [245,255,250], mistyrose: [255,228,225], moccasin: [255,228,181], 
-           navajowhite: [255,222,173], navy: [0,0,128], oldlace: [253,245,230], olive: [128,128,0], olivedrab: [107,142,35], orange: [255,165,0], orangered: [255,69,0], orchid: [218,112,214], palegoldenrod: [238,232,170], palegreen: [152,251,152], paleturquoise: [175,238,238], palevioletred: [219,112,147], papayawhip: [255,239,213], peachpuff: [255,218,185], peru: [205,133,63], 
-           pink: [255,192,203], plum: [221,160,221], powderblue: [176,224,230], purple: [128,0,128], rebeccapurple: [102,51,153], red: [255,0,0], rosybrown: [188,143,143], royalblue: [65,105,225], saddlebrown: [139,69,19], salmon: [250,128,114], sandybrown: [244,164,96], seagreen: [46,139,87], seashell: [255,245,238], sienna: [160,82,45], silver: [192,192,192], skyblue: [135,206,235], 
+      let NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0],
+           chocolate: [210,105,30], coral: [255,127,80], cornflowerblue: [100,149,237], cornsilk: [255,248,220], crimson: [220,20,60], cyan: [0,255,255], darkblue: [0,0,139], darkcyan: [0,139,139], darkgoldenrod: [184,134,11], darkgray: [169,169,169], darkgrey: [169,169,169], darkgreen: [0,100,0], darkkhaki: [189,183,107], darkmagenta: [139,0,139], darkolivegreen: [85,107,47],
+           darkorange: [255,140,0], darkorchid: [153,50,204], darkred: [139,0,0], darksalmon: [233,150,122], darkseagreen: [143,188,143], darkslateblue: [72,61,139], darkslategray: [47,79,79], darkslategrey: [47,79,79], darkturquoise: [0,206,209], darkviolet: [148,0,211], deeppink: [255,20,147], deepskyblue: [0,191,255], dimgray: [105,105,105], dimgrey: [105,105,105],
+           dodgerblue: [30,144,255], firebrick: [178,34,34], floralwhite: [255,250,240], forestgreen: [34,139,34], fuchsia: [255,0,255], gainsboro: [220,220,220], ghostwhite: [248,248,255], gold: [255,215,0], goldenrod: [218,165,32], gray: [128,128,128], grey: [128,128,128], green: [0,128,0], greenyellow: [173,255,47], honeydew: [240,255,240], hotpink: [255,105,180],
+           indianred: [205,92,92], indigo: [75,0,130], ivory: [255,255,240], khaki: [240,230,140], lavender: [230,230,250], lavenderblush: [255,240,245], lawngreen: [124,252,0], lemonchiffon: [255,250,205], lightblue: [173,216,230], lightcoral: [240,128,128], lightcyan: [224,255,255], lightgoldenrodyellow: [250,250,210], lightgray: [211,211,211], lightgrey: [211,211,211],
+           lightgreen: [144,238,144], lightpink: [255,182,193], lightsalmon: [255,160,122], lightseagreen: [32,178,170], lightskyblue: [135,206,250], lightslategray: [119,136,153], lightslategrey: [119,136,153], lightsteelblue: [176,196,222], lightyellow: [255,255,224], lime: [0,255,0], limegreen: [50,205,50], linen: [250,240,230], magenta: [255,0,255], maroon: [128,0,0],
+           mediumaquamarine: [102,205,170], mediumblue: [0,0,205], mediumorchid: [186,85,211], mediumpurple: [147,112,219], mediumseagreen: [60,179,113], mediumslateblue: [123,104,238], mediumspringgreen: [0,250,154], mediumturquoise: [72,209,204], mediumvioletred: [199,21,133], midnightblue: [25,25,112], mintcream: [245,255,250], mistyrose: [255,228,225], moccasin: [255,228,181],
+           navajowhite: [255,222,173], navy: [0,0,128], oldlace: [253,245,230], olive: [128,128,0], olivedrab: [107,142,35], orange: [255,165,0], orangered: [255,69,0], orchid: [218,112,214], palegoldenrod: [238,232,170], palegreen: [152,251,152], paleturquoise: [175,238,238], palevioletred: [219,112,147], papayawhip: [255,239,213], peachpuff: [255,218,185], peru: [205,133,63],
+           pink: [255,192,203], plum: [221,160,221], powderblue: [176,224,230], purple: [128,0,128], rebeccapurple: [102,51,153], red: [255,0,0], rosybrown: [188,143,143], royalblue: [65,105,225], saddlebrown: [139,69,19], salmon: [250,128,114], sandybrown: [244,164,96], seagreen: [46,139,87], seashell: [255,245,238], sienna: [160,82,45], silver: [192,192,192], skyblue: [135,206,235],
            slateblue: [106,90,205], slategray: [112,128,144], slategrey: [112,128,144], snow: [255,250,250], springgreen: [0,255,127], steelblue: [70,130,180], tan: [210,180,140], teal: [0,128,128], thistle: [216,191,216], tomato: [255,99,71], turquoise: [64,224,208], violet: [238,130,238], wheat: [245,222,179], white: [255,255,255], whitesmoke: [245,245,245], yellow: [255,255,0]};
       let temp;
       v = (v || '').toLowerCase().trim();
@@ -422,11 +422,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (values.length === argsNumber) {
           this[command].apply(this, values);
         } else {
-          warningMessage('SvgPath: Command ' + command + ' with ' + values.length + ' numbers'); break;
+          warningMessage('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); break;
         }
       }
       if (temp = parser.match(/^.+/)) {
-        warningMessage('SvgPath: Unexpected string ' + temp);
+        warningMessage('SvgPath: unexpected string ' + temp);
       }
     };
     var SvgShape = function(commands) {
@@ -774,7 +774,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let id = temp[1] || temp[2] || temp[3] || temp[4];
         if (id) {
           let svgObj = svg.getElementById(id);
-          if (this.getStack().indexOf(svgObj) === -1) {return svgObj;}
+          if (this.getStack().indexOf(svgObj) === -1) {
+            return svgObj;
+          } else {
+            warningMessage('SVGtoPDF: loop of circular references for id "' + id + '"');
+          }
         }
       };
       this.computeLength = function(value, percent, initial) {
@@ -900,7 +904,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient') {
                   return ref;
                 } else if (ref.nodeName === 'pattern') {
-                  warningMessage('Patterns are not implemented');
+                  warningMessage('SVGtoPDF: patterns are not implemented');
                 }
                 return 'none';
               }
@@ -1027,11 +1031,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             fill = this.get('fill'),
             fillOpacity = this.get('fill-opacity');
         if (fill !== 'none' && opacity && fillOpacity) {
-          if (fill.nodeName === 'linearGradient') {
-            return new SvgElemLinearGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
-          }
-          if (fill.nodeName === 'radialGradient') {
-            return new SvgElemRadialGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
+          if (fill.nodeName === 'linearGradient' || fill.nodeName === 'radialGradient') {
+            return new SvgElemGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
           }
           return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
         }
@@ -1041,11 +1042,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             stroke = this.get('stroke'),
             strokeOpacity = this.get('stroke-opacity');
         if (stroke !== 'none' && opacity && strokeOpacity) {
-          if (stroke.nodeName === 'linearGradient') {
-            return new SvgElemLinearGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
-          }
-          if (stroke.nodeName === 'radialGradient') {
-            return new SvgElemRadialGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
+          if (stroke.nodeName === 'linearGradient' || stroke.nodeName === 'radialGradient') {
+            return new SvgElemGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
           }
           return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
         }
@@ -1208,7 +1206,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let height = this.getLength('height', this.getVHeight(), 0);
       let x = this.getLength('x', this.getVWidth(), 0);
       let y = this.getLength('y', this.getVHeight(), 0);
-      let image = (function() {if (!link) {return;} try {return doc.openImage(link);} catch(e) {warningMessage('SvgElemImage: failed to open image \'' + link.slice(0, 50) + '\' in PDFKit'); return;}})();
+      let image = (function() {if (!link) {return;} try {return doc.openImage(link);} catch(e) {warningMessage('SVGElemImage: failed to open image "' + link.slice(0, 50) + '" in PDFKit'); return;}})();
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
@@ -1252,24 +1250,42 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemLinearGradient = function(obj, inherits, bBox, gOpacity) {
+    var SvgElemGradient = function(obj, inherits, bBox, gOpacity) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
       this.getGradient = function(isClip, isMask) {
         let children = this.getChildren(),
             bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
-            x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
-            x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
-            y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
-            y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0),
-            matrix = parseTranform(this.attr('gradientTransform'));
-        let grad = doc.linearGradient(x1, y1, x2, y2);
+            matrix = parseTranform(this.attr('gradientTransform')),
+            grad;
+        if (this.name === 'linearGradient') {
+          let x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
+              x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
+              y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
+              y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
+          grad = doc.linearGradient(x1, y1, x2, y2);
+        } else {
+          let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
+              y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
+              r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), 0.5),
+              x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
+              y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
+          grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
+        }
+        if (children.length === 0) {return;}
+        if (children.length === 1) {
+          let child = children[0],
+              color = child.get('stop-color');
+          if (color === 'none') {return;}
+          return [color.slice(0, 3), child.get('stop-opacity') * color[3] * gOpacity];
+        }
         for (let i = 0; i < children.length; i++) {
-          let child = children[i];
-          let color = child.get('stop-color'); if (color === 'none') {color = [255, 255, 255, 0];}
+          let child = children[i],
+              color = child.get('stop-color');
+          if (color === 'none') {color = [255, 255, 255, 0];}
           let opacity = color[3] * gOpacity * child.get('stop-opacity');
           if (opacity < 1) {
-            if (!isMask) {warningMessage('Gradients with opacity are unsupported');}
+            if (!isMask) {warningMessage('SvgElemGradient: gradients with opacity are unsupported');}
             color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
             color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
             color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
@@ -1281,42 +1297,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         } else {
           grad.transform = matrix;
         }
-        if (grad.stops.length === 0) {return;}
-        return [grad];
-      }
-    };
-
-    var SvgElemRadialGradient = function(obj, inherits, bBox, gOpacity) {
-      SvgElem.call(this, obj, inherits);
-      this.allowedChildren = ['stop'];
-      this.getGradient = function(isClip, isMask) {
-        let children = this.getChildren(),
-            bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
-            x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
-            y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
-            r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), 0.5),
-            x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
-            y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2),
-            matrix = parseTranform(this.attr('gradientTransform'));
-        let grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
-        for (let i = 0; i < children.length; i++) {
-          let child = children[i];
-          let color = child.get('stop-color'); if (color === 'none') {color = [255, 255, 255, 0];}
-          let opacity = color[3] * gOpacity * child.get('stop-opacity');
-          if (opacity < 1) {
-            if (!isMask) {warningMessage('Gradients with opacity are unsupported');}
-            color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
-            color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
-            color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
-          }
-          grad.stop(child.getPercent('offset'), color.slice(0, 3), 1);
-        }
-        if (bBoxUnits) {
-          grad.transform = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
-        } else {
-          grad.transform = matrix;
-        }
-        if (grad.stops.length === 0) {return;}
         return [grad];
       }
     };
@@ -1349,7 +1329,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
                 let x = subPaths[j].boundingBox[0],
                     y = subPaths[j].boundingBox[1];
-                doc.fillColor.apply(doc, stroke)
+                doc.fillColor.apply(doc, stroke);
                 if (LineCap === 'square') {
                   doc.rect(x - 0.5 * LineWidth, y - 0.5 * LineWidth, LineWidth, LineWidth);
                 } else if (LineCap === 'round') {
@@ -1507,7 +1487,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let x = this.computeUnits(points[i].value, points[i].unit, this.getVWidth()),
             y = this.computeUnits(points[i+1].value, points[i+1].unit, this.getVHeight());
         if (i === 0) {
-          this.shape.M(x, y);          
+          this.shape.M(x, y);
         } else {
           this.shape.L(x, y);
         }
@@ -1522,7 +1502,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
             y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
         if (i === 0) {
-          this.shape.M(x, y);          
+          this.shape.M(x, y);
         } else {
           this.shape.L(x, y);
         }
@@ -1924,7 +1904,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (!isClip) {
                   if (fill || stroke) {
                     if (fill) {
-                      doc.fillColor.apply(doc, fill)
+                      doc.fillColor.apply(doc, fill);
                     }
                     if (stroke && strokeWidth) {
                       doc.strokeColor.apply(doc, stroke)
@@ -1977,7 +1957,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         useCss;
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
-    if (typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function') {useCss = options.useCss;}
+    if (options.useCss) {
+      if (typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function') {
+        useCss = true;
+      } else {
+        warningMessage('SVGtoPDF: useCss option can only be used for SVG *elements* in compatible browsers');
+      }
+    }
     if (typeof options.fontCallback !== 'function') {
       options.fontCallback = function(family, bold, italic) {
         family = family || '';
@@ -2006,7 +1992,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       new SvgElem(svg, null).drawInDocument();
       doc.restore();
     } else {
-      warningMessage('SVGtoPDF: This element can\'t be processed as SVG : ' + (svg && svg.nodeName));
+      warningMessage('SVGtoPDF: this element can\'t be processed as SVG : ' + (svg && svg.nodeName));
     }
 
 };
