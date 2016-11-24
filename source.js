@@ -706,8 +706,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         'visibility':       {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
         'fill':             {inherit: true, initial: [0, 0, 0, 1]},
         'stroke':           {inherit: true, initial: 'none'},
+        'stop-color':       {inherit: false, initial: [0, 0, 0, 1]},
         'fill-opacity':     {inherit: true, initial: 1},
         'stroke-opacity':   {inherit: true, initial: 1},
+        'stop-opacity':     {inherit: false, initial: 1},
         'fill-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
         'clip-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
         'stroke-width':     {inherit: true, initial: 1},
@@ -726,13 +728,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         'baseline-shift':   {inherit: true, initial: 0, values: {'sub':'sub', 'super':'super'}},
         'word-spacing':     {inherit: true, initial: 0},
         'letter-spacing':   {inherit: true, initial: 0},
-        'xml:space':        {inherit: true, initial: 'default', values: {'preserve':'preserve', 'default':'default'}},
+        'xml:space':        {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
         'marker-start':     {inherit: true, initial: null},
         'marker-mid':       {inherit: true, initial: null},
         'marker-end':       {inherit: true, initial: null},
         'opacity':          {inherit: false, initial: 1},
-        'stop-color':       {inherit: false, initial: 'none'},
-        'stop-opacity':     {inherit: false, initial: 1},
         'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
         'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block'}},
         'clip-path':        {inherit: false, initial: null},
@@ -814,6 +814,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (viewBox.length === 4 && viewBox[2] >= 0 && viewBox[3] >= 0) {return viewBox;}
         return initial;
       };
+      this.getPercent = function(key) {
+        let value = this.attr(key);
+        let parser = new StringParser((value || '').trim()), temp1, temp2;
+        let number = parser.matchNumber();
+        if (parser.match('%')) {
+          number *= 0.01;
+        }
+        return Math.max(0, Math.min(1, number));
+      };
       this.chooseValue = function(args) {
         for (let i = 0; i < arguments.length; i++) {
           if ((arguments[i] !== undefined) && (arguments[i] !== null) && (arguments[i] === arguments[i])) {return arguments[i];}
@@ -822,11 +831,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.get = function(key) {
         if (cache[key] !== undefined) {return cache[key];}
-        let value = this.attr(key), keyInfo = properties[key] || {}, result;
+        let keyInfo = properties[key] || {}, value, result;
+        if (useCss && key !== 'transform') { // the CSS transform behaves stangely
+          if (!this.css) {this.css = getComputedStyle(obj);}
+          value = this.css[keyInfo.css || key];
+        } else {
+          value = this.attr(key);
+        }
+        if (value === 'inherit') {
+          result = (this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
+          if (result != null) {return cache[key] = result;}
+        }
         if (keyInfo.values != null) {
           result = keyInfo.values[value];
+          if (result != null) {return cache[key] = result;}
         }
-        if (result != null) {return cache[key] = result;}
         switch (key) {
           case 'font-size':
             result = (function() {
@@ -848,7 +867,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           case 'font-family':
             result = value;
             break;
-          case 'opacity': case 'stroke-opacity': case 'fill-opacity':
+          case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
             result = (function() {
               let parsed = parseFloat(value);
               if (!isNaN(parsed)) {
@@ -879,17 +898,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (color) {return color;}
               let ref = this.resolveUrl(value);
               if (ref) {
-                if (ref.nodeName === 'linearGradient') {
-                  // return new SvgElemLinearGradient(ref, null).getGradient();
-                  warningMessage('Gradients are not implemented');
-                } else if (ref.nodeName === 'radialGradient') {
-                  // return new SvgElemRadialGradient(ref, null).getGradient();
-                  warningMessage('Gradients are not implemented');
+                if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient') {
+                  return ref;
                 } else if (ref.nodeName === 'pattern') {
                   warningMessage('Patterns are not implemented');
                 }
                 return 'none';
               }
+            }).call(this);
+            break;
+          case 'stop-color':
+            result = (function() {
+              if (value === 'none' || value === 'transparent') {return 'none';}
+              if (value === 'currentColor') {return this.get('color');}
+              return parseColor(value);
             }).call(this);
             break;
           case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
@@ -953,7 +975,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (inherit) {
           return cache['<parentVWidth>'] = inherit.getVWidth();
         } else {
-          return cache['<parentVWidth>'] = ViewportWidth;
+          return cache['<parentVWidth>'] = viewportWidth;
         }
       };
       this.getParentVHeight = function() {
@@ -962,7 +984,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (inherit) {
           return cache['<parentVHeight>'] = inherit.getVHeight();
         } else {
-          return cache['<parentVHeight>'] = ViewportHeight;
+          return cache['<parentVHeight>'] = viewportHeight;
         }
       };
       this.getVWidth = function() {
@@ -983,7 +1005,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemMaskable = function(obj) {
+    var SvgElemStylable = function(obj) {
       this.transform = function() {
         doc.transform.apply(doc, this.getTransformation());
       };
@@ -991,12 +1013,42 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (this.get('clip-path')) {
           let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
           clipPath.drawInDocument();
+          return true;
         }
       };
       this.mask = function() {
         if (this.get('mask')) {
           let mask = new SvgElemMask(this.get('mask'), null, this.getBoundingBox());
           mask.drawInDocument();
+          return true;
+        }
+      };
+      this.getFill = function(isClip, isMask) {
+        let opacity = this.get('opacity'),
+            fill = this.get('fill'),
+            fillOpacity = this.get('fill-opacity');
+        if (fill !== 'none' && opacity && fillOpacity) {
+          if (fill.nodeName === 'linearGradient') {
+            return new SvgElemLinearGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
+          }
+          if (fill.nodeName === 'radialGradient') {
+            return new SvgElemRadialGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
+          }
+          return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
+        }
+      };
+      this.getStroke = function(isClip, isMask) {
+        let opacity = this.get('opacity'),
+            stroke = this.get('stroke'),
+            strokeOpacity = this.get('stroke-opacity');
+        if (stroke !== 'none' && opacity && strokeOpacity) {
+          if (stroke.nodeName === 'linearGradient') {
+            return new SvgElemLinearGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
+          }
+          if (stroke.nodeName === 'radialGradient') {
+            return new SvgElemRadialGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
+          }
+          return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
         }
       };
     };
@@ -1018,12 +1070,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return shape;
       };
-      this.drawChildren = function(isClip) {
+      this.drawChildren = function(isClip, isMask) {
         let children = this.getChildren();
         for (let i = 0; i < children.length; i++) {
           if (children[i].get('display') !== 'none') {
             if (typeof children[i].drawInDocument === 'function') {
-              children[i].drawInDocument(isClip);
+              children[i].drawInDocument(isClip, isMask);
             }
           }
         }
@@ -1032,7 +1084,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemUse = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       let x = this.getLength('x', this.getVWidth(), 0),
           y = this.getLength('y', this.getVHeight(), 0),
           child = this.getUrl('xlink:href');
@@ -1049,17 +1101,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return new SvgShape();
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         if (child && typeof child.drawInDocument === 'function' && child.get('display') !== 'none') {
           doc.save();
           this.transform();
           this.clip();
-          this.mask();
-          let group;
-          if (this.get('opacity') < 1 && !isClip) {
+          let masked = this.mask(), group;
+          if ((this.get('opacity') < 1 || masked) && !isClip) {
             group = doc.createGroup();
           }
-          child.drawInDocument(isClip);
+          child.drawInDocument(isClip, isMask);
           if (group) {
             doc.closeGroup(group);
             doc.fillOpacity(this.get('opacity'));
@@ -1073,21 +1124,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemGroup = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         return this.get('transform');
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         doc.save();
         this.transform();
         this.clip();
-        this.mask();
-        let group;
-        if (this.get('opacity') < 1 && !isClip) {
+        let masked = this.mask(), group;
+        if ((this.get('opacity') < 1 || masked) && !isClip) {
           group = doc.createGroup();
         }
-        this.drawChildren(isClip);
+        this.drawChildren(isClip, isMask);
         if (group) {
           doc.closeGroup(group);
           doc.fillOpacity(this.get('opacity'));
@@ -1100,7 +1150,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemSvg = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       let width = this.getLength('width', this.getParentVWidth(), this.getVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getVHeight()),
@@ -1130,19 +1180,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return [scaleX, 0, 0, scaleY, x + dx * (width - viewBox[2] * scaleX) - scaleX * viewBox[0], y + dy * (height - viewBox[3] * scaleY) - scaleY * viewBox[1]];
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         doc.save();
         if (this.get('overflow') === 'hidden') {
           doc.rect(x, y, width, height).clip();
         }
         this.transform();
         this.clip();
-        this.mask();
-        let group;
-        if (this.get('opacity') < 1 && !isClip) {
+        let masked = this.mask(), group;
+        if ((this.get('opacity') < 1 || masked) && !isClip) {
           group = doc.createGroup();
         }
-        this.drawChildren(isClip);
+        this.drawChildren(isClip, isMask);
         if (group) {
           doc.closeGroup(group);
           doc.fillOpacity(this.get('opacity'));
@@ -1154,7 +1203,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       let link = (this.attr('xlink:href') || '').replace(/\s+/g, '');
       let width = this.getLength('width', this.getVWidth(), 0);
       let height = this.getLength('height', this.getVHeight(), 0);
@@ -1184,7 +1233,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getBoundingShape = function() {
         return new SvgShape().M(x, y).L(x + width, y).L(x + width, y + height).L(x, y + height).Z();
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !image) {return;}
         doc.save();
         this.transform();
@@ -1204,61 +1253,135 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
+    var SvgElemLinearGradient = function(obj, inherits, bBox, gOpacity) {
+      SvgElem.call(this, obj, inherits);
+      this.allowedChildren = ['stop'];
+      this.getGradient = function(isClip, isMask) {
+        let children = this.getChildren(),
+            bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
+            x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
+            x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
+            y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
+            y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0),
+            matrix = parseTranform(this.attr('gradientTransform'));
+        let grad = doc.linearGradient(x1, y1, x2, y2);
+        for (let i = 0; i < children.length; i++) {
+          let child = children[i];
+          let color = child.get('stop-color'); if (color === 'none') {color = [255, 255, 255, 0];}
+          let opacity = color[3] * gOpacity * child.get('stop-opacity');
+          if (opacity < 1) {
+            if (!isMask) {warningMessage('Gradients with opacity are unsupported');}
+            color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
+            color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
+            color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
+          }
+          grad.stop(child.getPercent('offset'), color.slice(0, 3), 1);
+        }
+        if (bBoxUnits) {
+          grad.transform = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
+        } else {
+          grad.transform = matrix;
+        }
+        if (grad.stops.length === 0) {return;}
+        return [grad];
+      }
+    };
+
+    var SvgElemRadialGradient = function(obj, inherits, bBox, gOpacity) {
+      SvgElem.call(this, obj, inherits);
+      this.allowedChildren = ['stop'];
+      this.getGradient = function(isClip, isMask) {
+        let children = this.getChildren(),
+            bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
+            x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
+            y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
+            r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), 0.5),
+            x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
+            y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2),
+            matrix = parseTranform(this.attr('gradientTransform'));
+        let grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
+        for (let i = 0; i < children.length; i++) {
+          let child = children[i];
+          let color = child.get('stop-color'); if (color === 'none') {color = [255, 255, 255, 0];}
+          let opacity = color[3] * gOpacity * child.get('stop-opacity');
+          if (opacity < 1) {
+            if (!isMask) {warningMessage('Gradients with opacity are unsupported');}
+            color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
+            color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
+            color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
+          }
+          grad.stop(child.getPercent('offset'), color.slice(0, 3), 1);
+        }
+        if (bBoxUnits) {
+          grad.transform = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
+        } else {
+          grad.transform = matrix;
+        }
+        if (grad.stops.length === 0) {return;}
+        return [grad];
+      }
+    };
+
     var SvgElemBasicShape = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       this.getBoundingShape = function() {
         return this.shape.clone();
       };
       this.getTransformation = function() {
         return this.get('transform');
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
         doc.save();
         this.transform();
         this.clip();
-        this.mask();
         if (!isClip) {
-          let subPaths = this.shape.getSubPaths();
+          let masked = this.mask(), group;
+          if (masked) {
+            group = doc.createGroup();
+          }
+          let subPaths = this.shape.getSubPaths(),
+              fill = this.getFill(isClip, isMask),
+              stroke = this.getStroke(isClip, isMask);
           for (let j = 0; j < subPaths.length; j++) {
             if (subPaths[j].totalLength === 0) {
               let LineWidth = this.get('stroke-width'), LineCap = this.get('stroke-linecap');
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
-                let X = subPaths[j].boundingBox[0],
-                    Y = subPaths[j].boundingBox[1];
-                doc.fillColor(this.get('stroke').slice(0, 3), this.get('stroke-opacity') * this.get('stroke')[3] * this.get('opacity'));
+                let x = subPaths[j].boundingBox[0],
+                    y = subPaths[j].boundingBox[1];
+                doc.fillColor.apply(doc, stroke)
                 if (LineCap === 'square') {
-                  doc.rect(X - 0.5 * LineWidth, Y - 0.5 * LineWidth, LineWidth, LineWidth);
+                  doc.rect(x - 0.5 * LineWidth, y - 0.5 * LineWidth, LineWidth, LineWidth);
                 } else if (LineCap === 'round') {
-                  doc.circle(X, Y, 0.5 * LineWidth);
+                  doc.circle(x, y, 0.5 * LineWidth);
                 }
                 doc.fill();
               }
             }
           }
-          if (this.get('fill') !== 'none' || this.get('stroke') !== 'none') {
-            if (this.get('fill') !== 'none') {
-              doc.fillColor(this.get('fill').slice(0, 3), this.get('fill-opacity') * this.get('fill')[3] * this.get('opacity'))
+          if (fill || stroke) {
+            if (fill) {
+              doc.fillColor.apply(doc, fill);
             }
-            if (this.get('stroke') !== 'none' && this.get('stroke-width')) {
-              doc.strokeColor(this.get('stroke').slice(0, 3), this.get('stroke-opacity') * this.get('stroke')[3] * this.get('opacity'))
+            if (stroke) {
+              doc.strokeColor.apply(doc, stroke)
                  .lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(this.get('stroke-linecap'))
-                 .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
+                 .dash(this.get('stroke-dasharray'), {phase: this.get('stroke-dashoffset')});
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
                 subPaths[j].insertInDocument();
               }
             }
-            if (this.get('fill') !== 'none' && this.get('stroke') !== 'none') {
+            if (fill && stroke) {
               doc.fillAndStroke(this.get('fill-rule'));
-            } else if (this.get('fill') !== 'none') {
+            } else if (fill) {
               doc.fill(this.get('fill-rule'));
-            } else if (this.get('stroke') !== 'none') {
+            } else if (stroke) {
               doc.stroke();
             }
           }
@@ -1276,6 +1399,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (this.get('marker-end')) {
             let marker = new SvgElemMarker(this.get('marker-end'), null, MarkersPos[MarkersPos.length - 1], this.get('stroke-width'));
             marker.drawInDocument();
+          }
+          if (group) {
+            doc.insertGroup(group);
           }
         } else {
           this.shape.insertInDocument();
@@ -1447,7 +1573,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX), dy * (height - viewBox[3] * scaleY)];
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         let refX = this.getLength('refX', this.getVWidth(), 0),
             refY = this.getLength('refY', this.getVHeight(), 0),
             transform2 = this.getTransformation2();
@@ -1462,7 +1588,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (this.get('opacity') < 1 && !isClip) {
           group = doc.createGroup();
         }
-        this.drawChildren(isClip);
+        this.drawChildren(isClip, isMask);
         if (group) {
           doc.closeGroup(group);
           doc.fillOpacity(this.get('opacity'));
@@ -1475,7 +1601,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemClipPath = function(obj, inherits, bBox) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      SvgElemMaskable.call(this, obj);
+      SvgElemStylable.call(this, obj);
       this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         if (this.attr('clipPathUnits') === 'objectBoundingBox') {
@@ -1489,7 +1615,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.save();
         doc.transform.apply(doc, this.getTransformation());
         this.clip();
-        this.drawChildren(true);
+        this.drawChildren(true, false);
         doc.restore();
         if (group) {
           doc.closeGroup(group);
@@ -1530,7 +1656,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
           clipPath.drawInDocument();
         }
-        this.drawChildren(false);
+        this.drawChildren(false, true);
         doc.restore()
         if (group) {
           doc.closeGroup(group);
@@ -1541,6 +1667,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemTextContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
+      SvgElemStylable.call(this, obj);
     };
 
     var SvgElemTextNode = function(obj, inherits) {
@@ -1561,7 +1688,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemText = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      SvgElemMaskable.call(this, obj);
       this.allowedChildren = ['textPath', 'tspan', '#text'];
       (function (textParentElem) {
         let ProcessedText = '', RemainingText = obj.textContent, CurrentChunk = [], CurrentAnchor, CurrentDirection, CurrentX = 0, CurrentY = 0;
@@ -1772,15 +1898,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getTransformation = function() {
         return this.get('transform');
       };
-      this.drawInDocument = function(isClip) {
+      this.drawInDocument = function(isClip, isMask) {
         function recursive(elem) {
-          let stroke = elem.get('stroke'), strokeOpacity = elem.get('stroke-opacity'),
-              fill = elem.get('fill'), fillOpacity = elem.get('fill-opacity'),
+          let fill = elem.getFill(isClip, isMask),
+              stroke = elem.getStroke(isClip, isMask),
               strokeWidth = elem.get('stroke-width');
           if (elem._font.fauxbold) {
-            if (stroke === 'none') {
+            if (!stroke) {
               stroke = fill;
-              strokeOpacity = fillOpacity;
               strokeWidth = elem._font.size * 0.03;
             } else {
               strokeWidth += elem._font.size * 0.03;
@@ -1798,12 +1923,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               case '#text':
                 if (elem.get('visibility') === 'hidden') {continue;}
                 if (!isClip) {
-                  if (fill !== 'none' || stroke !== 'none') {
-                    if (fill !== 'none') {
-                      doc.fillColor(fill.slice(0, 3), fill[3] * fillOpacity * elem.get('opacity'))
+                  if (fill || stroke) {
+                    if (fill) {
+                      doc.fillColor.apply(doc, fill)
                     }
-                    if (stroke !== 'none' && strokeWidth) {
-                      doc.strokeColor(stroke.slice(0, 3), stroke[3] * strokeOpacity * elem.get('opacity'))
+                    if (stroke && strokeWidth) {
+                      doc.strokeColor.apply(doc, stroke)
                          .lineWidth(strokeWidth)
                          .miterLimit(elem.get('stroke-miterlimit'))
                          .lineJoin(elem.get('stroke-linejoin'))
@@ -1816,7 +1941,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 }
                 doc.beginText(elem._font.font, elem._font.size);
                 if (!isClip) {
-                  doc.setTextMode(fill !== 'none', stroke !== 'none');
+                  doc.setTextMode(!!fill, !!stroke);
                 } else {
                   doc.setTextMode(true, false);
                 }
@@ -1835,15 +1960,25 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.save();
         doc.transform.apply(doc, this.getTransformation());
         this.clip();
-        this.mask();
+        let masked = this.mask(), group;
+        if (masked) {
+          group = doc.createGroup();
+        }
         recursive(this);
         doc.restore();
+        if (group) {
+          doc.insertGroup(group);
+        }
       };
     };
 
-    var PxToPt = 72/96, ViewportWidth, ViewportHeight, ElementStack = []; // 1px = 72/96pt
+    var pxToPt = 72/96, // 1px = 72/96pt
+        viewportWidth,
+        viewportHeight,
+        useCss;
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
+    if (typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function') {useCss = options.useCss;}
     if (typeof options.fontCallback !== 'function') {
       options.fontCallback = function(family, bold, italic) {
         family = family || '';
@@ -1866,9 +2001,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     }
     if (svg && svg.nodeName === 'svg') {
-      doc.save().translate(x || 0, y || 0).scale(PxToPt);
-      ViewportWidth = options.width || doc.page.width / PxToPt,
-      ViewportHeight = options.height || doc.page.height / PxToPt;
+      doc.save().translate(x || 0, y || 0).scale(pxToPt);
+      viewportWidth = options.width || doc.page.width / pxToPt,
+      viewportHeight = options.height || doc.page.height / pxToPt;
       new SvgElem(svg, null).drawInDocument();
       doc.restore();
     } else {
