@@ -520,18 +520,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               th3 = th0 + (i + 1) * th_arc / segments,
               th_half = 0.5 * (th3 - th2);
           let t = 8/3 * Math.sin(th_half * 0.5) * Math.sin(th_half * 0.5) / Math.sin(th_half);
-          let x1 = xc + Math.cos(th2) - t * Math.sin(th2),
-              y1 = yc + Math.sin(th2) + t * Math.cos(th2),
-              x3 = xc + Math.cos(th3),
-              y3 = yc + Math.sin(th3),
-              x2 = x3 + t * Math.sin(th3),
-              y2 = y3 - t * Math.cos(th3);
-          let c1x = _a00 * x1 + _a01 * y1,
-              c1y = _a10 * x1 + _a11 * y1,
-              c2x = _a00 * x2 + _a01 * y2,
-              c2y = _a10 * x2 + _a11 * y2,
-              ex = _a00 * x3 + _a01 * y3,
-              ey = _a10 * x3 + _a11 * y3;
+          let _x1 = xc + Math.cos(th2) - t * Math.sin(th2),
+              _y1 = yc + Math.sin(th2) + t * Math.cos(th2),
+              _x3 = xc + Math.cos(th3),
+              _y3 = yc + Math.sin(th3),
+              _x2 = _x3 + t * Math.sin(th3),
+              _y2 = _y3 - t * Math.cos(th3);
+          let c1x = _a00 * _x1 + _a01 * _y1,
+              c1y = _a10 * _x1 + _a11 * _y1,
+              c2x = _a00 * _x2 + _a01 * _y2,
+              c2y = _a10 * _x2 + _a11 * _y2,
+              ex = _a00 * _x3 + _a01 * _y3,
+              ey = _a10 * _x3 + _a11 * _y3;
           pathCommands.push(['C', (i === 0), (i === segments - 1), c1x, c1y, c2x, c2y, ex, ey]);
         }
         CurrX = x; CurrY = y; LastCom = 'A';
@@ -749,7 +749,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else {
             return parseFloat(value) / 100 * this.getViewport();
           }
-          return Percentage(value);
         } else if (unit === 'ex' || unit === 'em') {
           return value * {'em':1, 'ex':0.5}[unit] * this.get('font-size');
         } else {
