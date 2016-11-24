@@ -40,6 +40,6 @@ Insert SVG into a PDF document created with PDFKit.
  - There are bugs, please send issues and/or pull requests.
 
 ####Other useful projects:
- - <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, the JavaScript PDF generation library for Node and the browser 
- - If you want to insert SVGs into a PDFKit document there is also <a href="https://github.com/devongovett/svgkit">svgkit</a> with more supported features.
+ - <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, the JavaScript PDF generation library for Node and the browser.
+ - For inserting SVG graphics into a PDFKit document there is also <a href="https://github.com/devongovett/svgkit">svgkit</a>.
  - For the opposite conversion, from PDF to SVG, you can use <a href="https://github.com/mozilla/pdf.js">Mozilla's PDF.js</a>.
