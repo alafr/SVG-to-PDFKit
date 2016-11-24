@@ -1,7 +1,7 @@
 "use strict";
 var SVGtoPDF = function(doc, svg, x, y, options) {
 
-    if (typeof doc.number !== 'function') {doc.number = function(n) {return n;}} // compatibility with current PDFKit version https://git.io/vXbSB
+    if (typeof doc.number !== 'function') {doc.number = function(n) {return n;};} // compatibility with current PDFKit version https://git.io/vXbSB
 
     doc.addContent = function(data) {
       (this._writeTarget || this.page).write(data);
@@ -119,11 +119,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       }});
       Object.defineProperty(SvgNode.prototype, 'textContent', { get: function() {
-        return (function TextContent(node) {
+        return (function recursive(node) {
           if (node.nodeType === 3) {return node.nodeValue;}
           let temp = '';
           for (let i = 0; i < node.childNodes.length; i++) {
-            temp += TextContent(node.childNodes[i]);
+            temp += recursive(node.childNodes[i]);
           }
           return temp;
         })(this);
@@ -135,12 +135,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return this.attributes.hasOwnProperty(attr);
       };
       SvgNode.prototype.getElementById = function(id) {
-        return (function GetElementById(node, id) {
+        return (function recursive(node, id) {
           let temp;
           if (node.nodeType === 1) {
             if (node.attributes.id === id) {return node;}
             for (let i = 0; i < node.childNodes.length; i++) {
-              if (temp = GetElementById(node.childNodes[i], id)) {return temp;}
+              if (temp = recursive(node.childNodes[i], id)) {return temp;}
             }
           }
         })(this, '' + id) || null;
@@ -430,7 +430,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     };
     var SvgShape = function(commands) {
-      let pathCommands = this.pathCommands = [], StartX = 0, StartY = 0, CurrX = 0, CurrY = 0, LastCom, LastCtrlX, LastCtrlY;
+      let pathCommands = this.pathCommands = [], startX = 0, startY = 0, currX = 0, currY = 0, lastCom, lastCtrlX, lastCtrlY;
       if (commands && commands.length) {
         for (let i = 0; i < commands.length; i++) {
           pathCommands.push(commands[i].slice());
@@ -441,7 +441,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return this;
       }
       this.resetCommands = function() {
-        StartX = StartY = CurrX = CurrY = LastCtrlX = LastCtrlY = 0; LastCom = null;
+        startX = startY = currX = currY = lastCtrlX = lastCtrlY = 0; lastCom = null;
         return this;
       }
       // Shape creation
@@ -451,45 +451,45 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.M = function(x, y) {
         pathCommands.push(['M', true, true, x, y]);
-        StartX = CurrX = x; StartY = CurrY = y; LastCom = 'M';
+        startX = currX = x; startY = currY = y; lastCom = 'M';
         return this.resetProperties();
       };
-      this.m = function(x, y) {return this.M(CurrX + x, CurrY + y);};
+      this.m = function(x, y) {return this.M(currX + x, currY + y);};
       this.Z = this.z = function() {
         pathCommands.push(['Z', true, true]);
-        CurrX = StartX; CurrY = StartY; LastCom = 'Z';
+        currX = startX; currY = startY; lastCom = 'Z';
         return this.resetProperties();
       };
       this.L = function(x, y) {
         pathCommands.push(['L', true, true, x, y]);
-        CurrX = x; CurrY = y; LastCom = 'L';
+        currX = x; currY = y; lastCom = 'L';
         return this.resetProperties();
       };
-      this.l = function(x, y) {return this.L(CurrX + x, CurrY + y);};
-      this.H = function(x) {return this.L(x, CurrY);};
-      this.h = function(x) {return this.L(CurrX + x, CurrY);};
-      this.V = function(y) {return this.L(CurrX, y);};
-      this.v = function(y) {return this.L(CurrX, CurrY + y);};
+      this.l = function(x, y) {return this.L(currX + x, currY + y);};
+      this.H = function(x) {return this.L(x, currY);};
+      this.h = function(x) {return this.L(currX + x, currY);};
+      this.V = function(y) {return this.L(currX, y);};
+      this.v = function(y) {return this.L(currX, currY + y);};
       this.C = function(c1x, c1y, c2x, c2y, x, y) {
         pathCommands.push(['C', true, true, c1x, c1y, c2x, c2y, x, y]);
-        CurrX = x; CurrY = y; LastCom = 'C'; LastCtrlX = c2x; LastCtrlY = c2y;
+        currX = x; currY = y; lastCom = 'C'; lastCtrlX = c2x; lastCtrlY = c2y;
         return this.resetProperties();
       };
-      this.c = function(c1x, c1y, c2x, c2y, x, y) {return this.C(CurrX + c1x, CurrY + c1y, CurrX + c2x, CurrY + c2y, CurrX + x, CurrY + y);};
-      this.S = function(c1x, c1y, x, y) {return this.C(CurrX + (LastCom === 'C' ? CurrX - LastCtrlX : 0), CurrY + (LastCom === 'C' ? CurrY - LastCtrlY : 0), c1x, c1y, x, y);};
-      this.s = function(c1x, c1y, x, y) {return this.C(CurrX + (LastCom === 'C' ? CurrX - LastCtrlX : 0), CurrY + (LastCom === 'C' ? CurrY - LastCtrlY : 0), CurrX + c1x, CurrY + c1y, CurrX + x, CurrY + y);};
+      this.c = function(c1x, c1y, c2x, c2y, x, y) {return this.C(currX + c1x, currY + c1y, currX + c2x, currY + c2y, currX + x, currY + y);};
+      this.S = function(c1x, c1y, x, y) {return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), c1x, c1y, x, y);};
+      this.s = function(c1x, c1y, x, y) {return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), currX + c1x, currY + c1y, currX + x, currY + y);};
       this.Q = function(cx, cy, x, y) {
-        let c1x = CurrX + 2 / 3 * (cx - CurrX), c1y = CurrY + 2 / 3 * (cy - CurrY),
+        let c1x = currX + 2 / 3 * (cx - currX), c1y = currY + 2 / 3 * (cy - currY),
             c2x = x + 2 / 3 * (cx - x), c2y = y + 2 / 3 * (cy - y);
         pathCommands.push(['C', true, true, c1x, c1y, c2x, c2y, x, y]);
-        CurrX = x; CurrY = y; LastCom = 'Q'; LastCtrlX = cx; LastCtrlY = cy;
+        currX = x; currY = y; lastCom = 'Q'; lastCtrlX = cx; lastCtrlY = cy;
         return this.resetProperties();
       };
-      this.q = function(c1x, c1y, x, y) {return this.Q(CurrX + c1x, CurrY + c1y, CurrX + x, CurrY + y);};
-      this.T = function(x, y) {return this.Q(CurrX + (LastCom === 'Q' ? CurrX - LastCtrlX : 0), CurrY + (LastCom === 'Q' ? CurrY - LastCtrlY : 0), x, y);};
-      this.t = function(x, y) {return this.Q(CurrX + (LastCom === 'Q' ? CurrX - LastCtrlX : 0), CurrY + (LastCom === 'Q' ? CurrY - LastCtrlY : 0), CurrX + x, CurrY + y);};
+      this.q = function(c1x, c1y, x, y) {return this.Q(currX + c1x, currY + c1y, currX + x, currY + y);};
+      this.T = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), x, y);};
+      this.t = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), currX + x, currY + y);};
       this.A = function(rx, ry, rotAngle, arcLarge, arcSweep, x, y) { // From PDFKit
-        let xInit = CurrX, yInit = CurrY, xEnd = x, yEnd = y;
+        let xInit = currX, yInit = currY, xEnd = x, yEnd = y;
         rx = Math.abs(rx); ry = Math.abs(ry); arcLarge = 1*!!arcLarge; arcSweep = 1*!!arcSweep;
         let th = rotAngle * (Math.PI / 180), sin_th = Math.sin(th), cos_th = Math.cos(th);
         let px = cos_th * (xInit - xEnd) * 0.5 + sin_th * (yInit - yEnd) * 0.5,
@@ -534,29 +534,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               ey = _a10 * _x3 + _a11 * _y3;
           pathCommands.push(['C', (i === 0), (i === segments - 1), c1x, c1y, c2x, c2y, ex, ey]);
         }
-        CurrX = x; CurrY = y; LastCom = 'A';
+        currX = x; currY = y; lastCom = 'A';
         return this.resetProperties();
       };
-      this.a = function(rx, ry, rot, fa, fs, x, y) {return this.A(rx, ry, rot, fa, fs, CurrX + x, CurrY + y);};
+      this.a = function(rx, ry, rot, fa, fs, x, y) {return this.A(rx, ry, rot, fa, fs, currX + x, currY + y);};
       // Shape properties
       let pathSegments = null; Object.defineProperty(this, 'pathSegments', {get: function() {
         if (pathSegments !== null) {return pathSegments;}
-        let CurrX = 0, CurrY = 0, StartX = 0, StartY = 0, segments = [];
+        let currX = 0, currY = 0, startX = 0, startY = 0, segments = [];
         for (let i = 0; i < pathCommands.length; i++) {
           let command = pathCommands[i][0], values = pathCommands[i].slice(3), segment;
           switch(command) {
             case 'M':
               segment = null;
-              StartX = CurrX = values[0]; StartY = CurrY = values[1];  break;
+              startX = currX = values[0]; startY = currY = values[1];  break;
             case 'L':
-              segment = new LineSegment(CurrX, CurrY, values[0], values[1]);
-              CurrX = values[0]; CurrY = values[1];  break;
+              segment = new LineSegment(currX, currY, values[0], values[1]);
+              currX = values[0]; currY = values[1];  break;
             case 'C':
-              segment = new BezierSegment(CurrX, CurrY, values[0], values[1], values[2], values[3], values[4], values[5]);
-              CurrX = values[4]; CurrY = values[5];  break;
+              segment = new BezierSegment(currX, currY, values[0], values[1], values[2], values[3], values[4], values[5]);
+              currX = values[4]; currY = values[5];  break;
             case 'Z':
-              segment = new LineSegment(CurrX, CurrY, StartX, StartY);
-              CurrX = StartX; CurrY = StartY;  break;
+              segment = new LineSegment(currX, currY, startX, startY);
+              currX = startX; currY = startY;  break;
           }
           if (segment) {
             segment.hasStart = pathCommands[i][1];
@@ -585,14 +585,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let boundingBox = null; Object.defineProperty(this, 'boundingBox', {get: function() {
         if (boundingBox !== null) {return boundingBox;}
         let bbox = [Infinity, Infinity, -Infinity, -Infinity];
-        function AddBounds(bbox1) {
+        function addBounds(bbox1) {
           if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
           if (bbox1[2] > bbox[2]) {bbox[2] = bbox1[2];}
           if (bbox1[1] < bbox[1]) {bbox[1] = bbox1[1];}
           if (bbox1[3] > bbox[3]) {bbox[3] = bbox1[3];}
         }
         for (let i = 0; i < this.pathSegments.length; i++) {
-          AddBounds(this.pathSegments[i].boundingBox);
+          addBounds(this.pathSegments[i].boundingBox);
         }
         if (bbox[0] === Infinity) {bbox[0] = 0;}
         if (bbox[1] === Infinity) {bbox[1] = 0;}
@@ -679,6 +679,45 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
+    var Properties = {
+      'color':            {inherit: true, initial: undefined},
+      'visibility':       {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
+      'fill':             {inherit: true, initial: [0, 0, 0, 1]},
+      'stroke':           {inherit: true, initial: 'none'},
+      'stop-color':       {inherit: false, initial: [0, 0, 0, 1]},
+      'fill-opacity':     {inherit: true, initial: 1},
+      'stroke-opacity':   {inherit: true, initial: 1},
+      'stop-opacity':     {inherit: false, initial: 1},
+      'fill-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
+      'clip-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
+      'stroke-width':     {inherit: true, initial: 1},
+      'stroke-dasharray': {inherit: true, initial: []},
+      'stroke-dashoffset':{inherit: true, initial: 0},
+      'stroke-miterlimit':{inherit: true, initial: 4},
+      'stroke-linejoin':  {inherit: true, initial: 'miter', values: {'miter':'miter', 'round':'round', 'bevel':'bevel'}},
+      'stroke-linecap':   {inherit: true, initial: 'butt', values: {'butt':'butt', 'round':'round', 'square':'square'}},
+      'font-size':        {inherit: true, initial: 16, values: {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}},
+      'font-family':      {inherit: true, initial: 'sans-serif'},
+      'font-weight':      {inherit: true, initial: 'normal', values: {'600':'bold', '700':'bold', '800':'bold', '900':'bold', 'bold':'bold', 'bolder':'bold', '500':'normal', '400':'normal', '300':'normal', '200':'normal', '100':'normal', 'normal':'normal', 'lighter':'normal'}},
+      'font-style':       {inherit: true, initial: 'normal', values: {'italic':'italic', 'oblique':'italic', 'normal':'normal'}},
+      'text-anchor':      {inherit: true, initial: 'start', values: {'start':'start', 'middle':'middle', 'end':'end'}},
+      'direction':        {inherit: true, initial: 'ltr', values: {'ltr':'ltr', 'rtl':'rtl'}},
+      'dominant-baseline':{inherit: true, initial: 'baseline', values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
+      'baseline-shift':   {inherit: true, initial: 0, values: {'sub':'sub', 'super':'super'}},
+      'word-spacing':     {inherit: true, initial: 0},
+      'letter-spacing':   {inherit: true, initial: 0},
+      'xml:space':        {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
+      'marker-start':     {inherit: true, initial: null},
+      'marker-mid':       {inherit: true, initial: null},
+      'marker-end':       {inherit: true, initial: null},
+      'opacity':          {inherit: false, initial: 1},
+      'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
+      'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block'}},
+      'clip-path':        {inherit: false, initial: null},
+      'mask':             {inherit: false, initial: null},
+      'overflow':         {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
+    };
+
     var SvgElem = function(obj, inherits) {
       switch (obj.nodeName) {
         case 'use': if (this instanceof SvgElemUse) {break;} else {return new SvgElemUse(obj, inherits);}
@@ -697,48 +736,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
         case '#text': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
       }
+      let cache = Object.create(null);
       this.name = obj.nodeName;
       this.node = obj;
       this.allowedChildren = [];
-      let cache = Object.create(null);
-      let properties = {
-        'color':            {inherit: true, initial: undefined},
-        'visibility':       {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
-        'fill':             {inherit: true, initial: [0, 0, 0, 1]},
-        'stroke':           {inherit: true, initial: 'none'},
-        'stop-color':       {inherit: false, initial: [0, 0, 0, 1]},
-        'fill-opacity':     {inherit: true, initial: 1},
-        'stroke-opacity':   {inherit: true, initial: 1},
-        'stop-opacity':     {inherit: false, initial: 1},
-        'fill-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
-        'clip-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
-        'stroke-width':     {inherit: true, initial: 1},
-        'stroke-dasharray': {inherit: true, initial: []},
-        'stroke-dashoffset':{inherit: true, initial: 0},
-        'stroke-miterlimit':{inherit: true, initial: 4},
-        'stroke-linejoin':  {inherit: true, initial: 'miter', values: {'miter':'miter', 'round':'round', 'bevel':'bevel'}},
-        'stroke-linecap':   {inherit: true, initial: 'butt', values: {'butt':'butt', 'round':'round', 'square':'square'}},
-        'font-size':        {inherit: true, initial: 16, values: {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}},
-        'font-family':      {inherit: true, initial: 'sans-serif'},
-        'font-weight':      {inherit: true, initial: 'normal', values: {'600':'bold', '700':'bold', '800':'bold', '900':'bold', 'bold':'bold', 'bolder':'bold', '500':'normal', '400':'normal', '300':'normal', '200':'normal', '100':'normal', 'normal':'normal', 'lighter':'normal'}},
-        'font-style':       {inherit: true, initial: 'normal', values: {'italic':'italic', 'oblique':'italic', 'normal':'normal'}},
-        'text-anchor':      {inherit: true, initial: 'start', values: {'start':'start', 'middle':'middle', 'end':'end'}},
-        'direction':        {inherit: true, initial: 'ltr', values: {'ltr':'ltr', 'rtl':'rtl'}},
-        'dominant-baseline':{inherit: true, initial: 'baseline', values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
-        'baseline-shift':   {inherit: true, initial: 0, values: {'sub':'sub', 'super':'super'}},
-        'word-spacing':     {inherit: true, initial: 0},
-        'letter-spacing':   {inherit: true, initial: 0},
-        'xml:space':        {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
-        'marker-start':     {inherit: true, initial: null},
-        'marker-mid':       {inherit: true, initial: null},
-        'marker-end':       {inherit: true, initial: null},
-        'opacity':          {inherit: false, initial: 1},
-        'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-        'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block'}},
-        'clip-path':        {inherit: false, initial: null},
-        'mask':             {inherit: false, initial: null},
-        'overflow':         {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
-      };
       this.attr = function(key) {
         return obj.getAttribute(key);
       };
@@ -834,7 +835,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.get = function(key) {
         if (cache[key] !== undefined) {return cache[key];}
-        let keyInfo = properties[key] || {}, value, result;
+        let keyInfo = Properties[key] || {}, value, result;
         if (useCSS && key !== 'transform') { // the CSS transform behaves stangely
           if (!this.css) {this.css = getComputedStyle(obj);}
           value = this.css[keyInfo.css || key] || this.attr(key);
@@ -1669,8 +1670,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['textPath', 'tspan', '#text'];
       (function (textParentElem) {
-        let ProcessedText = '', RemainingText = obj.textContent, CurrentChunk = [], CurrentAnchor, CurrentDirection, CurrentX = 0, CurrentY = 0;
-        function combineArrays(Arr1, Arr2) {return Arr1.concat(Arr2.slice(Arr1.length));}
+        let processedText = '', remainingText = obj.textContent, currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
+        function combineArrays(array1, array2) {return array1.concat(array2.slice(array1.length));}
         function getAscent(font, size) {
           return Math.max(font.ascender, (font.bbox[3] || font.bbox.maxY) * (font.scale || 1)) * size / 1000;
         }
@@ -1715,17 +1716,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return data;
         }
         function doAnchoring() {
-          if (CurrentChunk.length) {
-            let last = CurrentChunk[CurrentChunk.length - 1];
-            let first = CurrentChunk[0]
+          if (currentChunk.length) {
+            let last = currentChunk[currentChunk.length - 1];
+            let first = currentChunk[0]
             let width = last.x + last.width - first.x;
-            let anchordx = {'startltr': 0, 'middleltr': 0.5, 'endltr': 1, 'startrtl': 1, 'middlertl': 0.5, 'endrtl': 0}[CurrentAnchor + CurrentDirection] * width || 0;
-            for (let i = 0; i < CurrentChunk.length; i++) {
-              CurrentChunk[i].x -= anchordx;
+            let anchordx = {'startltr': 0, 'middleltr': 0.5, 'endltr': 1, 'startrtl': 1, 'middlertl': 0.5, 'endrtl': 0}[currentAnchor + currentDirection] * width || 0;
+            for (let i = 0; i < currentChunk.length; i++) {
+              currentChunk[i].x -= anchordx;
             }
-            CurrentX -= anchordx;
+            currentX -= anchordx;
           }
-          CurrentChunk = [];
+          currentChunk = [];
         }
         function recursive(currentElem, parentElem) {
           currentElem._x = combineArrays(currentElem.getLengthList('x', currentElem.getVWidth()), (parentElem ? parentElem._x.slice(parentElem._pos.length) : []));
@@ -1735,19 +1736,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._rot = combineArrays(currentElem.getNumberList('rotate'), (parentElem ? parentElem._rot.slice(parentElem._pos.length) : []));
           currentElem._defRot = currentElem.chooseValue(currentElem._rot[currentElem._rot.length - 1], parentElem && parentElem._defRot, 0);
           if (currentElem.name === 'textPath') {currentElem._y = [];}
-          let FontStylesFound = {};
-          options.fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', FontStylesFound);
+          let fontStylesFound = {};
+          options.fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
           currentElem._pos = [];
-          currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: FontStylesFound.italicFound===false, fauxbold: FontStylesFound.boldFound===false};
-          let TextLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
-              WordSpacing = currentElem.get('word-spacing'),
-              LetterSpacing = currentElem.get('letter-spacing'),
-              TextAnchor = currentElem.get('text-anchor'),
-              TextDirection = currentElem.get('direction'),
-              Baseline = getBaseline(currentElem._font.font, currentElem._font.size, currentElem.get('dominant-baseline'), currentElem.get('baseline-shift'));
+          currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
+          let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
+              wordSpacing = currentElem.get('word-spacing'),
+              letterSpacing = currentElem.get('letter-spacing'),
+              textAnchor = currentElem.get('text-anchor'),
+              textDirection = currentElem.get('direction'),
+              baseline = getBaseline(currentElem._font.font, currentElem._font.size, currentElem.get('dominant-baseline'), currentElem.get('baseline-shift'));
           if (currentElem.name === 'textPath') {
             doAnchoring();
-            CurrentX = CurrentY = 0;
+            currentX = currentY = 0;
           } else if (currentElem._x.length || currentElem._y.length) {
             doAnchoring();
           }
@@ -1762,16 +1763,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 let rawText = childElem.textContent, renderedText = rawText, words;
                 childElem._font = currentElem._font;
                 childElem._pos = [];
-                RemainingText = RemainingText.substring(rawText.length);
+                remainingText = remainingText.substring(rawText.length);
                 if (currentElem.get('xml:space') === 'preserve') {
                   renderedText = renderedText.replace(/[\s]/g, ' ');
                 } else {
                   renderedText = renderedText.replace(/[\s]+/g, ' ');
-                  if (ProcessedText.match(/[\s]$|^$/)) {renderedText = renderedText.replace(/^[\s]/, '');}
-                  if (RemainingText.match(/^[\s]*$/)) {renderedText = renderedText.replace(/[\s]$/, '');}
+                  if (processedText.match(/[\s]$|^$/)) {renderedText = renderedText.replace(/^[\s]/, '');}
+                  if (remainingText.match(/^[\s]*$/)) {renderedText = renderedText.replace(/[\s]$/, '');}
                 }
-                ProcessedText += rawText;
-                if (WordSpacing === 0) {
+                processedText += rawText;
+                if (wordSpacing === 0) {
                   words = [renderedText];
                 } else {
                   words = renderedText.split(/(\s)/);
@@ -1780,44 +1781,44 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   let pos = getTextPos(currentElem._font.font, currentElem._font.size, words[w]);
                   for (let j = 0; j < pos.length; j++) {
                     let indexInElement = currentElem._pos.length;
-                    if (currentElem._x[indexInElement] !== undefined) {doAnchoring(); CurrentX = currentElem._x[indexInElement];}
-                    if (currentElem._y[indexInElement] !== undefined) {doAnchoring(); CurrentY = currentElem._y[indexInElement];}
-                    CurrentX += (currentElem._dx[indexInElement] || 0);
-                    CurrentY += (currentElem._dy[indexInElement] || 0);
+                    if (currentElem._x[indexInElement] !== undefined) {doAnchoring(); currentX = currentElem._x[indexInElement];}
+                    if (currentElem._y[indexInElement] !== undefined) {doAnchoring(); currentY = currentElem._y[indexInElement];}
+                    currentX += (currentElem._dx[indexInElement] || 0);
+                    currentY += (currentElem._dy[indexInElement] || 0);
                     pos[j].rotate = (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[indexInElement], currentElem._defRot);
-                    pos[j].x = CurrentX;
-                    pos[j].y = CurrentY + Baseline;
+                    pos[j].x = currentX;
+                    pos[j].y = currentY + baseline;
                     pos[j].scale = 1;
                     pos[j].index = indexInElement;
                     pos[j].hidden = false;
-                    CurrentChunk.push(pos[j]);
+                    currentChunk.push(pos[j]);
                     childElem._pos.push(pos[j]);
                     currentElem._pos.push(pos[j]);
-                    if (CurrentChunk.length === 1) {
-                      CurrentAnchor = TextAnchor;
-                      CurrentDirection = TextDirection;
+                    if (currentChunk.length === 1) {
+                      currentAnchor = textAnchor;
+                      currentDirection = textDirection;
                     }
-                    CurrentX += pos[j].xAdvance + LetterSpacing;
-                    CurrentY += pos[j].yAdvance;
+                    currentX += pos[j].xAdvance + letterSpacing;
+                    currentY += pos[j].yAdvance;
                   }
                   if (words[w] === ' ') {
-                    CurrentX += WordSpacing;
+                    currentX += wordSpacing;
                   }
                 }
                 break;
             }
           }
-          if (TextLength && currentElem._pos.length) {
-            let FirstChar = currentElem._pos[0], LastChar = currentElem._pos[currentElem._pos.length - 1],
-                StartX = FirstChar.x, EndX = LastChar.x + LastChar.width,
-                TextScale = TextLength / (EndX - StartX);
+          if (textLength && currentElem._pos.length) {
+            let firstChar = currentElem._pos[0], lastChar = currentElem._pos[currentElem._pos.length - 1],
+                startX = firstChar.x, endX = lastChar.x + lastChar.width,
+                textScale = textLength / (endX - startX);
             for (let j = 0; j < currentElem._pos.length; j++) {
-              currentElem._pos[j].x = StartX + TextScale * (currentElem._pos[j].x - StartX);
-              currentElem._pos[j].scale *= TextScale;
-              currentElem._pos[j].xAdvance *= TextScale;
-              currentElem._pos[j].width *= TextScale;
+              currentElem._pos[j].x = startX + textScale * (currentElem._pos[j].x - startX);
+              currentElem._pos[j].scale *= textScale;
+              currentElem._pos[j].xAdvance *= textScale;
+              currentElem._pos[j].width *= textScale;
             }
-            CurrentX += TextLength - (EndX - StartX);
+            currentX += textLength - (endX - startX);
           }
           if (currentElem.name === 'textPath') {
             doAnchoring();
@@ -1834,18 +1835,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   currentElem._pos[j].xAdvance *= pathLengthScale;
                   currentElem._pos[j].width *= pathLengthScale;
                 }
-                let CharMidX = textOffset + currentElem._pos[j].x * pathLengthScale + 0.5 * currentElem._pos[j].width;
-                if (CharMidX > pathComputedLength || CharMidX < 0) {
+                let charMidX = textOffset + currentElem._pos[j].x * pathLengthScale + 0.5 * currentElem._pos[j].width;
+                if (charMidX > pathComputedLength || charMidX < 0) {
                   currentElem._pos[j].hidden = true;
                 } else {
-                  let PointOnPath = pathObject.getPointAtLength(CharMidX);
-                  currentElem._pos[j].x = PointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(PointOnPath[2]) - currentElem._pos[j].y * Math.sin(PointOnPath[2]);
-                  currentElem._pos[j].y = PointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(PointOnPath[2]) + currentElem._pos[j].y * Math.cos(PointOnPath[2]);
-                  currentElem._pos[j].rotate = PointOnPath[2] + currentElem._pos[j].rotate;
+                  let pointOnPath = pathObject.getPointAtLength(charMidX);
+                  currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
+                  currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
+                  currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
                 }
               }
-              let EndPoint = pathObject.getPointAtLength(pathComputedLength);
-              CurrentX = EndPoint[0]; CurrentY = EndPoint[1];
+              let endPoint = pathObject.getPointAtLength(pathComputedLength);
+              currentX = endPoint[0]; currentY = endPoint[1];
             } else {
               for (let j = 0; j < currentElem._pos.length; j++) {
                 currentElem._pos[j].hidden = true;
