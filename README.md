@@ -32,7 +32,6 @@ Insert SVG into a PDF document created with PDFKit.
  - gradients (opaque only)
 
 ####Unsupported:
- - css: style element and inline style (see <a href="https://github.com/alafr/SVG-to-PDFKit/pull/17">#17</a>)
  - patterns
  - filters
  - other things I don't even know they exist
