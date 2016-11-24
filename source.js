@@ -1381,6 +1381,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             marker.drawInDocument();
           }
           if (group) {
+            doc.closeGroup(group);
             doc.insertGroup(group);
           }
         } else {
@@ -1945,10 +1946,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           group = doc.createGroup();
         }
         recursive(this);
-        doc.restore();
         if (group) {
+          doc.closeGroup(group);
           doc.insertGroup(group);
         }
+        doc.restore();
       };
     };
 
