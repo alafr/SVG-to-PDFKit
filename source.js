@@ -255,6 +255,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let dt = m[0] * m[3] - m[1] * m[2];
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
     }
+    function validateMatrix(m) {
+      return doc.number(m[0]) * doc.number(m[3]) - doc.number(m[1]) * doc.number(m[2]) !== 0;
+    }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
       while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
@@ -1294,11 +1297,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           grad.stop(child.getPercent('offset'), color.slice(0, 3), 1);
         }
         if (bBoxUnits) {
-          grad.transform = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
-        } else {
-          grad.transform = matrix;
+          matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
-        return [grad];
+        if (validateMatrix(matrix)) {
+          grad.transform = matrix;
+          return [grad];
+        } else {
+          return;
+        }
       }
     };
 
