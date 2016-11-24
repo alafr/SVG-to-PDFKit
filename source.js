@@ -835,7 +835,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.get = function(key) {
         if (cache[key] !== undefined) {return cache[key];}
         let keyInfo = properties[key] || {}, value, result;
-        if (useCss && key !== 'transform') { // the CSS transform behaves stangely
+        if (useCSS && key !== 'transform') { // the CSS transform behaves stangely
           if (!this.css) {this.css = getComputedStyle(obj);}
           value = this.css[keyInfo.css || key];
         } else {
@@ -1954,14 +1954,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var pxToPt = 72/96, // 1px = 72/96pt
         viewportWidth,
         viewportHeight,
-        useCss;
+        useCSS;
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
-    if (options.useCss) {
+    if (options.useCSS) {
       if (typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function') {
-        useCss = true;
+        useCSS = true;
       } else {
-        warningMessage('SVGtoPDF: useCss option can only be used for SVG *elements* in compatible browsers');
+        warningMessage('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
       }
     }
     if (typeof options.fontCallback !== 'function') {
