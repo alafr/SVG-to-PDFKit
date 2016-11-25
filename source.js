@@ -1909,8 +1909,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 break;
               case '#text':
                 if (elem.get('visibility') === 'hidden') {continue;}
-                if (!isClip) {
-                  if (fill || stroke) {
+                if (fill || stroke || isClip) {
+                  if (!isClip) {
                     if (fill) {
                       doc.fillColor.apply(doc, fill);
                     }
@@ -1922,24 +1922,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                          .lineCap(elem.get('stroke-linecap'))
                          .dash(elem.get('stroke-dasharray'), {phase:elem.get('stroke-dashoffset')});
                     }
+                  } else {
+                    doc.fillColor('white');
                   }
-                } else {
-                  doc.fillColor('white');
-                }
-                doc.beginText(elem._font.font, elem._font.size);
-                if (!isClip) {
-                  doc.setTextMode(!!fill, !!stroke);
-                } else {
-                  doc.setTextMode(true, false);
-                }
-                for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
-                  if (!pos[j].hidden) {
-                    let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxitalic ? -0.25 : 0);
-                    doc.setTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
-                    doc.writeGlyph(pos[j].glyphid);
+                  doc.beginText(elem._font.font, elem._font.size);
+                  if (!isClip) {
+                    doc.setTextMode(!!fill, !!stroke);
+                  } else {
+                    doc.setTextMode(true, false);
                   }
+                  for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
+                    if (!pos[j].hidden) {
+                      let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxitalic ? -0.25 : 0);
+                      doc.setTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
+                      doc.writeGlyph(pos[j].glyphid);
+                    }
+                  }
+                  doc.endText();
                 }
-                doc.endText();
                 break;
             }
           }
