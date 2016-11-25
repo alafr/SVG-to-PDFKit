@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <title>SVG-to-PDFKit demo page</title>
@@ -183,8 +183,10 @@ a{text-decoration:none;color:#66a8a8;}
  <use xlink:href="#Chemistry"/>
  <use xlink:href="#Path"/>
  <rect x="2%" y="2%" width="96%" height="96%" fill="none" stroke="orange" stroke-width="2" stroke-dasharray="5 2 2 2 5 5"/>
- <text>
+ <text textLength="600px" lengthAdjust="spacingAndGlyphs">
   <textPath xlink:href="#Triangle" font-size="20" textLength="600px" lengthAdjust="spacingAndGlyphs">Text adjusted around a triangle</textPath>
+ </text>
+ <text>
   <textPath xlink:href="#Maths" font-size="30" text-anchor="middle" startOffset="50%">Maths x<tspan font-size="20" baseline-shift="super">2</tspan> + y<tspan font-size="20" baseline-shift="super">2</tspan> = z<tspan font-size="20" baseline-shift="super">2</tspan>!</textPath>
   <textPath xlink:href="#Chemistry" font-size="30" text-anchor="middle" startOffset="50%">Chemistry 2H<tspan font-size="20" baseline-shift="sub">2</tspan> + O<tspan font-size="20" baseline-shift="sub">2</tspan> -> 2H<tspan font-size="20" baseline-shift="sub">2</tspan>O</textPath>
   <textPath xlink:href="#Path" font-size="30" dominant-baseline="middle" text-anchor="middle" startOffset="50%">Text centered on a complex path</textPath>
