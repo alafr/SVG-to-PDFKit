@@ -911,7 +911,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let color = parseColor(value);
               if (color) {return color;}
               let ref = this.resolveUrl(value);
-              if (ref) {
+              if (ref) { // TODO implement fallback syntax : <funciri> <color>
                 if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient') {
                   return ref;
                 } else if (ref.nodeName === 'pattern') {
@@ -1698,7 +1698,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['textPath', 'tspan', '#text'];
       (function (textParentElem) {
-        let processedText = '', remainingText = obj.textContent, currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
+        let processedText = '', remainingText = obj.textContent, textPaths = [], currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
         function combineArrays(array1, array2) {return array1.concat(array2.slice(array1.length));}
         function getAscent(font, size) {
           return Math.max(font.ascender, (font.bbox[3] || font.bbox.maxY) * (font.scale || 1)) * size / 1000;
@@ -1848,46 +1848,52 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
             currentX += textLength - (endX - startX);
           }
+          if (currentElem.name === 'textPath' || currentElem.name === 'text') {
+            doAnchoring();
+          }
           if (currentElem.name === 'textPath') {
-            doAnchoring();
-            let pathElem = currentElem.path;
-            if (pathElem) {
-              let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
-                  pathComputedLength = pathObject.totalLength,
-                  textOffset = currentElem.getLength('startOffset', pathComputedLength, 0),
-                  pathLength = pathElem.getLength('pathLength', pathElem.getViewport(), undefined),
-                  pathLengthScale = (pathElem.pathLength !== undefined ? pathComputedLength / pathElem.pathLength : 1);
-              for (let j = 0; j < currentElem._pos.length; j++) {
-                if (pathLengthScale !== 1) {
-                  currentElem._pos[j].scale *= pathLengthScale;
-                  currentElem._pos[j].xAdvance *= pathLengthScale;
-                  currentElem._pos[j].width *= pathLengthScale;
-                }
-                let charMidX = textOffset + currentElem._pos[j].x * pathLengthScale + 0.5 * currentElem._pos[j].width;
-                if (charMidX > pathComputedLength || charMidX < 0) {
-                  currentElem._pos[j].hidden = true;
-                } else {
-                  let pointOnPath = pathObject.getPointAtLength(charMidX);
-                  currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
-                  currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
-                  currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
-                }
-              }
-              let endPoint = pathObject.getPointAtLength(pathComputedLength);
-              currentX = endPoint[0]; currentY = endPoint[1];
-            } else {
-              for (let j = 0; j < currentElem._pos.length; j++) {
-                currentElem._pos[j].hidden = true;
-              }
-            }
-          } else if (currentElem.name === 'text') {
-            doAnchoring();
+            textPaths.push(currentElem);
           }
           if (parentElem) {
             parentElem._pos = parentElem._pos.concat(currentElem._pos);
           }
         }
+        function textOnPath(currentElem) {
+          let pathElem = currentElem.path;
+          if (pathElem) {
+            let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
+                pathComputedLength = pathObject.totalLength,
+                textOffset = currentElem.getLength('startOffset', pathComputedLength, 0),
+                pathLength = pathElem.getLength('pathLength', pathElem.getViewport(), undefined),
+                pathLengthScale = (pathElem.pathLength !== undefined ? pathComputedLength / pathElem.pathLength : 1);
+            for (let j = 0; j < currentElem._pos.length; j++) {
+              if (pathLengthScale !== 1) {
+                currentElem._pos[j].scale *= pathLengthScale;
+                currentElem._pos[j].xAdvance *= pathLengthScale;
+                currentElem._pos[j].width *= pathLengthScale;
+              }
+              let charMidX = textOffset + currentElem._pos[j].x * pathLengthScale + 0.5 * currentElem._pos[j].width;
+              if (charMidX > pathComputedLength || charMidX < 0) {
+                currentElem._pos[j].hidden = true;
+              } else {
+                let pointOnPath = pathObject.getPointAtLength(charMidX);
+                currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
+                currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
+                currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
+              }
+            }
+            let endPoint = pathObject.getPointAtLength(pathComputedLength);
+            currentX = endPoint[0]; currentY = endPoint[1];
+          } else {
+            for (let j = 0; j < currentElem._pos.length; j++) {
+              currentElem._pos[j].hidden = true;
+            }
+          }
+        }
         recursive(textParentElem, null);
+        for (let i = 0; i < textPaths.length; i++) {
+          textOnPath(textPaths[i]);
+        }
       })(this);
       this.getBoundingShape = function() {
         let shape = new SvgShape();
