@@ -24,7 +24,7 @@ function CreatePdf() {
   } else {
     let svgs = document.querySelectorAll('#col1 > svg'); // Use all the svg drawings on the page
     for (let i = 0; i < svgs.length; i++) {
-      doc.fontSize(20).text(svgs[i].id, {underline:true});
+      doc.fontSize(20).text(svgs[i].id, {underline: true});
       SVGtoPDF(doc, svgs[i].outerHTML || svgs[i], 0, 0);
       if (i !== svgs.length - 1) {
         ResetToDefault(doc);
@@ -189,6 +189,25 @@ a{text-decoration:none;color:#66a8a8;}
   <textPath xlink:href="#Chemistry" font-size="30" text-anchor="middle" startOffset="50%">Chemistry 2H<tspan font-size="20" baseline-shift="sub">2</tspan> + O<tspan font-size="20" baseline-shift="sub">2</tspan> -> 2H<tspan font-size="20" baseline-shift="sub">2</tspan>O</textPath>
   <textPath xlink:href="#Path" font-size="30" dominant-baseline="middle" text-anchor="middle" startOffset="50%">Text centered on a complex path</textPath>
  </text>
+</svg>
+<svg id="Text gradient" xmlns="http://www.w3.org/2000/svg" viewBox="20 20 760 760">
+  <radialGradient id="grad">
+    <stop stop-color="green" offset="0.2"/>
+    <stop stop-color="blue" offset="0.3"/>
+    <stop stop-color="indigo" offset="0.4"/>
+    <stop stop-color="violet" offset="0.5"/>
+    <stop stop-color="darkred" offset="0.6"/>
+    <stop stop-color="darkorange" offset="0.7"/>
+    <stop stop-color="crimson" offset="0.8"/>
+    <stop stop-color="green" offset="0.9"/>
+    <stop stop-color="violet" offset="1"/>
+  </radialGradient>
+  <path stroke="orange" stroke-opacity="0.2" stroke-width="3" fill="none" d="M0,0C2,0,4-2,3-5,2-8-1-11-6-10-11-10-16-6-18,0-20,6-18,15-12,21-6,27,5,29,15,26,25,23,34,13,36,0,38-13,33-27,21-36,9-46-9-48-24-42-39-35-52-19-54,0-56,19-47,40-30,52-13,64,12,67,33,57,54,47,70,25,72,0,74-25,62-52,39-68,16-83-16-86-42-73-68-60-88-31-90,0-92,31-76,65-48,83-20,102,19,104,51,88,83,72,106,38,108,0,110-38,90-77,57-99,24-120-23-123-60-104-97-85-124-44-126,0-128,44-105,90-66,114-27,139,26,142,69,120,112,97,142,50,144,0,146-50,119-102,75-130,31-158-30-161-78-135-126-110-160-57-162,0-164,57-134,114-84,145-34,177,33,179,87,151,141,122,178,63,180,0,182-63,148-127,93-161,38-195-37-198-96-166-155-135-196-69-198,0-200,69-163,139-102,177-41,214,41,217,105,182,169,147,214,75,216,0,218-75,177-152,111-192,45-233-44-236-114-197-184-159-232-82-234,0-236,82-192,164-120,208-48,251,48,254,123,213,198,172,250,88,252,0,254-88,206-177,129-223,52-270-51-273-132-229-213-184-268-94-270,0-272,94-220,189-138,239-56,289,55,292,141,244,227,197,286,101,288,0" transform="translate(400,400) scale(1.2)" id="path"/>
+  <text fill-opacity="0.2" stroke-linejoin="round" stroke="url(#grad)" font-size="45" font-family="serif" font-weight="bold" dominant-baseline="central" text-anchor="middle" fill="url(#grad)">
+    <textPath startOffset="50%" xlink:href="#path">
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+    </textPath>
+  </text>
 </svg>
 <svg id="Clipped Image (bottom aligned)" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 160 80" preserveAspectRatio="xMidYMax meet">
   <image xlink:href="data:image/jpeg;base64,/9j/4QAYRXhpZgAASUkqAAgAAAAAAAAAAAAAAP/sABFEdWNreQABAAQAAAALAAD/4QM0aHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjMtYzAxMSA2Ni4xNDU2NjEsIDIwMTIvMDIvMDYtMTQ6NTY6MjcgICAgICAgICI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3
