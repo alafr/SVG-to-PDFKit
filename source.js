@@ -1303,7 +1303,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
           }
           offset = Math.max(offset, child.getPercent('offset'));
+          if (i === 0 && offset > 0) {
+            grad.stop(0, color.slice(0, 3), 1);
+          }
           grad.stop(offset, color.slice(0, 3), 1);
+          if (i === children.length - 1 && offset < 1) {
+            grad.stop(1, color.slice(0, 3), 1);
+          }
         }
         if (bBoxUnits) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
