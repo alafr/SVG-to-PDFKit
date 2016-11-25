@@ -888,7 +888,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           case 'stroke-dasharray':
             result = (function() {
               if (value === 'none') {return [];}
-              if (value != null) {return this.computeLengthList(value, this.getViewport());}
+              let dasharray = this.computeLengthList(value, this.getViewport()),
+                  sum = 0;
+              for (let j = 0; j < dasharray.length; j++) {
+                if (dasharray[j] < 0) {return;}
+                sum += doc.number(dasharray[j]);
+              }
+              return (sum === 0 ? [] : dasharray);
             }).call(this);
             break;
           case 'color':
@@ -1258,10 +1264,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
       this.getGradient = function(isClip, isMask) {
-        let children = this.getChildren(),
-            bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
+        let children = this.getChildren();
+        if (children.length === 0) {return;}
+        if (children.length === 1) {
+          let child = children[0],
+              color = child.get('stop-color');
+          if (color === 'none') {return;}
+          return [color.slice(0, 3), child.get('stop-opacity') * color[3] * gOpacity];
+        }
+        let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
-            grad;
+            grad,
+            offset = 0;
         if (this.name === 'linearGradient') {
           let x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
               x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
@@ -1276,13 +1290,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
           grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
         }
-        if (children.length === 0) {return;}
-        if (children.length === 1) {
-          let child = children[0],
-              color = child.get('stop-color');
-          if (color === 'none') {return;}
-          return [color.slice(0, 3), child.get('stop-opacity') * color[3] * gOpacity];
-        }
         for (let i = 0; i < children.length; i++) {
           let child = children[i],
               color = child.get('stop-color');
@@ -1294,7 +1301,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
             color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
           }
-          grad.stop(child.getPercent('offset'), color.slice(0, 3), 1);
+          offset = Math.max(offset, child.getPercent('offset'));
+          grad.stop(offset, color.slice(0, 3), 1);
         }
         if (bBoxUnits) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
