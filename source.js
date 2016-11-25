@@ -70,7 +70,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return this.addContent(this.number(a) + ' ' + this.number(b) + ' ' + this.number(-c) + ' '  + this.number(-d) + ' ' + this.number(e) + ' ' + this.number(f) + ' Tm');
     };
     doc.setTextMode = function(fill, stroke) {
-      return this.addContent((2 * (!!stroke) + 1 * (!!fill) - 1) + ' Tr');
+      let mode = fill && stroke ? 2 : stroke ? 1 : fill ? 0 : 3;
+      return this.addContent(mode + ' Tr');
     };
     doc.writeGlyph = function(glyphid) {
       return this.addContent('<' + glyphid + '> Tj');
