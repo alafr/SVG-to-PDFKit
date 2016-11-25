@@ -1295,7 +1295,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let child = children[i],
               color = child.get('stop-color');
           if (color === 'none') {color = [255, 255, 255, 0];}
-          let opacity = color[3] * gOpacity * child.get('stop-opacity');
+          let opacity = color[3] * child.get('stop-opacity');
           if (opacity < 1) {
             if (!isMask) {warningMessage('SvgElemGradient: gradients with opacity are unsupported');}
             color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
@@ -1310,7 +1310,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         if (validateMatrix(matrix)) {
           grad.transform = matrix;
-          return [grad];
+          return [grad, gOpacity];
         } else {
           return;
         }
@@ -1664,6 +1664,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
+      this.getBoundingShape = function() {
+        return this.getInherit().getBoundingShape();
+      };
     };
 
     var SvgElemTextNode = function(obj, inherits) {
@@ -1679,7 +1682,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      this.path = new SvgElemPath(this.getUrl('xlink:href'), this);
+      let pathObj = this.getUrl('xlink:href');
+      if (pathObj && pathObj.nodeName === 'path') {
+        this.path = new SvgElemPath(pathObj, this);
+      }
     };
 
     var SvgElemText = function(obj, inherits) {
