@@ -1756,6 +1756,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           currentChunk = [];
         }
+        function adjustLength(pos, length) {
+          let firstChar = pos[0], lastChar = pos[pos.length - 1],
+              startX = firstChar.x, endX = lastChar.x + lastChar.width,
+              textScale = length / (endX - startX);
+          if (textScale > 0 && textScale < Infinity) {
+            for (let j = 0; j < pos.length; j++) {
+              pos[j].x = startX + textScale * (pos[j].x - startX);
+              pos[j].scale *= textScale;
+              pos[j].xAdvance *= textScale;
+              pos[j].width *= textScale;
+            }
+          }
+          currentX += length - (endX - startX);
+        }
         function recursive(currentElem, parentElem) {
           currentElem._x = combineArrays(currentElem.getLengthList('x', currentElem.getVWidth()), (parentElem ? parentElem._x.slice(parentElem._pos.length) : []));
           currentElem._y = combineArrays(currentElem.getLengthList('y', currentElem.getVHeight()), (parentElem ? parentElem._y.slice(parentElem._pos.length) : []));
@@ -1837,16 +1851,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
           }
           if (textLength && currentElem._pos.length) {
-            let firstChar = currentElem._pos[0], lastChar = currentElem._pos[currentElem._pos.length - 1],
-                startX = firstChar.x, endX = lastChar.x + lastChar.width,
-                textScale = textLength / (endX - startX);
-            for (let j = 0; j < currentElem._pos.length; j++) {
-              currentElem._pos[j].x = startX + textScale * (currentElem._pos[j].x - startX);
-              currentElem._pos[j].scale *= textScale;
-              currentElem._pos[j].xAdvance *= textScale;
-              currentElem._pos[j].width *= textScale;
-            }
-            currentX += textLength - (endX - startX);
+            adjustLength(currentElem._pos, textLength);
           }
           if (currentElem.name === 'textPath' || currentElem.name === 'text') {
             doAnchoring();
