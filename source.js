@@ -292,7 +292,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         } else {return;}
         parser.matchSeparator();
       }
-      if (parser.match(/^[.]/)) {return;}
+      if (parser.match(/^.+/)) {return;}
       return result;
     }
 
