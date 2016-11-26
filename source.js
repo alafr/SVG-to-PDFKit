@@ -692,8 +692,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'fill-opacity':     {inherit: true, initial: 1},
       'stroke-opacity':   {inherit: true, initial: 1},
       'stop-opacity':     {inherit: false, initial: 1},
-      'fill-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
-      'clip-rule':        {inherit: true, initial: 'non-zero', values: {'nonzero':'non-zero', 'evenodd':'even-odd'}},
+      'fill-rule':        {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
+      'clip-rule':        {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
       'stroke-width':     {inherit: true, initial: 1},
       'stroke-dasharray': {inherit: true, initial: []},
       'stroke-dashoffset':{inherit: true, initial: 0},
@@ -716,7 +716,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'marker-end':       {inherit: true, initial: 'none'},
       'opacity':          {inherit: false, initial: 1},
       'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-      'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block', 'inline':'block'}},
+      'display':          {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':        {inherit: false, initial: 'none'},
       'mask':             {inherit: false, initial: 'none'},
       'overflow':         {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
@@ -1858,6 +1858,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   }
                 }
                 break;
+              default:
+                remainingText = remainingText.substring(childElem.textContent.length);
             }
           }
           if (textLength && currentElem._pos.length) {
@@ -2003,9 +2005,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var pxToPt = 72/96, // 1px = 72/96pt
-        viewportWidth,
-        viewportHeight,
-        useCSS;
+        viewportWidth, viewportHeight, useCSS;
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
     if (options.useCSS) {
@@ -2036,14 +2036,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
     }
-    if (svg && svg.nodeName === 'svg') {
-      doc.save().translate(x || 0, y || 0).scale(pxToPt);
+    if (svg) {
       viewportWidth = options.width || doc.page.width / pxToPt,
       viewportHeight = options.height || doc.page.height / pxToPt;
-      new SvgElem(svg, null).drawInDocument();
-      doc.restore();
+      let elem = new SvgElem(svg, null);
+      if (typeof elem.drawInDocument === 'function') {
+        doc.save().translate(x || 0, y || 0).scale(pxToPt);
+        elem.drawInDocument();
+        doc.restore();
+      } else {
+        warningMessage('SVGtoPDF: this element can\'t be rendered directly: ' + svg.nodeName);
+      }
     } else {
-      warningMessage('SVGtoPDF: this element can\'t be processed as SVG : ' + (svg && svg.nodeName));
+      warningMessage('SVGtoPDF: the input does not look like a valid SVG');
     }
 
 };
