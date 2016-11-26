@@ -707,18 +707,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'text-anchor':      {inherit: true, initial: 'start', values: {'start':'start', 'middle':'middle', 'end':'end'}},
       'direction':        {inherit: true, initial: 'ltr', values: {'ltr':'ltr', 'rtl':'rtl'}},
       'dominant-baseline':{inherit: true, initial: 'baseline', values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
-      'baseline-shift':   {inherit: true, initial: 0, values: {'sub':'sub', 'super':'super'}},
-      'word-spacing':     {inherit: true, initial: 0},
-      'letter-spacing':   {inherit: true, initial: 0},
+      'baseline-shift':   {inherit: true, initial: 'baseline', values: {'baseline':'baseline', 'sub':'sub', 'super':'super'}},
+      'word-spacing':     {inherit: true, initial: 0, values: {normal:0}},
+      'letter-spacing':   {inherit: true, initial: 0, values: {normal:0}},
       'xml:space':        {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
-      'marker-start':     {inherit: true, initial: null},
-      'marker-mid':       {inherit: true, initial: null},
-      'marker-end':       {inherit: true, initial: null},
+      'marker-start':     {inherit: true, initial: 'none'},
+      'marker-mid':       {inherit: true, initial: 'none'},
+      'marker-end':       {inherit: true, initial: 'none'},
       'opacity':          {inherit: false, initial: 1},
       'transform':        {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-      'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block'}},
-      'clip-path':        {inherit: false, initial: null},
-      'mask':             {inherit: false, initial: null},
+      'display':          {inherit: false, initial: 'block', values: {'none':'none', 'block':'block', 'inline':'block'}},
+      'clip-path':        {inherit: false, initial: 'none'},
+      'mask':             {inherit: false, initial: 'none'},
       'overflow':         {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
     };
 
@@ -929,12 +929,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }).call(this);
             break;
           case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
-            result = this.resolveUrl(value);
+            result = (function() {
+              if (value === 'none') {return 'none';}
+              return this.resolveUrl(value);
+            }).call(this);
             break;
           case 'stroke-width': case 'stroke-miterlimit':
             result = (function() {
               let parsed = this.computeLength(value, this.getViewport());
               if (parsed != null && parsed >= 0) {return parsed;}
+            }).call(this);
+            break;
+          case 'stroke-miterlimit':
+            result = (function() {
+              let parsed = parseFloat(value);
+              if (parsed != null && parsed >= 1) {return parsed;}
             }).call(this);
             break;
           case 'word-spacing': case 'letter-spacing':
@@ -1024,14 +1033,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.transform.apply(doc, this.getTransformation());
       };
       this.clip = function() {
-        if (this.get('clip-path')) {
+        if (this.get('clip-path') !== 'none') {
           let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
           clipPath.drawInDocument();
           return true;
         }
       };
       this.mask = function() {
-        if (this.get('mask')) {
+        if (this.get('mask') !== 'none') {
           let mask = new SvgElemMask(this.get('mask'), null, this.getBoundingBox());
           mask.drawInDocument();
           return true;
@@ -1386,19 +1395,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               doc.stroke();
             }
           }
-          let MarkersPos = this.shape.getMarkers();
-          if (this.get('marker-start')) {
-            let marker = new SvgElemMarker(this.get('marker-start'), null, MarkersPos[0], this.get('stroke-width'));
+          let markersPos = this.shape.getMarkers();
+          if (this.get('marker-start') !== 'none') {
+            let marker = new SvgElemMarker(this.get('marker-start'), null, markersPos[0], this.get('stroke-width'));
             marker.drawInDocument();
           }
-          if (this.get('marker-mid')) {
-            for (let i = 1; i < MarkersPos.length - 1; i++) {
-              let marker = new SvgElemMarker(this.get('marker-mid'), null, MarkersPos[i], this.get('stroke-width'));
+          if (this.get('marker-mid') !== 'none') {
+            for (let i = 1; i < markersPos.length - 1; i++) {
+              let marker = new SvgElemMarker(this.get('marker-mid'), null, markersPos[i], this.get('stroke-width'));
               marker.drawInDocument();
             }
           }
-          if (this.get('marker-end')) {
-            let marker = new SvgElemMarker(this.get('marker-end'), null, MarkersPos[MarkersPos.length - 1], this.get('stroke-width'));
+          if (this.get('marker-end') !== 'none') {
+            let marker = new SvgElemMarker(this.get('marker-end'), null, markersPos[markersPos.length - 1], this.get('stroke-width'));
             marker.drawInDocument();
           }
           if (group) {
@@ -1654,7 +1663,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         doc.rect(x, y, w, h).clip();
         doc.transform.apply(doc, this.getTransformation());
-        if (this.get('clip-path')) {
+        if (this.get('clip-path') !== 'none') {
           let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
           clipPath.drawInDocument();
         }
@@ -1722,6 +1731,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             default: dy1 = 0; break;
           }
           switch (shift) {
+            case 'baseline': dy2 = 0; break;
             case 'super': dy2 = 0.6 * size; break;
             case 'sub': dy2 = -0.6 * size; break;
             default: dy2 = shift; break;
