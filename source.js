@@ -1111,7 +1111,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemStylable.call(this, obj);
       let x = this.getLength('x', this.getVWidth(), 0),
           y = this.getLength('y', this.getVHeight(), 0),
-          child = this.getUrl('xlink:href');
+          child = this.getUrl('href') || this.getUrl('xlink:href');
       if (child) {child = new SvgElem(child, this);}
       this.getChildren  = function() {
         return [child];
@@ -1228,7 +1228,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      let link = (this.attr('xlink:href') || '').replace(/\s+/g, '');
+      let link = (this.attr('href') || this.attr('xlink:href') || '').replace(/\s+/g, '');
       let width = this.getLength('width', this.getVWidth(), 0);
       let height = this.getLength('height', this.getVHeight(), 0);
       let x = this.getLength('x', this.getVWidth(), 0);
@@ -1704,7 +1704,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      let pathObj = this.getUrl('xlink:href');
+      let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
       if (pathObj && pathObj.nodeName === 'path') {
         this.path = new SvgElemPath(pathObj, this);
       }
