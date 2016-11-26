@@ -1176,8 +1176,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
       this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
-      let width = this.getLength('width', this.getParentVWidth(), this.getVWidth()),
-          height = this.getLength('height', this.getParentVHeight(), this.getVHeight()),
+      let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
+          height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
           x = this.getLength('x', this.getParentVWidth(), 0),
           y = this.getLength('y', this.getParentVHeight(), 0);
