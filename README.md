@@ -4,6 +4,16 @@ Insert SVG into a PDF document created with PDFKit.
 ####Use:
 
     SVGtoPDF(doc, svg, x, y, options);
+    
+If you prefer, you can add the function to the PDFDocument prototype:
+
+    PDFDocument.prototype.addSVG = function(svg, x, y, options) {
+      return SVGtoPDF(this, svg, x, y, options), this;
+    };
+
+And then simply call:
+    
+    doc.addSVG(svg, x, y, options);
 
 ####Parameters:
 
