@@ -100,9 +100,9 @@ function RunTest(Svg, Callback) {
   function RunSvgToPdfKit() {
     var doc = new PDFDocument({size: [DocWidth * 72/96, DocHeight * 72/96], compress:false});
     var fontCallback = function(family, bold, italic, FontStylesFound) {
-      doc.font(FontBuffer(FontData));
       if (italic) {FontStylesFound.italicFound = false;}
       if (bold) {FontStylesFound.boldFound = false;}
+      return FontBuffer(FontData);
     };
     try {
       SVGtoPDF(doc, Svg, 0, 0, {fontCallback: fontCallback});
