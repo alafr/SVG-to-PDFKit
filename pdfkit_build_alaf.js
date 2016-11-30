@@ -18132,12 +18132,18 @@ PDFGradient = (function() {
     return this;
   };
 
-  PDFGradient.prototype.embed = function() {
-    var bounds, dx, dy, encode, fn, form, grad, group, gstate, i, j, k, last, len, m, m0, m1, m11, m12, m2, m21, m22, m3, m4, m5, name, pattern, ref, ref1, ref2, resources, sMask, shader, stop, stops, v;
-    if (this.embedded || this.stops.length === 0) {
+  PDFGradient.prototype.setTransform = function(m11, m12, m21, m22, dx, dy) {
+    this.transform = [m11, m12, m21, m22, dx, dy];
+    return this;
+  };
+
+  PDFGradient.prototype.embed = function(m) {
+    var bounds, encode, fn, form, grad, gstate, i, j, k, last, len, opacityPattern, pageBBox, pattern, ref, ref1, shader, stop, stops, v;
+    if (this.stops.length === 0) {
       return;
     }
     this.embedded = true;
+    this.matrix = m;
     last = this.stops[this.stops.length - 1];
     if (last[0] < 1) {
       this.stops.push([1, last[1], last[2]]);
@@ -18148,31 +18154,13 @@ PDFGradient = (function() {
     for (i = j = 0, ref = this.stops.length - 1; 0 <= ref ? j < ref : j > ref; i = 0 <= ref ? ++j : --j) {
       encode.push(0, 1);
       if (i + 2 !== this.stops.length) {
-        bounds.push(this.doc.number(this.stops[i + 1][0]));
+        bounds.push(this.stops[i + 1][0]);
       }
       fn = this.doc.ref({
         FunctionType: 2,
         Domain: [0, 1],
-        C0: (function() {
-          var k, len, ref1, results;
-          ref1 = this.stops[i + 0][1];
-          results = [];
-          for (k = 0, len = ref1.length; k < len; k++) {
-            v = ref1[k];
-            results.push(this.doc.number(v));
-          }
-          return results;
-        }).call(this),
-        C1: (function() {
-          var k, len, ref1, results;
-          ref1 = this.stops[i + 1][1];
-          results = [];
-          for (k = 0, len = ref1.length; k < len; k++) {
-            v = ref1[k];
-            results.push(this.doc.number(v));
-          }
-          return results;
-        }).call(this),
+        C0: this.stops[i + 0][1],
+        C1: this.stops[i + 1][1],
         N: 1
       });
       stops.push(fn);
@@ -18191,15 +18179,6 @@ PDFGradient = (function() {
       fn.end();
     }
     this.id = 'Sh' + (++this.doc._gradCount);
-    m = this.doc._ctm.slice();
-    m0 = m[0], m1 = m[1], m2 = m[2], m3 = m[3], m4 = m[4], m5 = m[5];
-    ref1 = this.transform, m11 = ref1[0], m12 = ref1[1], m21 = ref1[2], m22 = ref1[3], dx = ref1[4], dy = ref1[5];
-    m[0] = m0 * m11 + m2 * m12;
-    m[1] = m1 * m11 + m3 * m12;
-    m[2] = m0 * m21 + m2 * m22;
-    m[3] = m1 * m21 + m3 * m22;
-    m[4] = m0 * dx + m2 * dy + m4;
-    m[5] = m1 * dx + m3 * dy + m5;
     shader = this.shader(fn);
     shader.end();
     pattern = this.doc.ref({
@@ -18207,77 +18186,93 @@ PDFGradient = (function() {
       PatternType: 2,
       Shading: shader,
       Matrix: (function() {
-        var k, len, results;
+        var k, len, ref1, results;
+        ref1 = this.matrix;
         results = [];
-        for (k = 0, len = m.length; k < len; k++) {
-          v = m[k];
-          results.push(this.doc.number(v));
+        for (k = 0, len = ref1.length; k < len; k++) {
+          v = ref1[k];
+          results.push(+v.toFixed(5));
         }
         return results;
       }).call(this)
     });
-    this.doc.page.patterns[this.id] = pattern;
     pattern.end();
     if (this.stops.some(function(stop) {
       return stop[2] < 1;
     })) {
       grad = this.opacityGradient();
       grad._colorSpace = 'DeviceGray';
-      ref2 = this.stops;
-      for (k = 0, len = ref2.length; k < len; k++) {
-        stop = ref2[k];
+      ref1 = this.stops;
+      for (k = 0, len = ref1.length; k < len; k++) {
+        stop = ref1[k];
         grad.stop(stop[0], [stop[2]]);
       }
-      grad = grad.embed();
-      group = this.doc.ref({
-        Type: 'Group',
-        S: 'Transparency',
-        CS: 'DeviceGray'
-      });
-      group.end();
-      resources = this.doc.ref({
-        ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
-        Shading: {
-          Sh1: grad.data.Shading
-        }
-      });
-      resources.end();
+      grad = grad.embed(this.matrix);
+      pageBBox = [0, 0, this.doc.page.width, this.doc.page.height];
       form = this.doc.ref({
         Type: 'XObject',
         Subtype: 'Form',
         FormType: 1,
-        BBox: [0, 0, this.doc.page.width, this.doc.page.height],
-        Group: group,
-        Resources: resources
+        BBox: pageBBox,
+        Group: {
+          Type: 'Group',
+          S: 'Transparency',
+          CS: 'DeviceGray'
+        },
+        Resources: {
+          ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
+          Pattern: {
+            Sh1: grad
+          }
+        }
       });
-      form.end("/Sh1 sh");
-      sMask = this.doc.ref({
-        Type: 'Mask',
-        S: 'Luminosity',
-        G: form
-      });
-      sMask.end();
+      form.write("/Pattern cs /Sh1 scn");
+      form.end((pageBBox.join(" ")) + " re f");
       gstate = this.doc.ref({
         Type: 'ExtGState',
-        SMask: sMask
+        SMask: {
+          Type: 'Mask',
+          S: 'Luminosity',
+          G: form
+        }
       });
-      this.opacity_id = ++this.doc._opacityCount;
-      name = "Gs" + this.opacity_id;
-      this.doc.page.ext_gstates[name] = gstate;
       gstate.end();
+      opacityPattern = this.doc.ref({
+        Type: 'Pattern',
+        PatternType: 1,
+        PaintType: 1,
+        TilingType: 2,
+        BBox: pageBBox,
+        XStep: pageBBox[2],
+        YStep: pageBBox[3],
+        Resources: {
+          ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
+          Pattern: {
+            Sh1: pattern
+          },
+          ExtGState: {
+            Gs1: gstate
+          }
+        }
+      });
+      opacityPattern.write("/Gs1 gs /Pattern cs /Sh1 scn");
+      opacityPattern.end((pageBBox.join(" ")) + " re f");
+      this.doc.page.patterns[this.id] = opacityPattern;
+    } else {
+      this.doc.page.patterns[this.id] = pattern;
     }
     return pattern;
   };
 
   PDFGradient.prototype.apply = function(op) {
-    if (!this.embedded) {
-      this.embed();
+    var dx, dy, m, m0, m1, m11, m12, m2, m21, m22, m3, m4, m5, ref, ref1;
+    ref = this.doc._ctm.slice(), m0 = ref[0], m1 = ref[1], m2 = ref[2], m3 = ref[3], m4 = ref[4], m5 = ref[5];
+    ref1 = this.transform, m11 = ref1[0], m12 = ref1[1], m21 = ref1[2], m22 = ref1[3], dx = ref1[4], dy = ref1[5];
+    m = [m0 * m11 + m2 * m12, m1 * m11 + m3 * m12, m0 * m21 + m2 * m22, m1 * m21 + m3 * m22, m0 * dx + m2 * dy + m4, m1 * dx + m3 * dy + m5];
+    if (!(this.embedded && m.join(" ") === this.matrix.join(" "))) {
+      this.embed(m);
     }
-    this.doc.addContent("/" + this.id + " " + op);
-    if (this.opacity_id) {
-      this.doc.addContent("/Gs" + this.opacity_id + " gs");
-      return this.doc._sMasked = true;
-    }
+    return this.doc.addContent("/" + this.id + " " + op);
   };
 
   return PDFGradient;
@@ -18300,7 +18295,7 @@ PDFLinearGradient = (function(superClass) {
     return this.doc.ref({
       ShadingType: 2,
       ColorSpace: this._colorSpace,
-      Coords: [this.doc.number(this.x1), this.doc.number(this.y1), this.doc.number(this.x2), this.doc.number(this.y2)],
+      Coords: [this.x1, this.y1, this.x2, this.y2],
       Function: fn,
       Extend: [true, true]
     });
@@ -18332,7 +18327,7 @@ PDFRadialGradient = (function(superClass) {
     return this.doc.ref({
       ShadingType: 3,
       ColorSpace: this._colorSpace,
-      Coords: [this.doc.number(this.x1), this.doc.number(this.y1), this.doc.number(this.r1), this.doc.number(this.x2), this.doc.number(this.y2), this.doc.number(this.r2)],
+      Coords: [this.x1, this.y1, this.r1, this.x2, this.y2, this.r2],
       Function: fn,
       Extend: [true, true]
     });
@@ -19079,21 +19074,10 @@ module.exports = {
     return null;
   },
   _setColor: function(color, stroke) {
-    var gstate, name, op, space, v;
+    var op, space;
     color = this._normalizeColor(color);
     if (!color) {
       return false;
-    }
-    if (this._sMasked) {
-      gstate = this.ref({
-        Type: 'ExtGState',
-        SMask: 'None'
-      });
-      gstate.end();
-      name = "Gs" + (++this._opacityCount);
-      this.page.ext_gstates[name] = gstate;
-      this.addContent("/" + name + " gs");
-      this._sMasked = false;
     }
     op = stroke ? 'SCN' : 'scn';
     if (color instanceof PDFGradient) {
@@ -19102,15 +19086,7 @@ module.exports = {
     } else {
       space = color.length === 4 ? 'DeviceCMYK' : 'DeviceRGB';
       this._setColorSpace(space, stroke);
-      color = ((function() {
-        var i, len, results;
-        results = [];
-        for (i = 0, len = color.length; i < len; i++) {
-          v = color[i];
-          results.push(this.number(v));
-        }
-        return results;
-      }).call(this)).join(' ');
+      color = color.join(' ');
       this.addContent(color + " " + op);
     }
     return true;
@@ -19161,10 +19137,10 @@ module.exports = {
       return;
     }
     if (fillOpacity != null) {
-      fillOpacity = this.number(Math.max(0, Math.min(1, fillOpacity)));
+      fillOpacity = Math.max(0, Math.min(1, fillOpacity));
     }
     if (strokeOpacity != null) {
-      strokeOpacity = this.number(Math.max(0, Math.min(1, strokeOpacity)));
+      strokeOpacity = Math.max(0, Math.min(1, strokeOpacity));
     }
     key = fillOpacity + "_" + strokeOpacity;
     if (this._opacityRegistry[key]) {
