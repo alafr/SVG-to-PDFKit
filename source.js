@@ -891,7 +891,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             result = this.computeLength(value, this.get('font-size'));
             break;
           case 'font-family':
-            result = value;
+            result = value || undefined;
             break;
           case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
             result = (function() {
@@ -1239,12 +1239,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      let link = this.attr('href') || this.attr('xlink:href') || '';
-      let width = this.getLength('width', this.getVWidth(), 0);
-      let height = this.getLength('height', this.getVHeight(), 0);
-      let x = this.getLength('x', this.getVWidth(), 0);
-      let y = this.getLength('y', this.getVHeight(), 0);
-      let image = imageCallback(link);
+      let link = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
+          width = this.getLength('width', this.getVWidth(), 0),
+          height = this.getLength('height', this.getVHeight(), 0),
+          x = this.getLength('x', this.getVWidth(), 0),
+          y = this.getLength('y', this.getVHeight(), 0),
+          image;
+      try {
+        image = doc.openImage(link);
+      } catch(e) {
+        warningMessage('SVGElemImage: failed to open image "' + link + '" in PDFKit');
+      }
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
@@ -1824,8 +1829,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._rot = combineArrays(currentElem.getNumberList('rotate'), (parentElem ? parentElem._rot.slice(parentElem._pos.length) : []));
           currentElem._defRot = currentElem.chooseValue(currentElem._rot[currentElem._rot.length - 1], parentElem && parentElem._defRot, 0);
           if (currentElem.name === 'textPath') {currentElem._y = [];}
-          let fontStylesFound = {};
-          fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
+          let fontStylesFound = {},
+              fontNameorLink = fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
+          try {
+            doc.font(fontNameorLink);
+          } catch(e) {
+            warningMessage('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit');
+          }
           currentElem._pos = [];
           currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
           let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
@@ -2055,35 +2065,27 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     if (typeof fontCallback !== 'function') {
       fontCallback = function(family, bold, italic) {
-        family = family || '';
         if (family.match(/(?:^|,)\s*serif\s*$/)) {
-          if (bold && italic) {doc.font('Times-BoldItalic');}
-          if (bold && !italic) {doc.font('Times-Bold');}
-          if (!bold && italic) {doc.font('Times-Italic');}
-          if (!bold && !italic) {doc.font('Times-Roman');}
+          if (bold && italic) {return 'Times-BoldItalic';}
+          if (bold && !italic) {return 'Times-Bold';}
+          if (!bold && italic) {return 'Times-Italic';}
+          if (!bold && !italic) {return 'Times-Roman';}
         } else if (family.match(/(?:^|,)\s*monospace\s*$/)) {
-          if (bold && italic) {doc.font('Courier-BoldOblique');}
-          if (bold && !italic) {doc.font('Courier-Bold');}
-          if (!bold && italic) {doc.font('Courier-Oblique');}
-          if (!bold && !italic) {doc.font('Courier');}
+          if (bold && italic) {return 'Courier-BoldOblique';}
+          if (bold && !italic) {return 'Courier-Bold';}
+          if (!bold && italic) {return 'Courier-Oblique';}
+          if (!bold && !italic) {return 'Courier';}
         } else if (family.match(/(?:^|,)\s*sans-serif\s*$/) || true) {
-          if (bold && italic) {doc.font('Helvetica-BoldOblique');}
-          if (bold && !italic) {doc.font('Helvetica-Bold');}
-          if (!bold && italic) {doc.font('Helvetica-Oblique');}
-          if (!bold && !italic) {doc.font('Helvetica');}
+          if (bold && italic) {return 'Helvetica-BoldOblique';}
+          if (bold && !italic) {return 'Helvetica-Bold';}
+          if (!bold && italic) {return 'Helvetica-Oblique';}
+          if (!bold && !italic) {return 'Helvetica';}
         }
       };
     }
     if (typeof imageCallback !== 'function') {
       imageCallback = function(link) {
-        link = link.replace(/\s+/g, '');
-        if (!link) {return;}
-        try {
-          return doc.openImage(link);
-        } catch(e) {
-          warningMessage('SVGElemImage: failed to open image "' + link.slice(0, 50) + '" in PDFKit');
-          return;
-        }
+        return link.replace(/\s+/g, '');
       };
     }
     if (svg) {
