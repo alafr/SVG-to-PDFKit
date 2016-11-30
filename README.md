@@ -5,13 +5,13 @@ Insert SVG into a PDF document created with PDFKit.
 
     SVGtoPDF(doc, svg, x, y, options);
     
-If you prefer, you can add the function to the PDFDocument prototype:
+&nbsp; &nbsp; If you prefer, you can add the function to the PDFDocument prototype:
 
     PDFDocument.prototype.addSVG = function(svg, x, y, options) {
       return SVGtoPDF(this, svg, x, y, options), this;
     };
 
-And then simply call:
+&nbsp; &nbsp; And then simply call:
     
     doc.addSVG(svg, x, y, options);
 
@@ -26,7 +26,6 @@ And then simply call:
       - fontCallback [function] = function called to get the fonts, see source code
 
 ####Demo:
-
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/demo.htm</a>
 
 ####Supported:
@@ -39,7 +38,7 @@ And then simply call:
  - units: all standard units
  - transformations: transform, viewBox & preserveAspectRatio attributes
  - clip paths & masks
- - gradients (opaque only)
+ - gradients
 
 ####Unsupported:
  - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
@@ -49,6 +48,9 @@ And then simply call:
 
 ####Warning:
  - There are bugs, please send issues and/or pull requests.
+ 
+####License:
+&nbsp; &nbsp; <a href="http://choosealicense.com/licenses/mit/">MIT</a>
 
 ####Other useful projects:
  - <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, the JavaScript PDF generation library for Node and the browser.
