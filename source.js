@@ -1,7 +1,14 @@
 "use strict";
 var SVGtoPDF = function(doc, svg, x, y, options) {
 
-    if (typeof doc.number !== 'function') {doc.number = function(n) {return n;};} // compatibility with current PDFKit version https://git.io/vXbSB
+    if (typeof doc.number !== 'function') { // compatibility with current PDFKit version https://git.io/vXbSB
+      doc.number = function (n) {
+        if (n > -1e21 && n < 1e21) {
+          return Math.round(n * 1e6) / 1e6;
+        }
+        throw new Error("unsupported number: " + n);
+      }
+    }
 
     doc.addContent = function(data) {
       (this._writeTarget || this.page).write(data);
@@ -261,7 +268,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
     }
     function validateMatrix(m) {
-      return doc.number(m[0]) * doc.number(m[3]) - doc.number(m[1]) * doc.number(m[2]) !== 0;
+      let m0 = doc.number(m[0]), m1 = doc.number(m[1]), m2 = doc.number(m[2]),
+          m3 = doc.number(m[3]), m4 = doc.number(m[4]), m5 = doc.number(m[5]);
+      if (m0 * m3 - m1 * m2 !== 0) {
+        return [m0, m1, m2, m3, m4, m5];
+      }
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -646,9 +657,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < pathCommands.length; i++) {
           let command = pathCommands[i][0], values = pathCommands[i].slice(3);
           switch(command) {
-            case 'M':  doc.moveTo(values[0], values[1]);  break;
-            case 'L':  doc.lineTo(values[0], values[1]);  break;
-            case 'C':  doc.bezierCurveTo(values[0], values[1], values[2], values[3], values[4], values[5]);  break;
+            case 'M':  doc.moveTo(doc.number(values[0]), doc.number(values[1]));  break;
+            case 'L':  doc.lineTo(doc.number(values[0]), doc.number(values[1]));  break;
+            case 'C':  doc.bezierCurveTo(doc.number(values[0]), doc.number(values[1]), doc.number(values[2]), doc.number(values[3]), doc.number(values[4]), doc.number(values[5]));  break;
             case 'Z':  doc.closePath();  break;
           }
         }
@@ -1298,14 +1309,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
               y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
               y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
-          grad = doc.linearGradient(x1, y1, x2, y2);
+          grad = doc.linearGradient(doc.number(x1), doc.number(y1), doc.number(x2), doc.number(y2));
         } else {
           let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
               y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
               r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), 0.5),
               x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
               y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
-          grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
+          x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
+          y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
+          grad = doc.radialGradient(doc.number(x1), doc.number(y1), 0, doc.number(x2), doc.number(y2), doc.number(r2));
         }
         for (let i = 0; i < children.length; i++) {
           let child = children[i],
@@ -1313,25 +1326,41 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (color === 'none') {color = [255, 255, 255, 0];}
           let opacity = color[3] * child.get('stop-opacity');
           if (opacity < 1) {
-            if (!isMask) {warningMessage('SvgElemGradient: gradients with opacity are unsupported');}
-            color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
-            color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
-            color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
+            if (typeof grad.setTransform === 'function') {
+              if (isMask) {
+                color[0] = color[0] * opacity * gOpacity;
+                color[1] = color[1] * opacity * gOpacity;
+                color[2] = color[2] * opacity * gOpacity;
+                opacity = gOpacity = 1;
+              } else {
+                opacity *= gOpacity; gOpacity = 1;
+              }
+            } else { // For current PDFKit version
+              if (!isMask) {warningMessage('SvgElemGradient: gradients with opacity are unsupported');}
+              color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
+              color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
+              color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
+              opacity = 1;
+            }
           }
           offset = Math.max(offset, child.getPercent('offset', 0));
           if (i === 0 && offset > 0) {
-            grad.stop(0, color.slice(0, 3), 1);
+            grad.stop(0, color.slice(0, 3), opacity);
           }
-          grad.stop(offset, color.slice(0, 3), 1);
+          grad.stop(doc.number(offset), color.slice(0, 3), opacity);
           if (i === children.length - 1 && offset < 1) {
-            grad.stop(1, color.slice(0, 3), 1);
+            grad.stop(1, color.slice(0, 3), opacity);
           }
         }
         if (bBoxUnits) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
-        if (validateMatrix(matrix)) {
-          grad.transform = matrix;
+        if (matrix = validateMatrix(matrix)) {
+          if (typeof grad.setTransform === 'function') {
+            grad.setTransform.apply(grad, matrix);
+          } else {
+            grad.transform = matrix;
+          }
           return [grad, gOpacity];
         } else {
           return;
