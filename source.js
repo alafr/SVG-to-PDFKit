@@ -1803,7 +1803,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             for (let i = 0; i < currentChunk.length; i++) {
               currentChunk[i].x -= anchordx;
             }
-            currentX -= anchordx;
           }
           currentChunk = [];
         }
@@ -1847,8 +1846,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (currentElem.name === 'textPath') {
             doAnchoring();
             currentX = currentY = 0;
-          } else if (currentElem._x.length || currentElem._y.length) {
-            doAnchoring();
           }
           let children = currentElem.getChildren();
           for (let i = 0; i < children.length; i++) {
