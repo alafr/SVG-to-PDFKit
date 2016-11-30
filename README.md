@@ -24,6 +24,7 @@ Insert SVG into a PDF document created with PDFKit.
       - width, height [number] = initial viewport, by default it's the page dimensions
       - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
       - fontCallback [function] = function called to get the fonts, see source code
+      - imageCallback [function] = same as above for the images (for Node.js)
 
 ####Demo:
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/demo.htm</a>
