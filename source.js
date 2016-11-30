@@ -1239,12 +1239,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      let link = (this.attr('href') || this.attr('xlink:href') || '').replace(/\s+/g, '');
+      let link = this.attr('href') || this.attr('xlink:href') || '';
       let width = this.getLength('width', this.getVWidth(), 0);
       let height = this.getLength('height', this.getVHeight(), 0);
       let x = this.getLength('x', this.getVWidth(), 0);
       let y = this.getLength('y', this.getVHeight(), 0);
-      let image = (function() {if (!link) {return;} try {return doc.openImage(link);} catch(e) {warningMessage('SVGElemImage: failed to open image "' + link.slice(0, 50) + '" in PDFKit'); return;}})();
+      let image = imageCallback(link);
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
@@ -1825,7 +1825,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._defRot = currentElem.chooseValue(currentElem._rot[currentElem._rot.length - 1], parentElem && parentElem._defRot, 0);
           if (currentElem.name === 'textPath') {currentElem._y = [];}
           let fontStylesFound = {};
-          options.fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
+          fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
           currentElem._pos = [];
           currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
           let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
@@ -2040,19 +2040,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var pxToPt = 72/96, // 1px = 72/96pt
-        viewportWidth, viewportHeight, useCSS;
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
-    if (options.useCSS) {
-      if (typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function') {
-        useCSS = true;
-      } else {
-        warningMessage('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
-      }
+
+    var pxToPt = 72/96, // 1px = 72/96pt
+        viewportWidth = options.width || doc.page.width / pxToPt,
+        viewportHeight = options.height || doc.page.height / pxToPt,
+        useCSS = options.useCSS && typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function',
+        fontCallback = options.fontCallback,
+        imageCallback = options.imageCallback;
+
+    if (options.useCSS && !useCSS) {
+      warningMessage('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
     }
-    if (typeof options.fontCallback !== 'function') {
-      options.fontCallback = function(family, bold, italic) {
+    if (typeof fontCallback !== 'function') {
+      fontCallback = function(family, bold, italic) {
         family = family || '';
         if (family.match(/(?:^|,)\s*serif\s*$/)) {
           if (bold && italic) {doc.font('Times-BoldItalic');}
@@ -2072,9 +2074,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
     }
+    if (typeof imageCallback !== 'function') {
+      imageCallback = function(link) {
+        link = link.replace(/\s+/g, '');
+        if (!link) {return;}
+        try {
+          return doc.openImage(link);
+        } catch(e) {
+          warningMessage('SVGElemImage: failed to open image "' + link.slice(0, 50) + '" in PDFKit');
+          return;
+        }
+      };
+    }
     if (svg) {
-      viewportWidth = options.width || doc.page.width / pxToPt,
-      viewportHeight = options.height || doc.page.height / pxToPt;
       let elem = new SvgElem(svg, null);
       if (typeof elem.drawInDocument === 'function') {
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
