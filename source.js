@@ -1331,21 +1331,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (color === 'none') {color = [255, 255, 255, 0];}
           let opacity = color[3] * child.get('stop-opacity');
           if (opacity < 1) {
-            if (typeof grad.setTransform === 'function') {
-              if (isMask) {
-                color[0] = color[0] * opacity * gOpacity;
-                color[1] = color[1] * opacity * gOpacity;
-                color[2] = color[2] * opacity * gOpacity;
-                opacity = gOpacity = 1;
-              } else {
-                opacity *= gOpacity; gOpacity = 1;
-              }
-            } else { // For current PDFKit version
-              if (!isMask) {warningMessage('SvgElemGradient: gradients with opacity are unsupported');}
-              color[0] = (isMask ? color[0] * opacity : 255 - (255 - color[0]) * opacity);
-              color[1] = (isMask ? color[1] * opacity : 255 - (255 - color[1]) * opacity);
-              color[2] = (isMask ? color[2] * opacity : 255 - (255 - color[2]) * opacity);
+            if (isMask) {
+              color[0] = color[0] * opacity * gOpacity;
+              color[1] = color[1] * opacity * gOpacity;
+              color[2] = color[2] * opacity * gOpacity;
               opacity = 1;
+            } else {
+              opacity *= gOpacity;
             }
           }
           offset = Math.max(offset, child.getPercent('offset', 0));
@@ -1361,12 +1353,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
         if (matrix = validateMatrix(matrix)) {
-          if (typeof grad.setTransform === 'function') {
-            grad.setTransform.apply(grad, matrix);
-          } else {
-            grad.transform = matrix;
-          }
-          return [grad, gOpacity];
+          grad.setTransform.apply(grad, matrix);
+          return [grad, 1];
         } else {
           return;
         }
@@ -1396,7 +1384,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               fill = this.getFill(isClip, isMask),
               stroke = this.getStroke(isClip, isMask);
           for (let j = 0; j < subPaths.length; j++) {
-            if (subPaths[j].totalLength === 0) {
+            if (stroke && subPaths[j].totalLength === 0) {
               let LineWidth = this.get('stroke-width'), LineCap = this.get('stroke-linecap');
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
                 let x = subPaths[j].boundingBox[0],
