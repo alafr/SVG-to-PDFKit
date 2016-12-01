@@ -1297,6 +1297,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
       this.getGradient = function(isClip, isMask) {
+        console.log(gOpacity, new Error().stack)
         let children = this.getChildren();
         if (children.length === 0) {return;}
         if (children.length === 1) {
@@ -1329,15 +1330,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let child = children[i],
               color = child.get('stop-color');
           if (color === 'none') {color = [255, 255, 255, 0];}
-          let opacity = color[3] * child.get('stop-opacity');
+          let opacity = color[3] * child.get('stop-opacity') * gOpacity;
           if (opacity < 1) {
             if (isMask) {
-              color[0] = color[0] * opacity * gOpacity;
-              color[1] = color[1] * opacity * gOpacity;
-              color[2] = color[2] * opacity * gOpacity;
+              color[0] *= opacity;
+              color[1] *= opacity;
+              color[2] *= opacity;
               opacity = 1;
-            } else {
-              opacity *= gOpacity;
             }
           }
           offset = Math.max(offset, child.getPercent('offset', 0));
@@ -1354,6 +1353,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         if (matrix = validateMatrix(matrix)) {
           grad.setTransform.apply(grad, matrix);
+          console.log(grad)
           return [grad, 1];
         } else {
           return;
