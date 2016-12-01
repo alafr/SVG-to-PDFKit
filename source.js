@@ -1297,7 +1297,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
       this.getGradient = function(isClip, isMask) {
-        console.log(gOpacity, new Error().stack)
         let children = this.getChildren();
         if (children.length === 0) {return;}
         if (children.length === 1) {
@@ -1353,7 +1352,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         if (matrix = validateMatrix(matrix)) {
           grad.setTransform.apply(grad, matrix);
-          console.log(grad)
           return [grad, 1];
         } else {
           return;
