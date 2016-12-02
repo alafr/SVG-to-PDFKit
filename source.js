@@ -1132,7 +1132,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.getBoundingShape = function() {
         if (child && typeof child.getBoundingShape === 'function') {
-          return child.getBoundingShape().clone().transform(this.getTransformation());
+          return child.getBoundingShape().clone();
         }
         return new SvgShape();
       };
