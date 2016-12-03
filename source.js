@@ -69,7 +69,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return this;
     };
     doc.beginText = function(font, size) {
-      this._font = font; this._fontSize = size;
       if (!this.page.fonts[font.id]) {this.page.fonts[font.id] = font.ref();}
       return this.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
     };
@@ -1769,8 +1768,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let unit = size / 1000, fontascent = getAscent(font, size), fontdescent = getDescent(font, size);
           let encoded = font.encode('' + text), hex = encoded[0], pos = encoded[1], data = [];
           for (let i = 0; i < hex.length; i++) {
+            let unicode = font.unicode ? font.unicode[parseInt(hex[i], 16)] : [text.charCodeAt(i)];
             data.push({
               glyphid: hex[i],
+              unicode: unicode,
+              numchars: unicode.length,
               width: pos[i].advanceWidth * unit,
               ascent: fontascent,
               descent: fontdescent,
@@ -1822,6 +1824,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             warningMessage('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit');
           }
           currentElem._pos = [];
+          currentElem._index = 0;
           currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
           let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
               wordSpacing = currentElem.get('word-spacing'),
@@ -1861,20 +1864,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 for (let w = 0; w < words.length; w++) {
                   let pos = getTextPos(currentElem._font.font, currentElem._font.size, words[w]);
                   for (let j = 0; j < pos.length; j++) {
-                    let indexInElement = currentElem._pos.length;
-                    if (currentElem._x[indexInElement] !== undefined) {doAnchoring(); currentX = currentElem._x[indexInElement];}
-                    if (currentElem._y[indexInElement] !== undefined) {doAnchoring(); currentY = currentElem._y[indexInElement];}
-                    currentX += (currentElem._dx[indexInElement] || 0);
-                    currentY += (currentElem._dy[indexInElement] || 0);
-                    pos[j].rotate = (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[indexInElement], currentElem._defRot);
+                    let index = currentElem._index;
+                    if (currentElem._x[index] !== undefined) {doAnchoring(); currentX = currentElem._x[index];}
+                    if (currentElem._y[index] !== undefined) {doAnchoring(); currentY = currentElem._y[index];}
+                    currentX += (currentElem._dx[index] || 0);
+                    currentY += (currentElem._dy[index] || 0);
+                    pos[j].rotate = (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[index], currentElem._defRot);
                     pos[j].x = currentX;
                     pos[j].y = currentY + baseline;
                     pos[j].scale = 1;
-                    pos[j].index = indexInElement;
                     pos[j].hidden = false;
                     currentChunk.push(pos[j]);
                     childElem._pos.push(pos[j]);
                     currentElem._pos.push(pos[j]);
+                    currentElem._index += pos[j].numchars;
                     if (currentChunk.length === 1) {
                       currentAnchor = textAnchor;
                       currentDirection = textDirection;
@@ -2005,7 +2008,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                     doc.setTextMode(true, false);
                   }
                   for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
-                    if (!pos[j].hidden) {
+                    if (!pos[j].hidden && pos[j].width !== 0) {
                       let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxitalic ? -0.25 : 0);
                       doc.setTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
                       doc.writeGlyph(pos[j].glyphid);
