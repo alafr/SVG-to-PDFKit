@@ -1905,6 +1905,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           if (parentElem) {
             parentElem._pos = parentElem._pos.concat(currentElem._pos);
+            parentElem._index += currentElem._index;
           }
         }
         function textOnPath(currentElem) {
