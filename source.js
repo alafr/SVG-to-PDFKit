@@ -1,15 +1,6 @@
 "use strict";
 var SVGtoPDF = function(doc, svg, x, y, options) {
 
-    if (typeof doc.number !== 'function') { // compatibility with current PDFKit version https://git.io/vXbSB
-      doc.number = function (n) {
-        if (n > -1e21 && n < 1e21) {
-          return Math.round(n * 1e6) / 1e6;
-        }
-        throw new Error("unsupported number: " + n);
-      }
-    }
-
     doc.addContent = function(data) {
       (this._writeTarget || this.page).write(data);
       return this;
@@ -68,24 +59,23 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.addContent("/" + name + " gs");
       return this;
     };
-    doc.beginText = function(font, size) {
-      if (!this.page.fonts[font.id]) {this.page.fonts[font.id] = font.ref();}
-      return this.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
-    };
-    doc.setTextMatrix = function(a, b, c, d, e, f) {
-      return this.addContent(this.number(a) + ' ' + this.number(b) + ' ' + this.number(-c) + ' '  + this.number(-d) + ' ' + this.number(e) + ' ' + this.number(f) + ' Tm');
-    };
-    doc.setTextMode = function(fill, stroke) {
+    function docBeginText(font, size) {
+      if (!doc.page.fonts[font.id]) {doc.page.fonts[font.id] = font.ref();}
+      return doc.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
+    }
+    function docSetTextMatrix(a, b, c, d, e, f) {
+      return doc.addContent(validateNumber(a) + ' ' + validateNumber(b) + ' ' + validateNumber(-c) + ' '  + validateNumber(-d) + ' ' + validateNumber(e) + ' ' + validateNumber(f) + ' Tm');
+    }
+    function docSetTextMode(fill, stroke) {
       let mode = fill && stroke ? 2 : stroke ? 1 : fill ? 0 : 3;
-      return this.addContent(mode + ' Tr');
-    };
-    doc.writeGlyph = function(glyphid) {
-      return this.addContent('<' + glyphid + '> Tj');
-    };
-    doc.endText = function() {
-      return this.addContent('ET');
-    };
-
+      return doc.addContent(mode + ' Tr');
+    }
+    function docWriteGlyph(glyphid) {
+      return doc.addContent('<' + glyphid + '> Tj');
+    }
+    function docEndText() {
+      return doc.addContent('ET');
+    }
     function warningMessage(str) {
       if (typeof console !== undefined && typeof console.warn === 'function') {console.warn(str);}
     }
@@ -267,11 +257,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
     }
     function validateMatrix(m) {
-      let m0 = doc.number(m[0]), m1 = doc.number(m[1]), m2 = doc.number(m[2]),
-          m3 = doc.number(m[3]), m4 = doc.number(m[4]), m5 = doc.number(m[5]);
+      let m0 = validateNumber(m[0]), m1 = validateNumber(m[1]), m2 = validateNumber(m[2]),
+          m3 = validateNumber(m[3]), m4 = validateNumber(m[4]), m5 = validateNumber(m[5]);
       if (m0 * m3 - m1 * m2 !== 0) {
         return [m0, m1, m2, m3, m4, m5];
       }
+    }
+    function validateNumber(n) {
+      return n > -1e21 && n < 1e21 ? Math.round(n * 1e6) / 1e6 : 0;
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -656,9 +649,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < pathCommands.length; i++) {
           let command = pathCommands[i][0], values = pathCommands[i].slice(3);
           switch(command) {
-            case 'M':  doc.moveTo(doc.number(values[0]), doc.number(values[1]));  break;
-            case 'L':  doc.lineTo(doc.number(values[0]), doc.number(values[1]));  break;
-            case 'C':  doc.bezierCurveTo(doc.number(values[0]), doc.number(values[1]), doc.number(values[2]), doc.number(values[3]), doc.number(values[4]), doc.number(values[5]));  break;
+            case 'M':  doc.moveTo(values[0], values[1]);  break;
+            case 'L':  doc.lineTo(values[0], values[1]);  break;
+            case 'C':  doc.bezierCurveTo(values[0], values[1], values[2], values[3], values[4], values[5]);  break;
             case 'Z':  doc.closePath();  break;
           }
         }
@@ -910,7 +903,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   sum = 0;
               for (let j = 0; j < dasharray.length; j++) {
                 if (dasharray[j] < 0) {return;}
-                sum += doc.number(dasharray[j]);
+                sum += dasharray[j];
               }
               return (sum === 0 ? [] : dasharray);
             }).call(this);
@@ -1313,7 +1306,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
               y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
               y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
-          grad = doc.linearGradient(doc.number(x1), doc.number(y1), doc.number(x2), doc.number(y2));
+          grad = doc.linearGradient(x1, y1, x2, y2);
         } else {
           let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
               y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
@@ -1322,7 +1315,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
           x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
           y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
-          grad = doc.radialGradient(doc.number(x1), doc.number(y1), 0, doc.number(x2), doc.number(y2), doc.number(r2));
+          grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
         }
         for (let i = 0; i < children.length; i++) {
           let child = children[i],
@@ -1341,7 +1334,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (i === 0 && offset > 0) {
             grad.stop(0, color.slice(0, 3), opacity);
           }
-          grad.stop(doc.number(offset), color.slice(0, 3), opacity);
+          grad.stop(offset, color.slice(0, 3), opacity);
           if (i === children.length - 1 && offset < 1) {
             grad.stop(1, color.slice(0, 3), opacity);
           }
@@ -2002,20 +1995,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   } else {
                     doc.fillColor('white');
                   }
-                  doc.beginText(elem._font.font, elem._font.size);
+                  docBeginText(elem._font.font, elem._font.size);
                   if (!isClip) {
-                    doc.setTextMode(!!fill, !!stroke);
+                    docSetTextMode(!!fill, !!stroke);
                   } else {
-                    doc.setTextMode(true, false);
+                    docSetTextMode(true, false);
                   }
                   for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
                     if (!pos[j].hidden && pos[j].width !== 0) {
                       let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxitalic ? -0.25 : 0);
-                      doc.setTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
-                      doc.writeGlyph(pos[j].glyphid);
+                      docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
+                      docWriteGlyph(pos[j].glyphid);
                     }
                   }
-                  doc.endText();
+                  docEndText();
                 }
                 break;
             }
