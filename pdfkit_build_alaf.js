@@ -17456,13 +17456,6 @@ PDFDocument = (function(superClass) {
     return ref;
   };
 
-  PDFDocument.prototype.number = function(n) {
-    if (n > -1e21 && n < 1e21) {
-      return Math.round(n * 1e6) / 1e6;
-    }
-    throw new Error("unsupported number: " + n);
-  };
-
   PDFDocument.prototype._read = function() {};
 
   PDFDocument.prototype._write = function(data) {
@@ -19502,9 +19495,11 @@ module.exports = {
 
 
 },{"../image":53}],61:[function(require,module,exports){
-var LineWrapper;
+var LineWrapper, number;
 
 LineWrapper = require('../line_wrapper');
+
+number = require('../object').number;
 
 module.exports = {
   initText: function() {
@@ -19762,14 +19757,14 @@ module.exports = {
       base[name] = this._font.ref();
     }
     this.addContent("BT");
-    this.addContent("1 0 0 1 " + (this.number(x)) + " " + (this.number(y)) + " Tm");
-    this.addContent("/" + this._font.id + " " + (this.number(this._fontSize)) + " Tf");
+    this.addContent("1 0 0 1 " + (number(x)) + " " + (number(y)) + " Tm");
+    this.addContent("/" + this._font.id + " " + (number(this._fontSize)) + " Tf");
     mode = options.fill && options.stroke ? 2 : options.stroke ? 1 : 0;
     if (mode) {
       this.addContent(mode + " Tr");
     }
     if (characterSpacing) {
-      this.addContent((this.number(characterSpacing)) + " Tc");
+      this.addContent((number(characterSpacing)) + " Tc");
     }
     if (wordSpacing) {
       words = text.trim().split(/\s+/);
@@ -19797,7 +19792,7 @@ module.exports = {
         if (last < cur) {
           hex = encoded.slice(last, cur).join('');
           advance = positions[cur - 1].xAdvance - positions[cur - 1].advanceWidth;
-          commands.push("<" + hex + "> " + (_this.number(-advance)));
+          commands.push("<" + hex + "> " + (number(-advance)));
         }
         return last = cur;
       };
@@ -19815,12 +19810,12 @@ module.exports = {
       pos = positions[i];
       if (pos.xOffset || pos.yOffset) {
         flush(i);
-        this.addContent("1 0 0 1 " + (this.number(x + pos.xOffset * scale)) + " " + (this.number(y + pos.yOffset * scale)) + " Tm");
+        this.addContent("1 0 0 1 " + (number(x + pos.xOffset * scale)) + " " + (number(y + pos.yOffset * scale)) + " Tm");
         flush(i + 1);
         hadOffset = true;
       } else {
         if (hadOffset) {
-          this.addContent("1 0 0 1 " + (this.number(x)) + " " + (this.number(y)) + " Tm");
+          this.addContent("1 0 0 1 " + (number(x)) + " " + (number(y)) + " Tm");
           hadOffset = false;
         }
         if (pos.xAdvance - pos.advanceWidth !== 0) {
@@ -19836,11 +19831,13 @@ module.exports = {
 };
 
 
-},{"../line_wrapper":56}],62:[function(require,module,exports){
-var KAPPA, SVGPath,
+},{"../line_wrapper":56,"../object":63}],62:[function(require,module,exports){
+var KAPPA, SVGPath, number,
   slice = [].slice;
 
 SVGPath = require('../path');
+
+number = require('../object').number;
 
 KAPPA = 4.0 * ((Math.sqrt(2) - 1.0) / 3.0);
 
@@ -19861,7 +19858,7 @@ module.exports = {
     return this.addContent('h');
   },
   lineWidth: function(w) {
-    return this.addContent((this.number(w)) + " w");
+    return this.addContent((number(w)) + " w");
   },
   _CAP_STYLES: {
     BUTT: 0,
@@ -19886,7 +19883,7 @@ module.exports = {
     return this.addContent(j + " j");
   },
   miterLimit: function(m) {
-    return this.addContent((this.number(m)) + " M");
+    return this.addContent((number(m)) + " M");
   },
   dash: function(length, options) {
     var phase, ref, space, v;
@@ -19902,35 +19899,35 @@ module.exports = {
         results = [];
         for (i = 0, len = length.length; i < len; i++) {
           v = length[i];
-          results.push(this.number(v));
+          results.push(number(v));
         }
         return results;
-      }).call(this)).join(' ');
+      })()).join(' ');
       phase = options.phase || 0;
-      return this.addContent("[" + length + "] " + (this.number(phase)) + " d");
+      return this.addContent("[" + length + "] " + (number(phase)) + " d");
     } else {
       space = (ref = options.space) != null ? ref : length;
       phase = options.phase || 0;
-      return this.addContent("[" + (this.number(length)) + " " + (this.number(space)) + "] " + (this.number(phase)) + " d");
+      return this.addContent("[" + (number(length)) + " " + (number(space)) + "] " + (number(phase)) + " d");
     }
   },
   undash: function() {
     return this.addContent("[] 0 d");
   },
   moveTo: function(x, y) {
-    return this.addContent((this.number(x)) + " " + (this.number(y)) + " m");
+    return this.addContent((number(x)) + " " + (number(y)) + " m");
   },
   lineTo: function(x, y) {
-    return this.addContent((this.number(x)) + " " + (this.number(y)) + " l");
+    return this.addContent((number(x)) + " " + (number(y)) + " l");
   },
   bezierCurveTo: function(cp1x, cp1y, cp2x, cp2y, x, y) {
-    return this.addContent((this.number(cp1x)) + " " + (this.number(cp1y)) + " " + (this.number(cp2x)) + " " + (this.number(cp2y)) + " " + (this.number(x)) + " " + (this.number(y)) + " c");
+    return this.addContent((number(cp1x)) + " " + (number(cp1y)) + " " + (number(cp2x)) + " " + (number(cp2y)) + " " + (number(x)) + " " + (number(y)) + " c");
   },
   quadraticCurveTo: function(cpx, cpy, x, y) {
-    return this.addContent((this.number(cpx)) + " " + (this.number(cpy)) + " " + (this.number(x)) + " " + (this.number(y)) + " v");
+    return this.addContent((number(cpx)) + " " + (number(cpy)) + " " + (number(x)) + " " + (number(y)) + " v");
   },
   rect: function(x, y, w, h) {
-    return this.addContent((this.number(x)) + " " + (this.number(y)) + " " + (this.number(w)) + " " + (this.number(h)) + " re");
+    return this.addContent((number(x)) + " " + (number(y)) + " " + (number(w)) + " " + (number(h)) + " re");
   },
   roundedRect: function(x, y, w, h, r) {
     var c;
@@ -20048,10 +20045,10 @@ module.exports = {
       results = [];
       for (i = 0, len = ref.length; i < len; i++) {
         v = ref[i];
-        results.push(this.number(v));
+        results.push(number(v));
       }
       return results;
-    }).call(this)).join(' ');
+    })()).join(' ');
     return this.addContent(values + " cm");
   },
   translate: function(x, y) {
@@ -20098,7 +20095,7 @@ module.exports = {
 };
 
 
-},{"../path":65}],63:[function(require,module,exports){
+},{"../object":63,"../path":65}],63:[function(require,module,exports){
 (function (Buffer){
 
 /*
@@ -20188,9 +20185,18 @@ PDFObject = (function() {
       }
       out.push('>>');
       return out.join('\n');
+    } else if (typeof object === 'number') {
+      return PDFObject.number(object);
     } else {
       return '' + object;
     }
+  };
+
+  PDFObject.number = function(n) {
+    if (n > -1e21 && n < 1e21) {
+      return Math.round(n * 1e6) / 1e6;
+    }
+    throw new Error("unsupported number: " + n);
   };
 
   return PDFObject;
