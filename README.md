@@ -27,7 +27,7 @@ Insert SVG into a PDF document created with PDFKit.
       - imageCallback [function] = same as above for the images (for Node.js)
 
 ####Demo:
-&nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/demo.htm</a>
+&nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm</a>
 
 ####Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
