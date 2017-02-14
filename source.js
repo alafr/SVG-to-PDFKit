@@ -642,7 +642,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return new SvgShape(pathCommands);
       };
       this.mergeShape = function(shape) {
-        Array.prototype.push.apply(pathCommands, shape.pathCommands);
+        for (let i = 0; i < shape.pathCommands.length; i++) {
+          pathCommands.push(shape.pathCommands[i]);
+        }
         return this.resetCommands().resetProperties();
       };
       this.insertInDocument = function() {
