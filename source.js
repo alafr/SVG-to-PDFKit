@@ -22,17 +22,26 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return group;
     };
     doc.writeToGroup = function(group) {
-      let prevGroup = this._currentGroup,
-          nextGroup = group && (!group.closed) && group || null;
-      if (nextGroup) {
+      let prevGroup = this._currentGroup || null,
+          nextGroup = group && !group.closed ? group : null,
+          currentCtm = doc._ctm;
+      if (prevGroup && nextGroup) {
         this._currentGroup = nextGroup;
         this._writeTarget = nextGroup.xobj;
-      } else {
+        doc._ctm = nextGroup.matrix;
+        nextGroup.matrix = prevGroup.matrix;
+        prevGroup.matrix = currentCtm;
+      } else if (prevGroup && !nextGroup) {
         this._currentGroup = null;
         this._writeTarget = null;
+        doc._ctm = prevGroup.matrix;
+        prevGroup.matrix = currentCtm;
+      } else if (!prevGroup && nextGroup) {
+        this._currentGroup = nextGroup;
+        this._writeTarget = nextGroup.xobj;
+        doc._ctm = nextGroup.matrix;
+        nextGroup.matrix = currentCtm;
       }
-      if (prevGroup) {prevGroup.matrix = doc._ctm.slice();}
-      if (nextGroup) {doc._ctm = nextGroup.matrix.slice();}
       return this;
     };
     doc.closeGroup = function(group) {
