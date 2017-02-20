@@ -6,7 +6,7 @@
   <script src="blobstream.js"></script>
   <script src="../source.js"></script>
   <script>
-function ResetToDefault(doc) {
+function resetDefaultStyles(doc) {
   doc.fillColor('black')
      .fillOpacity(1)
      .strokeColor('black')
@@ -16,19 +16,24 @@ function ResetToDefault(doc) {
      .fontSize(12)
      .font('Helvetica');
 }
-    
-function CreatePdf() {
+function createPdf() {
   let doc = new PDFDocument({compress: false}); // It's easier to find bugs with uncompressed files
-  let textarea = document.getElementById('svg-input');
-  if (textarea.value) {
-    SVGtoPDF(doc, textarea.value, 0, 0); // Use the SVG code in the textarea
+  let textarea = document.getElementById('svg-code');
+  if (textarea.value) { // Use the SVG code in the textarea
+    if (document.getElementById('use-css').checked) {
+      let hiddenDiv = document.getElementById('hidden-div');
+      hiddenDiv.innerHTML = textarea.value;
+      SVGtoPDF(doc, hiddenDiv.firstChild, 0, 0, {useCSS:true});
+    } else {
+      SVGtoPDF(doc, textarea.value, 0, 0);
+    }
   } else {
-    let svgs = document.querySelectorAll('#col1 > svg'); // Use all the svg drawings on the page
+    let svgs = document.querySelectorAll('#column-1 > svg'); // Use all the svg drawings on the page
     for (let i = 0; i < svgs.length; i++) {
       doc.fontSize(20).text(svgs[i].id, {underline: true});
       SVGtoPDF(doc, svgs[i].outerHTML || svgs[i], 0, 0);
       if (i !== svgs.length - 1) {
-        ResetToDefault(doc);
+        resetDefaultStyles(doc);
         doc.addPage();
       }
     }
@@ -38,34 +43,34 @@ function CreatePdf() {
     let blob = stream.toBlob('application/pdf');
     if (navigator.msSaveOrOpenBlob) {
       navigator.msSaveOrOpenBlob(blob, 'File.pdf');
+    } else {
+      document.getElementById('pdf-file').setAttribute('src', URL.createObjectURL(blob));
     }
-    let reader = new FileReader();
-    reader.onload = function(e) {
-      document.getElementById('out').setAttribute('src', reader.result);
-    }
-    reader.readAsDataURL(blob);
   });
   doc.end();
 }
   </script>
   <style>
-body{margin:0;}
-div#col1{position:fixed;height:100%;width:50%;top:0;left:0;overflow:auto;}
-textarea#svg-input{width:100%;height:120px;box-sizing:border-box;resize:vertical;}
-div#col1 > svg{border:1px dotted green;margin:3px;}
-div#col2{position:fixed;height:100%;width:50%;top:0;right:0;}
-iframe#out{position:absolute;right:0;top:0;width:100%;height:100%;box-sizing:border-box;border:0;}
-h1{margin:10px;font-family:sans-serif;color:#555555;}
-a{text-decoration:none;color:#66a8a8;}
+body               {margin:0;}
+div#column-1       {position:fixed; height:100%; width:50%; top:0; left:0; overflow:auto;}
+textarea#svg-code  {width:100%; height:120px; box-sizing:border-box; resize:vertical;}
+div#column-1 > svg {border:1px dotted green; margin:3px;}
+div#column-2       {position:fixed; height:100%; width:50%; top:0; right:0;}
+iframe#pdf-file    {position:absolute; right:0; top:0; width:100%; height:100%; box-sizing:border-box; border:0;}
+h1                 {margin:10px; font-family:sans-serif; color:#555555;}
+a                  {text-decoration:none; color:#66a8a8;}
+div#hidden-div     {display:none;}
   </style>
 </head>
-<body onload="CreatePdf()">
-  <div id="col1">
+<body onload="createPdf()">
+  <div id="column-1">
     <h1><a href="https://github.com/alafr/SVG-to-PDFKit">SVG-to-PDFKit</a> demo page</h1>
     <form>
-      <textarea id="svg-input" onblur="CreatePdf()" placeholder="Paste svg code here, then click out of this textarea"></textarea>
+      <textarea id="svg-code" onblur="createPdf()" placeholder="Paste svg code here, then click out of this textarea"></textarea>
+      <label><input id="use-css" type="checkbox" onchange="createPdf()"/> Insert the SVG in the document and use the computed style</label>
+      <p>&nbsp;</p>
     </form>
-    <p>&nbsp;</p>
+<!-- Beginning of example SVG files -->
 <svg id="PreserveAspectRatio test © www.w3.org" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 480 360">
   <!--= SVG 1.1 2nd Edition Test Case = Copyright 2009 World Wide Web Consortium, (Massachusetts Institute of Technology, European Research Consortium for Informatics and Mathematics (ERCIM), Keio University). All Rights Reserved. See http://www.w3.org/Consortium/Legal/. =-->
   <title id="test-title">$RCSfile: coords-viewattr-01-b.svg,v $</title>
@@ -1215,9 +1220,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
     dominant-baseline="middle" text-anchor="middle"
     transform="translate(200 60) scale(2) translate(-20 0) scale(0.5)">Sample text</text>
 </svg>
+<!-- End of example SVG files -->
   </div>
-  <div id="col2">
-    <iframe id="out"></iframe>
+  <div id="column-2">
+    <iframe id="pdf-file"></iframe>
   </div>
+  <div id="hidden-div"></div>
 </body>
 </html>
