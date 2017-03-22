@@ -48,6 +48,7 @@ Insert SVG into a PDF document created with PDFKit.
  - other things I don't even know they exist
 
 #### Warning:
+ - Make sure to use a fully updated PDFKit version: see <a href="https://github.com/alafr/pdfkit/wiki/How-to-install-and-build-a-PDFKit-branch">here</a> how to build it
  - There are bugs, please send issues and/or pull requests.
  
 #### License:
