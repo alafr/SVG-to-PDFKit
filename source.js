@@ -2047,7 +2047,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var pxToPt = 72/96, // 1px = 72/96pt
         viewportWidth = options.width || doc.page.width / pxToPt,
         viewportHeight = options.height || doc.page.height / pxToPt,
-        useCSS = options.useCSS && typeof SVGSVGElement === 'function' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function',
+        useCSS = options.useCSS && typeof SVGSVGElement !== 'undefined' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function',
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback;
 
