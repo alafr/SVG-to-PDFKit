@@ -1405,12 +1405,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               doc.fillColor.apply(doc, fill);
             }
             if (stroke) {
+              var da = this.get('stroke-dasharray');
               doc.strokeColor.apply(doc, stroke)
                  .lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(this.get('stroke-linecap'))
-                 .dash(this.get('stroke-dasharray'), {phase: this.get('stroke-dashoffset')});
+                 .dash(da[0], { space: da[1], phase: this.get('stroke-dashoffset')});
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
@@ -1996,12 +1997,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                       doc.fillColor.apply(doc, fill);
                     }
                     if (stroke && strokeWidth) {
+                      var da = elem.get('stroke-dasharray');
                       doc.strokeColor.apply(doc, stroke)
                          .lineWidth(strokeWidth)
                          .miterLimit(elem.get('stroke-miterlimit'))
                          .lineJoin(elem.get('stroke-linejoin'))
                          .lineCap(elem.get('stroke-linecap'))
-                         .dash(elem.get('stroke-dasharray'), {phase:elem.get('stroke-dashoffset')});
+                         .dash(da[0], {space: da[1], phase:elem.get('stroke-dashoffset')});
                     }
                   } else {
                     doc.fillColor('white');
