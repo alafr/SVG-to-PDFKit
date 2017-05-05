@@ -1242,17 +1242,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      let link = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
+      let image = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
           width = this.getLength('width', this.getVWidth(), 0),
           height = this.getLength('height', this.getVHeight(), 0),
           x = this.getLength('x', this.getVWidth(), 0),
-          y = this.getLength('y', this.getVHeight(), 0),
-          image;
-      try {
-        image = doc.openImage(link);
-      } catch(e) {
-        warningMessage('SVGElemImage: failed to open image "' + link + '" in PDFKit');
-      }
+          y = this.getLength('y', this.getVHeight(), 0);
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
@@ -1288,7 +1282,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.transform.apply(doc, this.getTransformation2());
         if (!isClip) {
           doc.fillOpacity(this.get('opacity'));
-          doc.image(image, 0, 0);
+          doc.image(image, 0, 0, { width: width, height: height });
         } else {
           doc.rect(0, 0, image.width, image.height).fill('white');
         }
