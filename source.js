@@ -1202,7 +1202,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return viewBox[3];
       };
       this.getTransformation = function() {
-        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+        let aspectRatio = (preserveAspectRatio || this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
@@ -1254,7 +1254,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningMessage('SVGElemImage: failed to open image "' + link + '" in PDFKit');
       }
       this.getTransformation2 = function() {
-        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+        let aspectRatio = (preserveAspectRatio || this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
@@ -1598,7 +1598,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return [ Math.cos(rotate)*scale, Math.sin(rotate)*scale, -Math.sin(rotate)*scale, Math.cos(rotate)*scale, posArray[0], posArray[1] ];
       };
       this.getTransformation2 = function() {
-        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+        let aspectRatio = (preserveAspectRatio || this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
@@ -2044,9 +2044,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     options = options || {};
     if (typeof svg === 'string') {svg = parseXml(svg);}
 
-    var pxToPt = 72/96, // 1px = 72/96pt
+    var assumePt = options.assumePt || false, // setting this to true disables the px to pt translation
+        pxToPt = assumePt?1:(72/96), // 1px = 72/96pt, but only if assumePt is false
         viewportWidth = options.width || doc.page.width / pxToPt,
         viewportHeight = options.height || doc.page.height / pxToPt,
+        preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
         useCSS = options.useCSS && typeof SVGSVGElement !== 'undefined' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function',
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback;
