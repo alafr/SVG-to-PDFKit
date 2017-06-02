@@ -1,0 +1,10 @@
+{
+  "name": "svg-to-pdfkit",
+  "version": "0.1.0",
+  "description": "Insert SVG into a PDF document created with PDFKit",
+  "author": "alafr",
+  "license": "MIT",
+  "repository": "https://github.com/alafr/SVG-to-PDFKit",
+  "bugs": "https://github.com/alafr/SVG-to-PDFKit/issues",
+  "main": "source.js"
+}
