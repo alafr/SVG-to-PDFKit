@@ -1243,17 +1243,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      let link = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
+      let image = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
           width = this.getLength('width', this.getVWidth(), 0),
           height = this.getLength('height', this.getVHeight(), 0),
           x = this.getLength('x', this.getVWidth(), 0),
-          y = this.getLength('y', this.getVHeight(), 0),
-          image;
-      try {
-        image = doc.openImage(link);
-      } catch(e) {
-        warningMessage('SVGElemImage: failed to open image "' + link + '" in PDFKit');
-      }
+          y = this.getLength('y', this.getVHeight(), 0);
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
             temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
@@ -1289,7 +1283,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.transform.apply(doc, this.getTransformation2());
         if (!isClip) {
           doc.fillOpacity(this.get('opacity'));
-          doc.image(image, 0, 0);
+          doc.image(image, 0, 0, { width: width, height: height });
         } else {
           doc.rect(0, 0, image.width, image.height).fill('white');
         }
@@ -1406,12 +1400,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               doc.fillColor.apply(doc, fill);
             }
             if (stroke) {
+              var da = this.get('stroke-dasharray');
               doc.strokeColor.apply(doc, stroke)
                  .lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(this.get('stroke-linecap'))
-                 .dash(this.get('stroke-dasharray'), {phase: this.get('stroke-dashoffset')});
+                 .dash(da[0], { space: da[1], phase: this.get('stroke-dashoffset')});
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
@@ -1997,12 +1992,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                       doc.fillColor.apply(doc, fill);
                     }
                     if (stroke && strokeWidth) {
+                      var da = elem.get('stroke-dasharray');
                       doc.strokeColor.apply(doc, stroke)
                          .lineWidth(strokeWidth)
                          .miterLimit(elem.get('stroke-miterlimit'))
                          .lineJoin(elem.get('stroke-linejoin'))
                          .lineCap(elem.get('stroke-linecap'))
-                         .dash(elem.get('stroke-dasharray'), {phase:elem.get('stroke-dashoffset')});
+                         .dash(da[0], {space: da[1], phase:elem.get('stroke-dashoffset')});
                     }
                   } else {
                     doc.fillColor('white');
