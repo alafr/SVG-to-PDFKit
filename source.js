@@ -2071,8 +2071,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var assumePt = options.assumePt || false, // setting this to true disables the px to pt translation
         pxToPt = assumePt ? 1 : (72/96), // 1px = 72/96pt, but only if assumePt is false
-        viewportWidth = options.width || doc.page.width / pxToPt,
-        viewportHeight = options.height || doc.page.height / pxToPt,
+        viewportWidth = (options.width || doc.page.width) / pxToPt,
+        viewportHeight = (options.height || doc.page.height) / pxToPt,
         preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
         useCSS = options.useCSS && typeof SVGSVGElement !== 'undefined' && svg instanceof SVGSVGElement && typeof getComputedStyle === 'function',
         fontCallback = options.fontCallback,
