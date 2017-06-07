@@ -41,12 +41,15 @@ Insert SVG into a PDF document created with PDFKit.
  - units: all standard units
  - transformations: transform, viewBox & preserveAspectRatio attributes
  - clip paths & masks
+ - images
+ - fonts
  - gradients
 
 #### Unsupported:
  - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
  - patterns
  - filters
+ - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
  - other things I don't even know they exist
 
 #### Warning:
