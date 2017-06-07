@@ -747,6 +747,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       switch (obj.nodeName) {
         case 'use': if (this instanceof SvgElemUse) {break;} else {return new SvgElemUse(obj, inherits);}
         case 'g': if (this instanceof SvgElemGroup) {break;} else {return new SvgElemGroup(obj, inherits);}
+        case 'a': if (this instanceof SvgElemLink) {break;} else {return new SvgElemLink(obj, inherits);}
         case 'svg': if (this instanceof SvgElemSvg) {break;} else {return new SvgElemSvg(obj, inherits);}
         case 'image': if (this instanceof SVGElemImage) {break;} else {return new SVGElemImage(obj, inherits);}
         case 'rect': if (this instanceof SvgElemRect) {break;} else {return new SvgElemRect(obj, inherits);}
@@ -1093,6 +1094,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemHasChildren = function(obj) {
+      this.allowedChildren = ['use', 'g', 'a', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getBoundingShape = function() {
         let shape = new SvgShape(),
             children = this.getChildren();
@@ -1164,7 +1166,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         return this.get('transform');
       };
@@ -1186,11 +1187,37 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
+    var SvgElemLink = function(obj, inherits) {
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      SvgElemStylable.call(this, obj);
+      let link = this.attr('href') || this.attr('xlink:href');
+      this.getTransformation = function() {
+        return this.get('transform');
+      };
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        this.transform();
+        this.clip();
+        let masked = this.mask(), group;
+        if ((this.get('opacity') < 1 || masked) && !isClip) {
+          group = doc.createGroup();
+        }
+        if (link) {warningMessage('SVGElemLink: links are not supported');}
+        this.drawChildren(isClip, isMask);
+        if (group) {
+          doc.closeGroup(group);
+          doc.fillOpacity(this.get('opacity'));
+          doc.insertGroup(group);
+        }
+        doc.restore();
+      };
+    };
+
     var SvgElemSvg = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
@@ -1581,7 +1608,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemMarker = function(obj, inherits, posArray, strokeWidth) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       let width = this.getLength('markerWidth', this.getParentVWidth(), 3),
           height = this.getLength('markerHeight', this.getParentVHeight(), 3),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
@@ -1644,7 +1670,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         if (this.attr('clipPathUnits') === 'objectBoundingBox') {
           return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
@@ -1669,7 +1694,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemMask = function(obj, inherits, bBox) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      this.allowedChildren = ['use', 'g', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getTransformation = function() {
         if (this.attr('maskContentUnits') === 'objectBoundingBox') {
           return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
