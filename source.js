@@ -1823,16 +1823,26 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           currentChunk = [];
         }
-        function adjustLength(pos, length) {
+        function adjustLength(pos, length, spacingAndGlyphs) {
           let firstChar = pos[0], lastChar = pos[pos.length - 1],
-              startX = firstChar.x, endX = lastChar.x + lastChar.width,
-              textScale = length / (endX - startX);
-          if (textScale > 0 && textScale < Infinity) {
-            for (let j = 0; j < pos.length; j++) {
-              pos[j].x = startX + textScale * (pos[j].x - startX);
-              pos[j].scale *= textScale;
-              pos[j].xAdvance *= textScale;
-              pos[j].width *= textScale;
+              startX = firstChar.x, endX = lastChar.x + lastChar.width;
+          if (spacingAndGlyphs) {
+            let textScale = length / (endX - startX);
+            if (textScale > 0 && textScale < Infinity) {
+              for (let j = 0; j < pos.length; j++) {
+                pos[j].x = startX + textScale * (pos[j].x - startX);
+                pos[j].xAdvance *= textScale;
+                pos[j].scale *= textScale;
+                pos[j].width *= textScale;
+              }
+            }
+          } else {
+            if (pos.length >= 2) {
+              let spaceDiff = (length - (endX - startX)) / (pos.length - 1);
+              for (let j = 0; j < pos.length; j++) {
+                pos[j].x += j * spaceDiff;
+                pos[j].xAdvance += spaceDiff;
+              }
             }
           }
           currentX += length - (endX - startX);
@@ -1856,6 +1866,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._index = 0;
           currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
           let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
+              spacingAndGlyphs = currentElem.attr('lengthAdjust') === 'spacingAndGlyphs',
               wordSpacing = currentElem.get('word-spacing'),
               letterSpacing = currentElem.get('letter-spacing'),
               textAnchor = currentElem.get('text-anchor'),
@@ -1924,7 +1935,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
           }
           if (textLength && currentElem._pos.length) {
-            adjustLength(currentElem._pos, textLength);
+            adjustLength(currentElem._pos, textLength, spacingAndGlyphs);
           }
           if (currentElem.name === 'textPath' || currentElem.name === 'text') {
             doAnchoring();
