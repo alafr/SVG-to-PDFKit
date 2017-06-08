@@ -65,7 +65,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       });
       gstate.end();
       this.page.ext_gstates[name] = gstate;
-      this.addContent("/" + name + " gs");
+      this.addContent('/' + name + ' gs');
       return this;
     };
     function docBeginText(font, size) {
@@ -1855,8 +1855,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._rot = combineArrays(currentElem.getNumberList('rotate'), (parentElem ? parentElem._rot.slice(parentElem._pos.length) : []));
           currentElem._defRot = currentElem.chooseValue(currentElem._rot[currentElem._rot.length - 1], parentElem && parentElem._defRot, 0);
           if (currentElem.name === 'textPath') {currentElem._y = [];}
-          let fontStylesFound = {},
-              fontNameorLink = fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontStylesFound);
+          let fontOptions = {fauxItalic: false, fauxBold: false},
+              fontNameorLink = fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontOptions);
           try {
             doc.font(fontNameorLink);
           } catch(e) {
@@ -1864,7 +1864,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           currentElem._pos = [];
           currentElem._index = 0;
-          currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxitalic: fontStylesFound.italicFound===false, fauxbold: fontStylesFound.boldFound===false};
+          currentElem._font = {font: doc._font, size: currentElem.get('font-size'), fauxItalic: fontOptions.fauxItalic, fauxBold: fontOptions.fauxBold};
           let textLength = currentElem.getLength('textLength', currentElem.getVWidth(), undefined),
               spacingAndGlyphs = currentElem.attr('lengthAdjust') === 'spacingAndGlyphs',
               wordSpacing = currentElem.get('word-spacing'),
@@ -2007,7 +2007,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let fill = elem.getFill(isClip, isMask),
               stroke = elem.getStroke(isClip, isMask),
               strokeWidth = elem.get('stroke-width');
-          if (elem._font.fauxbold) {
+          if (elem._font.fauxBold) {
             if (!stroke) {
               stroke = fill;
               strokeWidth = elem._font.size * 0.03;
@@ -2050,7 +2050,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   }
                   for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
                     if (!pos[j].hidden && pos[j].width !== 0) {
-                      let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxitalic ? -0.25 : 0);
+                      let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxItalic ? -0.25 : 0);
                       docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
                       docWriteGlyph(pos[j].glyphid);
                     }
@@ -2093,7 +2093,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       warningMessage('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
     }
     if (typeof fontCallback !== 'function') {
-      fontCallback = function(family, bold, italic) {
+      fontCallback = function(family, bold, italic, fontOptions) {
         if (family.match(/(?:^|,)\s*serif\s*$/)) {
           if (bold && italic) {return 'Times-BoldItalic';}
           if (bold && !italic) {return 'Times-Bold';}
