@@ -50,6 +50,7 @@ Insert SVG into a PDF document created with PDFKit.
  - patterns
  - filters
  - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
+ - foreignObject
  - other things I don't even know they exist
 
 #### Warning:
