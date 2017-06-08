@@ -100,9 +100,9 @@ function RunTest(Svg, Callback) {
   // Create a new PDF document and insert the SVG with svg-to-pdfkit, and then render the pdf inside a canvas with PDF.js
   function RunSvgToPdfKit() {
     var doc = new PDFDocument({size: [DocWidth * 72/96, DocHeight * 72/96], compress:false});
-    var fontCallback = function(family, bold, italic, FontStylesFound) {
-      if (italic) {FontStylesFound.italicFound = false;}
-      if (bold) {FontStylesFound.boldFound = false;}
+    var fontCallback = function(family, bold, italic, fontOptions) {
+      if (italic) {fontOptions.fauxItalic = true;}
+      if (bold) {fontOptions.fauxBold = true;}
       return FontBuffer(FontData);
     };
     try {
