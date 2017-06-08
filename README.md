@@ -50,7 +50,7 @@ Insert SVG into a PDF document created with PDFKit.
  - patterns
  - filters
  - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
- - foreignObject
+ - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
 
 #### Warning:
