@@ -863,7 +863,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.get = function(key) {
         if (cache[key] !== undefined) {return cache[key];}
         let keyInfo = Properties[key] || {}, value, result;
-        if (useCSS && key !== 'transform') { // the CSS transform behaves stangely
+        if (useCSS && key !== 'transform') { // the CSS transform behaves strangely
           if (!this.css) {this.css = getComputedStyle(obj);}
           value = this.css[keyInfo.css || key] || this.attr(key);
         } else {
