@@ -62,7 +62,7 @@ PDFDocument.prototype.applyMask = function(group, clip) {
 };
 PDFDocument.prototype.makePattern = function(group, dx, dy, matrix) {
   if (!group.closed) {this.closeGroup(group);}
-  let pattern = new (function PDFGroup() {})();
+  let pattern = new (function PDFPattern() {})();
   pattern.name = 'P' + (this._patternCount = (this._patternCount || 0) + 1);
   pattern.ref = this.ref({
     Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
