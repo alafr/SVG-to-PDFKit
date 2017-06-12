@@ -935,10 +935,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (color) {return color;}
               let ref = this.resolveUrl(value);
               if (ref) { // TODO implement fallback syntax : <funciri> <color>
-                if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient') {
+                if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient' || ref.nodeName === 'pattern') {
                   return ref;
-                } else if (ref.nodeName === 'pattern') {
-                  warningMessage('SVGtoPDF: patterns are not implemented');
                 }
                 return 'none';
               }
@@ -1076,6 +1074,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (fill !== 'none' && opacity && fillOpacity) {
           if (fill.nodeName === 'linearGradient' || fill.nodeName === 'radialGradient') {
             return new SvgElemGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
+          } else if (fill.nodeName === 'pattern') {
+            return new SvgElemPattern(fill, null, this.getBoundingBox(), fillOpacity * opacity).getPattern(isClip, isMask);
           }
           return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
         }
@@ -1087,6 +1087,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (stroke !== 'none' && opacity && strokeOpacity) {
           if (stroke.nodeName === 'linearGradient' || stroke.nodeName === 'radialGradient') {
             return new SvgElemGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
+          } else if (stroke.nodeName === 'pattern') {
+            return new SvgElemPattern(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getPattern(isClip, isMask);
           }
           return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
         }
@@ -1321,6 +1323,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.rect(0, 0, image.width, image.height).fill('white');
         }
         doc.restore();
+      };
+    };
+
+    var SvgElemPattern = function(obj, inherits, bBox, gOpacity) {
+      SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
+      this.getPattern = function(isClip, isMask) {
+        warningMessage('SVGtoPDF: patterns are not implemented');
+        // TODO
       };
     };
 
