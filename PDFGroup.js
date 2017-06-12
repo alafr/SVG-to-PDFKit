@@ -60,34 +60,35 @@ PDFDocument.prototype.applyMask = function(group, clip) {
   this.addContent('/' + name + ' gs');
   return this;
 };
-PDFDocument.prototype.makePattern = function(group, dx, dy, matrix) {
+PDFDocument.prototype.createPattern = function(group, dx, dy, matrix) {
   if (!group.closed) {this.closeGroup(group);}
   let pattern = new (function PDFPattern() {})();
-  pattern.name = 'P' + (this._patternCount = (this._patternCount || 0) + 1);
-  pattern.ref = this.ref({
-    Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
-    BBox: [0, 0, dx, dy], XStep: dx, YStep: dy,
-    Matrix: matrix ? multiplyMatrix(this._ctm, matrix) : this._ctm,
-    Resources: {
-      ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
-      XObject: {[group.name]: group.xobj}
-    }
-  });
-  pattern.ref.write('/' + group.name + ' Do');
-  pattern.ref.end();
+  pattern.group = group;
+  pattern.dx = dx;
+  pattern.dy = dy;
+  pattern.matrix = matrix || [1, 0, 0, 1, 0, 0];
   return pattern;
 };
-PDFDocument.prototype.setPatternFill = function(group, dx, dy, matrix) {
-  let pattern = this.makePattern(group, dx, dy, matrix);
-  this.page.patterns[pattern.name] = pattern.ref;
-  this.addContent('/Pattern cs');
-  this.addContent('/' + pattern.name + ' scn');
-  return this;
-};
-PDFDocument.prototype.setPatternStroke = function(group, dx, dy, matrix) {
-  let pattern = this.makePattern(group, dx, dy, matrix);
-  this.page.patterns[pattern.name] = pattern.ref;
-  this.addContent('/Pattern cs');
-  this.addContent('/' + pattern.name + ' SCN');
+PDFDocument.prototype.usePattern = function(pattern, stroke) {
+  let name = 'P' + (this._patternCount = (this._patternCount || 0) + 1);
+  let ref = this.ref({
+    Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
+    BBox: [0, 0, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
+    Matrix: multiplyMatrix(this._ctm, pattern.matrix),
+    Resources: {
+      ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
+      XObject: {[pattern.group.name]: pattern.group.xobj}
+    }
+  });
+  ref.write('/' + pattern.group.name + ' Do');
+  ref.end();
+  this.page.patterns[name] = ref;
+  if (stroke) {
+    this.addContent('/Pattern CS');
+    this.addContent('/' + name + ' SCN');
+  } else {
+    this.addContent('/Pattern cs');
+    this.addContent('/' + name + ' scn');
+  }
   return this;
 };
