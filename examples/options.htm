@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <title>SVG-to-PDFKit demo page</title>
+  <script src="pdfkit.js"></script>
+  <script src="blobstream.js"></script>
+  <script src="../source.js"></script>
+  <script>
+function createPdf() {
+  let compress = (document.getElementById('compress').value === 'true'),
+      pagewidth = parseFloat(document.getElementById('pagewidth').value),
+      pageheight = parseFloat(document.getElementById('pageheight').value),
+      showViewport = document.getElementById('showViewport').checked,
+      x = parseFloat(document.getElementById('x').value),
+      y = parseFloat(document.getElementById('y').value);
+  let options = {
+      useCSS: (document.getElementById('useCSS').value === 'true'),
+      assumePt: (document.getElementById('assumePt').value === 'true'),
+      preserveAspectRatio: document.getElementById('preserveAspectRatio').value,
+      width: parseFloat(document.getElementById('width').value),
+      height: parseFloat(document.getElementById('height').value)
+  };
+  let doc = new PDFDocument({compress: compress, size: [pagewidth || 612, pageheight || 792]}),
+      textarea = document.getElementById('svg-code');
+  if (showViewport) {
+    doc.rect(x || 0, y || 0, options.width || doc.page.width, options.height || doc.page.height)
+       .lineWidth(8).dash([8,4]).strokeColor('green').stroke();
+  }
+  if (options.useCSS) {
+    let hiddenDiv = document.getElementById('hidden-div');
+    hiddenDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' + textarea.value + '</svg>';
+    SVGtoPDF(doc, hiddenDiv.firstChild.firstChild, x, y, options);
+  } else {
+    SVGtoPDF(doc, textarea.value, x, y, options);
+  }
+  let stream = doc.pipe(blobStream());
+  stream.on('finish', function() {
+    let blob = stream.toBlob('application/pdf');
+    if (navigator.msSaveOrOpenBlob) {
+      navigator.msSaveOrOpenBlob(blob, 'File.pdf');
+    } else {
+      document.getElementById('pdf-file').setAttribute('src', URL.createObjectURL(blob));
+    }
+  });
+  doc.end();
+}
+  </script>
+  <style>
+html, body   {margin:0; padding:0;}
+div#column-1   {position:fixed; height:100%; width:50%; left:0; box-sizing: border-box; overflow:auto;}
+div#column-2   {position:fixed; height:100%; width:50%; right:0; box-sizing: border-box; overflow:none;}
+textarea#svg-code   {width:100%; height:240px; box-sizing:border-box; resize:vertical;}
+iframe#pdf-file   {width:100%; height:100%; box-sizing: border-box;}
+input[type="input"], select   {width:80px; height:24px; box-sizing: border-box;}
+label   {line-height:24px;}
+div.element   {display:inline-block;}
+div.section   {display:block; font-size:120%; font-weight:bold; margin-top:10px;}
+div.options   {margin: 20px;}
+h1   {margin:10px; font-family:sans-serif; color:#555555;}
+a   {text-decoration:none; color:#66a8a8;}
+div#hidden-div   {display:none;}
+  </style>
+</head>
+<body>
+  <div id="column-1">
+    <h1><a href="https://github.com/alafr/SVG-to-PDFKit">SVG-to-PDFKit</a> options</h1>
+    <form>
+      <textarea id="svg-code" placeholder="Paste svg code here"></textarea>
+      <div class="options">
+        <div class="section">PDF options</div>
+        <div class="element">width (pt)<br><input id="pagewidth" type="input" value="612"/></div>
+        <div class="element">height (pt)<br><input id="pageheight" type="input" value="792"/></div>
+        <div class="element">compress<br>
+          <select id="compress">
+            <option>false</option>
+            <option>true</option>
+          </select>
+        </div>
+        <div class="section">SVG options</div>
+        <div class="element">x (pt)<br>
+          <input id="x" type="input">
+        </div>
+        <div class="element">y (pt)<br>
+          <input id="y" type="input">
+        </div>
+        <div class="element">width (pt)<br>
+          <input id="width" type="input">
+        </div>
+        <div class="element">height (pt)<br>
+          <input id="height" type="input">
+        </div><br>
+        <div class="element">useCSS<br>
+          <select id="useCSS">
+            <option>false</option>
+            <option>true</option>
+          </select>
+        </div>
+        <div class="element">assumePt<br>
+          <select id="assumePt">
+            <option>false</option>
+            <option>true</option>
+          </select>
+        </div>
+        <div class="element">preserveAspectRatio<br>
+          <select id="preserveAspectRatio">
+            <option></option>
+            <option>none</option>
+            <option>xMinYMin meet</option>
+            <option>xMidYMin meet</option>
+            <option>xMaxYMin meet</option>
+            <option>xMinYMid meet</option>
+            <option>xMidYMid meet</option>
+            <option>xMaxYMid meet</option>
+            <option>xMinYMax meet</option>
+            <option>xMidYMax meet</option>
+            <option>xMaxYMax meet</option>
+            <option>xMinYMin slice</option>
+            <option>xMidYMin slice</option>
+            <option>xMaxYMin slice</option>
+            <option>xMinYMid slice</option>
+            <option>xMidYMid slice</option>
+            <option>xMaxYMid slice</option>
+            <option>xMinYMax slice</option>
+            <option>xMidYMax slice</option>
+            <option>xMaxYMax slice</option>
+          </select>
+        </div>
+        <div class="section">Debugging</div>
+        <div class="element"><label><input type="checkbox" id="showViewport"/>Draw the viewport on the PDF</label></div>
+        <div class="section"><button type="button" onclick="createPdf()">Convert SVG to PDF</button></div>
+        <code>
+
+        </code>
+      </div>
+    </form>
+
+  </div>
+  <div id="column-2">
+    <iframe id="pdf-file"></iframe>
+  </div>
+  <div id="hidden-div"></div>
+</body>
+</html>
