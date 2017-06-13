@@ -1222,9 +1222,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemStylable.call(this, obj);
       let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
+          aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
           x = this.getLength('x', this.getParentVWidth(), 0),
           y = this.getLength('y', this.getParentVHeight(), 0);
+      if (this.isOuterElement && preserveAspectRatio) {
+        width = viewportWidth;
+        height = viewportHeight;
+        aspectRatio = preserveAspectRatio;
+      }
       this.getVWidth = function() {
         return viewBox[2];
       };
@@ -1232,8 +1238,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return viewBox[3];
       };
       this.getTransformation = function() {
-        let aspectRatio = ((this.isOuterElement && preserveAspectRatio) || this.attr('preserveAspectRatio') || '').trim(),
-            temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
+        let temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
             ratioType = temp[1] || temp[4] || 'meet',
             xAlign = temp[2] || 'Mid',
             yAlign = temp[3] || 'Mid',
