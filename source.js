@@ -1396,16 +1396,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         height = height * (bBox[3] - bBox[1]);
       }
       this.getPattern = function(isClip, isMask) {
-        if (width === 0 || height === 0) {return;}
-        let group = docBeginGroup();
-        doc.transform.apply(doc, parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0));
-        this.drawChildren(isClip, isMask);
-        docEndGroup(group);
+        let aspectRatioMatrix = parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0);
         if (bBoxUnitsContent) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
         matrix = multiplyMatrix(matrix, [1, 0, 0, 1, x, y])
-        if (matrix = validateMatrix(matrix)) {
+        if ((matrix = validateMatrix(matrix)) && (width = validateNumber(width)) && (height = validateNumber(height))) {
+          let group = docBeginGroup();
+          doc.transform.apply(doc, aspectRatioMatrix);
+          this.drawChildren(isClip, isMask);
+          docEndGroup(group);
           return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
         } else {
           return;
