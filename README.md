@@ -44,10 +44,10 @@ Insert SVG into a PDF document created with PDFKit.
  - images
  - fonts
  - gradients
+ - patterns
 
 #### Unsupported:
  - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
- - patterns (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/38">#38</a>)
  - filters
  - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
