@@ -43,6 +43,31 @@ function createPdf() {
     }
   });
   doc.end();
+  saveParameters();
+}
+function saveParameters() {
+  var inputs = document.querySelectorAll('textarea, input, select');
+  var strings = []
+  for (var i = 0; i < inputs.length; i++) {
+    var value = inputs[i].type === 'checkbox' ? inputs[i].checked : inputs[i].value;
+    strings.push(encodeURIComponent(inputs[i].id) + '=' + encodeURIComponent(value));
+  }
+  history.replaceState(null, '', '?' + strings.join('&'));
+}
+function restoreParameters() {
+  var query = location.search.substring(1);
+  var strings = query.split('&');
+  for (var i = 0; i < strings.length; i++) {
+    var element = document.getElementById(decodeURIComponent(strings[i].split('=')[0])),
+        value = decodeURIComponent(strings[i].split('=')[1]);
+    if (element) {
+      if (element.type === 'checkbox') {
+        element.checked = (value === 'true');
+      } else {
+        element.value = value;
+      }
+    }
+  }
 }
   </script>
   <style>
@@ -61,7 +86,7 @@ a   {text-decoration:none; color:#66a8a8;}
 div#hidden-div   {display:none;}
   </style>
 </head>
-<body>
+<body onload="restoreParameters()">
   <div id="column-1">
     <h1><a href="https://github.com/alafr/SVG-to-PDFKit">SVG-to-PDFKit</a> options</h1>
     <form>
