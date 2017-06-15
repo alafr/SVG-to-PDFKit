@@ -2,71 +2,85 @@
 var SVGtoPDF = function(doc, svg, x, y, options) {
 
     doc.addContent = function(data) {
-      (this._writeTarget || this.page).write(data);
+      (this._currentGroup && this._currentGroup.xobj || this.page).write(data);
       return this;
     };
-    doc.createGroup = function() {
+    function docBeginGroup() {
       let group = new (function PDFGroup() {})();
-      group.name = 'G' + (this._groupCount = (this._groupCount || 0) + 1);
+      group.name = 'G' + (doc._groupCount = (doc._groupCount || 0) + 1);
       group.closed = false;
-      group.matrix = [1, 0, 0, 1, 0, 0];
-      group.xobj = this.ref({
+      group.xobj = doc.ref({
         Type: 'XObject',
         Subtype: 'Form',
         FormType: 1,
         BBox: [-1000000, -1000000, 1000000, 1000000],
         Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
       });
-      group.previousGroup = this._currentGroup;
-      this.writeToGroup(group);
+      group.parentGroup = doc._currentGroup;
+      group.savedCtm = doc._ctm;
+      doc._currentGroup = group;
+      doc._ctm = [1, 0, 0, 1, 0, 0];
       return group;
     };
-    doc.writeToGroup = function(group) {
-      let prevGroup = this._currentGroup || null,
-          nextGroup = group && !group.closed ? group : null,
-          currentCtm = doc._ctm;
-      if (prevGroup && nextGroup) {
-        this._currentGroup = nextGroup;
-        this._writeTarget = nextGroup.xobj;
-        doc._ctm = nextGroup.matrix;
-        nextGroup.matrix = prevGroup.matrix;
-        prevGroup.matrix = currentCtm;
-      } else if (prevGroup && !nextGroup) {
-        this._currentGroup = null;
-        this._writeTarget = null;
-        doc._ctm = prevGroup.matrix;
-        prevGroup.matrix = currentCtm;
-      } else if (!prevGroup && nextGroup) {
-        this._currentGroup = nextGroup;
-        this._writeTarget = nextGroup.xobj;
-        doc._ctm = nextGroup.matrix;
-        nextGroup.matrix = currentCtm;
-      }
-      return this;
-    };
-    doc.closeGroup = function(group) {
-      this.page.xobjects[group.name] = group.xobj;
+    function docEndGroup(group) {
+      if (group !== doc._currentGroup || group.closed) {throw new Error('Group not matching or already closed');}
       group.xobj.end();
       group.closed = true;
-      this.writeToGroup(group.previousGroup);
-      return this;
+      doc._currentGroup = group.parentGroup;
+      doc._ctm = group.savedCtm;
+      return doc;
     };
-    doc.insertGroup = function(group) {
-      if (!group.closed) {this.closeGroup(group);}
-      this.addContent('/' + group.name + ' Do');
-      return this;
+    function docInsertGroup(group) {
+      if (!group.closed) {throw new Error('Group not closed');}
+      doc.page.xobjects[group.name] = group.xobj;
+      doc.addContent('/' + group.name + ' Do');
+      return doc;
     };
-    doc.applyMask = function(group, clip) {
-      if (!group.closed) {this.closeGroup(group);}
-      let name = 'M'+ (this._maskCount = (this._maskCount || 0) + 1);
-      let gstate = this.ref({
+    function docApplyMask(group, clip) {
+      if (!group.closed) {throw new Error('Group not closed');}
+      let name = 'M'+ (doc._maskCount = (doc._maskCount || 0) + 1);
+      let gstate = doc.ref({
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
         SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
       });
       gstate.end();
-      this.page.ext_gstates[name] = gstate;
-      this.addContent('/' + name + ' gs');
-      return this;
+      doc.page.ext_gstates[name] = gstate;
+      doc.addContent('/' + name + ' gs');
+      return doc;
+    };
+    function docCreatePattern(group, x, y, dx, dy, matrix) {
+      if (!group.closed) {throw new Error('Group not closed');}
+      let pattern = new (function PDFPattern() {})();
+      pattern.group = group;
+      pattern.x = x;
+      pattern.y = y;
+      pattern.dx = dx;
+      pattern.dy = dy;
+      pattern.matrix = matrix || [1, 0, 0, 1, 0, 0];
+      return pattern;
+    };
+    function docUsePattern(pattern, stroke) {
+      let name = 'P' + (doc._patternCount = (doc._patternCount || 0) + 1);
+      let ref = doc.ref({
+        Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
+        BBox: [pattern.x, pattern.y, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
+        Matrix: multiplyMatrix(doc._ctm, pattern.matrix),
+        Resources: {
+          ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
+          XObject: {[pattern.group.name]: pattern.group.xobj}
+        }
+      });
+      ref.write('/' + pattern.group.name + ' Do');
+      ref.end();
+      doc.page.patterns[name] = ref;
+      if (stroke) {
+        doc.addContent('/Pattern CS');
+        doc.addContent('/' + name + ' SCN');
+      } else {
+        doc.addContent('/Pattern cs');
+        doc.addContent('/' + name + ' scn');
+      }
+      return doc;
     };
     function docBeginText(font, size) {
       if (!doc.page.fonts[font.id]) {doc.page.fonts[font.id] = font.ref();}
@@ -87,6 +101,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     function warningMessage(str) {
       if (typeof console !== undefined && typeof console.warn === 'function') {console.warn(str);}
+    }
+    function docFillColor(color, opacity) {
+      if (color.constructor.name === 'PDFPattern') {
+        doc.fillOpacity(opacity);
+        docUsePattern(color, false);
+      } else {
+        doc.fillColor(color, opacity);
+      }
+    }
+    function docStrokeColor(color, opacity) {
+      if (color.constructor.name === 'PDFPattern') {
+        doc.strokeOpacity(opacity);
+        docUsePattern(color, true);
+      } else {
+        doc.strokeColor(color, opacity);
+      }
     }
     function parseXml(xml) {
       let SvgNode = function(tag) {
@@ -310,6 +340,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       if (parser.matchAll()) {return;}
       return result;
+    }
+    function parseAspectRatio(aspectRatio, availWidth, availHeight, elemWidth, elemHeight, initAlign) {
+      let temp = (aspectRatio || '').trim().match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
+          ratioType = temp[1] || temp[4] || 'meet',
+          xAlign = temp[2] || 'Mid',
+          yAlign = temp[3] || 'Mid',
+          scaleX = availWidth / elemWidth,
+          scaleY = availHeight / elemHeight,
+          dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign] - (initAlign || 0),
+          dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign] - (initAlign || 0);
+      if (ratioType === 'slice') {
+        scaleY = scaleX = Math.max(scaleX, scaleY);
+      } else if (ratioType === 'meet') {
+        scaleY = scaleX = Math.min(scaleX, scaleY);
+      }
+      return [scaleX, 0, 0, scaleY, dx * (availWidth - elemWidth * scaleX), dy * (availHeight - elemHeight * scaleY)];
     }
 
     var StringParser = function(str) {
@@ -1031,6 +1077,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return cache['<parentVHeight>'] = viewportHeight;
         }
       };
+      this.getParentViewport = function() {
+        if (cache['<parentViewport>'] !== undefined) {return cache['<parentViewport>'];}
+        return cache['<parentViewport>'] = Math.sqrt(0.5 * this.getParentVWidth() * this.getParentVWidth() + 0.5 * this.getParentVHeight() * this.getParentVHeight());
+      };
       this.getVWidth = function() {
         if (cache['<vWidth>'] !== undefined) {return cache['<vWidth>'];}
         return cache['<vWidth>'] = this.getParentVWidth();
@@ -1151,13 +1201,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           this.clip();
           let masked = this.mask(), group;
           if ((this.get('opacity') < 1 || masked) && !isClip) {
-            group = doc.createGroup();
+            group = docBeginGroup();
           }
           child.drawInDocument(isClip, isMask);
           if (group) {
-            doc.closeGroup(group);
+            docEndGroup(group);
             doc.fillOpacity(this.get('opacity'));
-            doc.insertGroup(group);
+            docInsertGroup(group);
           }
           doc.restore();
         }
@@ -1177,13 +1227,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.clip();
         let masked = this.mask(), group;
         if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = doc.createGroup();
+          group = docBeginGroup();
         }
         this.drawChildren(isClip, isMask);
         if (group) {
-          doc.closeGroup(group);
+          docEndGroup(group);
           doc.fillOpacity(this.get('opacity'));
-          doc.insertGroup(group);
+          docInsertGroup(group);
         }
         doc.restore();
       };
@@ -1203,14 +1253,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.clip();
         let masked = this.mask(), group;
         if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = doc.createGroup();
+          group = docBeginGroup();
         }
         if (link) {warningMessage('SVGElemLink: links are not supported');}
         this.drawChildren(isClip, isMask);
         if (group) {
-          doc.closeGroup(group);
+          docEndGroup(group);
           doc.fillOpacity(this.get('opacity'));
-          doc.insertGroup(group);
+          docInsertGroup(group);
         }
         doc.restore();
       };
@@ -1238,20 +1288,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return viewBox[3];
       };
       this.getTransformation = function() {
-        let temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
-            ratioType = temp[1] || temp[4] || 'meet',
-            xAlign = temp[2] || 'Mid',
-            yAlign = temp[3] || 'Mid',
-            scaleX = width / viewBox[2],
-            scaleY = height / viewBox[3],
-            dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign],
-            dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign];
-        if (ratioType === 'slice') {
-          scaleY = scaleX = Math.max(scaleX, scaleY);
-        } else if (ratioType === 'meet') {
-          scaleY = scaleX = Math.min(scaleX, scaleY);
-        }
-        return [scaleX, 0, 0, scaleY, x + dx * (width - viewBox[2] * scaleX) - scaleX * viewBox[0], y + dy * (height - viewBox[3] * scaleY) - scaleY * viewBox[1]];
+        return multiplyMatrix(
+          [1, 0, 0, 1, x, y],
+          parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]),
+          [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
+        );
       };
       this.drawInDocument = function(isClip, isMask) {
         doc.save();
@@ -1262,13 +1303,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.clip();
         let masked = this.mask(), group;
         if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = doc.createGroup();
+          group = docBeginGroup();
         }
         this.drawChildren(isClip, isMask);
         if (group) {
-          doc.closeGroup(group);
+          docEndGroup(group);
           doc.fillOpacity(this.get('opacity'));
-          doc.insertGroup(group);
+          docInsertGroup(group);
         }
         doc.restore();
       };
@@ -1334,9 +1375,47 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemPattern = function(obj, inherits, bBox, gOpacity) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
+      let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
+          bBoxUnitsContent = (this.attr('patternContentUnits') === 'objectBoundingBox'),
+          matrix = parseTranform(this.attr('patternTransform')),
+          x = this.getLength('x', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
+          y = this.getLength('y', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0),
+          width = this.getLength('width', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
+          height = this.getLength('height', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0),
+          viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
+          aspectRatio = (this.attr('preserveAspectRatio') || '').trim();
+      if (bBoxUnitsContent && !bBoxUnitsPattern) { // Use the same units for pattern & pattern content
+        x = (x - bBox[0]) / (bBox[2] - bBox[0]) || 0;
+        y = (y - bBox[1]) / (bBox[3] - bBox[1]) || 0;
+        width = width / (bBox[2] - bBox[0]) || 0;
+        height = height / (bBox[3] - bBox[1]) || 0;
+      } else if (!bBoxUnitsContent && bBoxUnitsPattern) {
+        x = bBox[0] + x * (bBox[2] - bBox[0]);
+        y = bBox[1] + y * (bBox[3] - bBox[1]);
+        width = width * (bBox[2] - bBox[0]);
+        height = height * (bBox[3] - bBox[1]);
+      }
       this.getPattern = function(isClip, isMask) {
-        warningMessage('SVGtoPDF: patterns are not implemented');
-        // TODO
+        if (width === 0 || height === 0) {return;}
+        let group = docBeginGroup();
+        doc.transform.apply(doc, parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0));
+        this.drawChildren(isClip, isMask);
+        docEndGroup(group);
+        if (bBoxUnitsContent) {
+          matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
+        }
+        matrix = multiplyMatrix(matrix, [1, 0, 0, 1, x, y])
+        if (matrix = validateMatrix(matrix)) {
+          return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
+        } else {
+          return;
+        }
+      };
+      this.getVWidth = function() {
+        return viewBox[2];
+      };
+      this.getVHeight = function() {
+        return viewBox[3];
       };
     };
 
@@ -1358,14 +1437,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             offset = 0;
         if (this.name === 'linearGradient') {
           let x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
-              x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), 1),
+              x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 1 : this.getVWidth())),
               y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
               y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
           grad = doc.linearGradient(x1, y1, x2, y2);
         } else {
-          let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), 0.5),
-              y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), 0.5),
-              r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), 0.5),
+          let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 0.5 : 0.5 * this.getVWidth())),
+              y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), (bBoxUnits ? 0.5 : 0.5 * this.getVHeight())),
+              r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), (bBoxUnits ? 0.5 : 0.5 * this.getViewport())),
               x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
               y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
           x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
@@ -1423,7 +1502,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (!isClip) {
           let masked = this.mask(), group;
           if (masked) {
-            group = doc.createGroup();
+            group = docBeginGroup();
           }
           let subPaths = this.shape.getSubPaths(),
               fill = this.getFill(isClip, isMask),
@@ -1434,7 +1513,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
                 let x = subPaths[j].boundingBox[0],
                     y = subPaths[j].boundingBox[1];
-                doc.fillColor.apply(doc, stroke);
+                docFillColor.apply(doc, stroke);
                 if (LineCap === 'square') {
                   doc.rect(x - 0.5 * LineWidth, y - 0.5 * LineWidth, LineWidth, LineWidth);
                 } else if (LineCap === 'round') {
@@ -1446,11 +1525,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           if (fill || stroke) {
             if (fill) {
-              doc.fillColor.apply(doc, fill);
+              docFillColor.apply(doc, fill);
             }
             if (stroke) {
-              doc.strokeColor.apply(doc, stroke)
-                 .lineWidth(this.get('stroke-width'))
+              docStrokeColor.apply(doc, stroke);
+              doc.lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(this.get('stroke-linecap'))
@@ -1485,13 +1564,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             marker.drawInDocument();
           }
           if (group) {
-            doc.closeGroup(group);
-            doc.insertGroup(group);
+            docEndGroup(group);
+            docInsertGroup(group);
           }
         } else {
           this.shape.insertInDocument();
-          doc.fillColor('white')
-             .fill(this.get('clip-rule'));
+          doc.fillColor('white');
+          doc.fill(this.get('clip-rule'));
         }
         doc.restore();
       };
@@ -1641,21 +1720,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return [ Math.cos(rotate)*scale, Math.sin(rotate)*scale, -Math.sin(rotate)*scale, Math.cos(rotate)*scale, posArray[0], posArray[1] ];
       };
       this.getTransformation2 = function() {
-        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
-            temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
-            ratioType = temp[1] || temp[4] || 'meet',
-            xAlign = temp[2] || 'Mid',
-            yAlign = temp[3] || 'Mid',
-            scaleX = width / viewBox[2],
-            scaleY = height / viewBox[3],
-            dx = {'Min':-0.5, 'Mid':0, 'Max':0.5}[xAlign],
-            dy = {'Min':-0.5, 'Mid':0, 'Max':0.5}[yAlign];
-        if (ratioType === 'slice') {
-          scaleY = scaleX = Math.max(scaleX, scaleY);
-        } else if (ratioType === 'meet') {
-          scaleY = scaleX = Math.min(scaleX, scaleY);
-        }
-        return [scaleX, 0, 0, scaleY, dx * (width - viewBox[2] * scaleX), dy * (height - viewBox[3] * scaleY)];
+        return parseAspectRatio(this.attr('preserveAspectRatio'), width, height, viewBox[2], viewBox[3], 0.5);
       };
       this.drawInDocument = function(isClip, isMask) {
         let refX = this.getLength('refX', this.getVWidth(), 0),
@@ -1670,13 +1735,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.translate(-refX, -refY);
         let group;
         if (this.get('opacity') < 1 && !isClip) {
-          group = doc.createGroup();
+          group = docBeginGroup();
         }
         this.drawChildren(isClip, isMask);
         if (group) {
-          doc.closeGroup(group);
+          docEndGroup(group);
           doc.fillOpacity(this.get('opacity'));
-          doc.insertGroup(group);
+          docInsertGroup(group);
         }
         doc.restore();
       };
@@ -1694,15 +1759,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.drawInDocument = function() {
-        let group = doc.createGroup();
+        let group = docBeginGroup();
         doc.save();
         doc.transform.apply(doc, this.getTransformation());
         this.clip();
         this.drawChildren(true, false);
         doc.restore();
         if (group) {
-          doc.closeGroup(group);
-          doc.applyMask(group, true);
+          docEndGroup(group);
+          docApplyMask(group, true);
         }
       };
     };
@@ -1718,7 +1783,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.drawInDocument = function() {
-        let group = doc.createGroup();
+        let group = docBeginGroup();
         doc.save();
         let x, y, w, h;
         if (this.attr('maskUnits') === 'userSpaceOnUse') {
@@ -1741,8 +1806,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.drawChildren(false, true);
         doc.restore()
         if (group) {
-          doc.closeGroup(group);
-          doc.applyMask(group, true);
+          docEndGroup(group);
+          docApplyMask(group, true);
         }
       };
     };
@@ -2045,11 +2110,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (fill || stroke || isClip) {
                   if (!isClip) {
                     if (fill) {
-                      doc.fillColor.apply(doc, fill);
+                      docFillColor.apply(doc, fill);
                     }
                     if (stroke && strokeWidth) {
-                      doc.strokeColor.apply(doc, stroke)
-                         .lineWidth(strokeWidth)
+                      docStrokeColor.apply(doc, stroke);
+                      doc.lineWidth(strokeWidth)
                          .miterLimit(elem.get('stroke-miterlimit'))
                          .lineJoin(elem.get('stroke-linejoin'))
                          .lineCap(elem.get('stroke-linecap'))
@@ -2082,12 +2147,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.clip();
         let masked = this.mask(), group;
         if (masked) {
-          group = doc.createGroup();
+          group = docBeginGroup();
         }
         recursive(this);
         if (group) {
-          doc.closeGroup(group);
-          doc.insertGroup(group);
+          docEndGroup(group);
+          docInsertGroup(group);
         }
         doc.restore();
       };
