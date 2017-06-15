@@ -811,7 +811,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let cache = Object.create(null);
       this.name = obj.nodeName;
       this.node = obj;
-      this.isOuterElement = obj.parentNode ? false : true;
+      this.isOuterElement = obj === svg || !obj.parentNode;
       this.allowedChildren = [];
       this.attr = function(key) {
         return obj.getAttribute(key);
