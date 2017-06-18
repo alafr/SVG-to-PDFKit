@@ -1006,7 +1006,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               return this.resolveUrl(value);
             }).call(this);
             break;
-          case 'stroke-width': case 'stroke-miterlimit':
+          case 'stroke-width':
             result = (function() {
               let parsed = this.computeLength(value, this.getViewport());
               if (parsed != null && parsed >= 0) {return parsed;}
@@ -1455,9 +1455,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (children.length === 0) {return;}
         if (children.length === 1) {
           let child = children[0],
-              color = child.get('stop-color');
-          if (color === 'none') {return;}
-          return [color.slice(0, 3), child.get('stop-opacity') * color[3] * gOpacity];
+              uniqueColor = child.get('stop-color');
+          if (uniqueColor === 'none') {return;}
+          return [uniqueColor.slice(0, 3), child.get('stop-opacity') * uniqueColor[3] * gOpacity];
         }
         let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
@@ -1518,24 +1518,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 inOrder = (spread !== 'reflect' || (n - nBefore) % 2 === 0);
             for (let i = 0; i < children.length; i++) {
               let child = children[inOrder ? i : children.length - 1 - i],
-                  color = child.get('stop-color');
-              if (color === 'none') {color = [255, 255, 255, 0];}
-              let opacity = color[3] * child.get('stop-opacity') * gOpacity;
-              if (opacity < 1) {
+                  stopColor = child.get('stop-color');
+              if (stopColor === 'none') {stopColor = [255, 255, 255, 0];}
+              let stopOpacity = stopColor[3] * child.get('stop-opacity') * gOpacity;
+              if (stopOpacity < 1) {
                 if (isMask) {
-                  color[0] *= opacity;
-                  color[1] *= opacity;
-                  color[2] *= opacity;
-                  opacity = 1;
+                  stopColor[0] *= stopOpacity;
+                  stopColor[1] *= stopOpacity;
+                  stopColor[2] *= stopOpacity;
+                  stopOpacity = 1;
                 }
               }
               offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
               if (i === 0 && offset > 0) {
-                grad.stop((n + 0) / nTotal, color.slice(0, 3), opacity);
+                grad.stop((n + 0) / nTotal, stopColor.slice(0, 3), stopOpacity);
               }
-              grad.stop((n + offset) / (nAfter + nBefore + 1), color.slice(0, 3), opacity);
+              grad.stop((n + offset) / (nAfter + nBefore + 1), stopColor.slice(0, 3), stopOpacity);
               if (i === children.length - 1 && offset < 1) {
-                grad.stop((n + 1) / nTotal, color.slice(0, 3), opacity);
+                grad.stop((n + 1) / nTotal, stopColor.slice(0, 3), stopOpacity);
               }
             }
           }
