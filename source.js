@@ -291,6 +291,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return result;
     }
+    function transformBBox(bbox, m) {
+      return [m[0] * bbox[0] + m[2] * bbox[1] + m[4],   m[1] * bbox[0] + m[3] * bbox[1] + m[5],
+              m[0] * bbox[2] + m[2] * bbox[3] + m[4],   m[1] * bbox[2] + m[3] * bbox[3] + m[5]];
+    }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
@@ -1433,50 +1437,84 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
+            spread = this.attr('spreadMethod'),
             grad,
-            offset = 0;
-        if (this.name === 'linearGradient') {
-          let x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0),
-              x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 1 : this.getVWidth())),
-              y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0),
-              y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
-          grad = doc.linearGradient(x1, y1, x2, y2);
-        } else {
-          let x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 0.5 : 0.5 * this.getVWidth())),
-              y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), (bBoxUnits ? 0.5 : 0.5 * this.getVHeight())),
-              r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), (bBoxUnits ? 0.5 : 0.5 * this.getViewport())),
-              x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2),
-              y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
-          x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
-          y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
-          grad = doc.radialGradient(x1, y1, 0, x2, y2, r2);
-        }
-        for (let i = 0; i < children.length; i++) {
-          let child = children[i],
-              color = child.get('stop-color');
-          if (color === 'none') {color = [255, 255, 255, 0];}
-          let opacity = color[3] * child.get('stop-opacity') * gOpacity;
-          if (opacity < 1) {
-            if (isMask) {
-              color[0] *= opacity;
-              color[1] *= opacity;
-              color[2] *= opacity;
-              opacity = 1;
-            }
-          }
-          offset = Math.max(offset, child.getPercent('offset', 0));
-          if (i === 0 && offset > 0) {
-            grad.stop(0, color.slice(0, 3), opacity);
-          }
-          grad.stop(offset, color.slice(0, 3), opacity);
-          if (i === children.length - 1 && offset < 1) {
-            grad.stop(1, color.slice(0, 3), opacity);
-          }
-        }
+            x1, x2, y1, y2, r2,
+            nAfter = 0,
+            nBefore = 0,
+            nTotal = 1;
         if (bBoxUnits) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
         if (matrix = validateMatrix(matrix)) {
+          if (this.name === 'linearGradient') {
+            x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0);
+            x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 1 : this.getVWidth()));
+            y1 = this.getLength('y1', (bBoxUnits ? 1 : this.getVHeight()), 0);
+            y2 = this.getLength('y2', (bBoxUnits ? 1 : this.getVHeight()), 0);
+          } else {
+            x2 = this.getLength('cx', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 0.5 : 0.5 * this.getVWidth()));
+            y2 = this.getLength('cy', (bBoxUnits ? 1 : this.getVHeight()), (bBoxUnits ? 0.5 : 0.5 * this.getVHeight()));
+            r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), (bBoxUnits ? 0.5 : 0.5 * this.getViewport()));
+            x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2);
+            y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
+            x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
+            y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
+          }
+          if (spread === 'reflect' || spread === 'repeat') {
+            var tbbox = transformBBox(bBox, inverseMatrix(matrix));
+            if (this.name === 'linearGradient') {
+              nAfter  = Math.max((tbbox[0] - x2) * (x2 - x1) + (tbbox[1] - y2) * (y2 - y1),
+                                 (tbbox[0] - x2) * (x2 - x1) + (tbbox[3] - y2) * (y2 - y1),
+                                 (tbbox[2] - x2) * (x2 - x1) + (tbbox[1] - y2) * (y2 - y1),
+                                 (tbbox[2] - x2) * (x2 - x1) + (tbbox[3] - y2) * (y2 - y1))
+                                   / ((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+              nBefore = Math.max((tbbox[0] - x1) * (x1 - x2) + (tbbox[1] - y1) * (y1 - y2),
+                                 (tbbox[0] - x1) * (x1 - x2) + (tbbox[3] - y1) * (y1 - y2),
+                                 (tbbox[2] - x1) * (x1 - x2) + (tbbox[1] - y1) * (y1 - y2),
+                                 (tbbox[2] - x1) * (x1 - x2) + (tbbox[3] - y1) * (y1 - y2))
+                                   / ((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+            } else {
+              nAfter  = Math.sqrt(Math.max(Math.pow(tbbox[0] - x2, 2) + Math.pow(tbbox[1] - y2, 2),
+                                           Math.pow(tbbox[0] - x2, 2) + Math.pow(tbbox[3] - y2, 2),
+                                           Math.pow(tbbox[2] - x2, 2) + Math.pow(tbbox[1] - y2, 2),
+                                           Math.pow(tbbox[2] - x2, 2) + Math.pow(tbbox[3] - y2, 2))) / r2;
+            }
+            nAfter = Math.ceil(nAfter);
+            nBefore = Math.ceil(nBefore);
+            nTotal = nBefore + 1 + nAfter;
+          }
+          if (this.name === 'linearGradient') {
+            grad = doc.linearGradient(x1 - nBefore * (x2 - x1), y1 - nBefore * (y2 - y1), x2 + nAfter * (x2 - x1), y2 + nAfter * (y2 - y1));
+          } else {
+            grad = doc.radialGradient(x1, y1, 0, x2, y2, r2 + nAfter * r2);
+          }
+          for (let n = 0; n < nTotal; n++) {
+            let offset = 0,
+                inOrder = (spread !== 'reflect' || (n - nBefore) % 2 === 0);
+            for (let i = 0; i < children.length; i++) {
+              let child = children[inOrder ? i : children.length - 1 - i],
+                  color = child.get('stop-color');
+              if (color === 'none') {color = [255, 255, 255, 0];}
+              let opacity = color[3] * child.get('stop-opacity') * gOpacity;
+              if (opacity < 1) {
+                if (isMask) {
+                  color[0] *= opacity;
+                  color[1] *= opacity;
+                  color[2] *= opacity;
+                  opacity = 1;
+                }
+              }
+              offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
+              if (i === 0 && offset > 0) {
+                grad.stop((n + 0) / nTotal, color.slice(0, 3), opacity);
+              }
+              grad.stop((n + offset) / (nAfter + nBefore + 1), color.slice(0, 3), opacity);
+              if (i === children.length - 1 && offset < 1) {
+                grad.stop((n + 1) / nTotal, color.slice(0, 3), opacity);
+              }
+            }
+          }
           grad.setTransform.apply(grad, matrix);
           return [grad, 1];
         } else {
