@@ -67,7 +67,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         Matrix: multiplyMatrix(doc._ctm, pattern.matrix),
         Resources: {
           ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
-          XObject: {[pattern.group.name]: pattern.group.xobj}
+          XObject: (function() {let temp = {}; temp[pattern.group.name] = pattern.group.xobj; return temp;})()
         }
       });
       ref.write('/' + pattern.group.name + ' Do');
