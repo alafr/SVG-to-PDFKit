@@ -1278,6 +1278,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
       if (this.isOuterElement && preserveAspectRatio) {
+        x = y = 0;
         width = viewportWidth;
         height = viewportHeight;
         aspectRatio = preserveAspectRatio;
