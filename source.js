@@ -796,6 +796,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElem = function(obj, inherits) {
       switch (obj.nodeName) {
         case 'use': if (this instanceof SvgElemUse) {break;} else {return new SvgElemUse(obj, inherits);}
+        case 'symbol': if (this instanceof SvgElemSymbol) {break;} else {return new SvgElemSymbol(obj, inherits);}
         case 'g': if (this instanceof SvgElemGroup) {break;} else {return new SvgElemGroup(obj, inherits);}
         case 'a': if (this instanceof SvgElemLink) {break;} else {return new SvgElemLink(obj, inherits);}
         case 'svg': if (this instanceof SvgElemSvg) {break;} else {return new SvgElemSvg(obj, inherits);}
@@ -1179,15 +1180,40 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemUse = function(obj, inherits) {
+    var SvgElemContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
+      SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
+      this.beforeDrawing = function() {};
+      this.afterDrawing = function() {};
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        this.beforeDrawing();
+        this.transform();
+        this.clip();
+        let masked = this.mask(), group;
+        if ((this.get('opacity') < 1 || masked) && !isClip) {
+          group = docBeginGroup();
+        }
+        this.drawChildren(isClip, isMask);
+        if (group) {
+          docEndGroup(group);
+          doc.fillOpacity(this.get('opacity'));
+          docInsertGroup(group);
+        }
+        this.afterDrawing();
+        doc.restore();
+      };
+    };
+
+    var SvgElemUse = function(obj, inherits) {
+      SvgElemContainer.call(this, obj, inherits);
       let x = this.getLength('x', this.getVWidth(), 0),
           y = this.getLength('y', this.getVHeight(), 0),
           child = this.getUrl('href') || this.getUrl('xlink:href');
       if (child) {child = new SvgElem(child, this);}
       this.getChildren  = function() {
-        return [child];
+        return child ? [child] : [];
       };
       this.getTransformation = function() {
         return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
@@ -1198,89 +1224,61 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return new SvgShape();
       };
-      this.drawInDocument = function(isClip, isMask) {
-        if (child && typeof child.drawInDocument === 'function' && child.get('display') !== 'none') {
-          doc.save();
-          this.transform();
-          this.clip();
-          let masked = this.mask(), group;
-          if ((this.get('opacity') < 1 || masked) && !isClip) {
-            group = docBeginGroup();
-          }
-          child.drawInDocument(isClip, isMask);
-          if (group) {
-            docEndGroup(group);
-            doc.fillOpacity(this.get('opacity'));
-            docInsertGroup(group);
-          }
-          doc.restore();
-        }
+    };
+
+    var SvgElemSymbol = function(obj, inherits) {
+      SvgElemContainer.call(this, obj, inherits);
+      let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
+          height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight());
+      if (inherits instanceof SvgElemUse) {
+        width = inherits.getLength('width', inherits.getParentVWidth(), width);
+        height = inherits.getLength('height', inherits.getParentVHeight(), height);
+      }
+      let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+          viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
+      this.getVWidth = function() {
+        return viewBox[2];
+      };
+      this.getVHeight = function() {
+        return viewBox[3];
+      };
+      this.getTransformation = function() {
+        return multiplyMatrix(parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]), [1, 0, 0, 1, -viewBox[0], -viewBox[1]]);
       };
     };
 
     var SvgElemGroup = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemContainer.call(this, obj, inherits);
       this.getTransformation = function() {
         return this.get('transform');
-      };
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
-        this.transform();
-        this.clip();
-        let masked = this.mask(), group;
-        if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = docBeginGroup();
-        }
-        this.drawChildren(isClip, isMask);
-        if (group) {
-          docEndGroup(group);
-          doc.fillOpacity(this.get('opacity'));
-          docInsertGroup(group);
-        }
-        doc.restore();
       };
     };
 
     var SvgElemLink = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemContainer.call(this, obj, inherits);
       let link = this.attr('href') || this.attr('xlink:href');
       this.getTransformation = function() {
         return this.get('transform');
       };
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
-        this.transform();
-        this.clip();
-        let masked = this.mask(), group;
-        if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = docBeginGroup();
-        }
-        if (link) {warningMessage('SVGElemLink: links are not supported');}
-        this.drawChildren(isClip, isMask);
-        if (group) {
-          docEndGroup(group);
-          doc.fillOpacity(this.get('opacity'));
-          docInsertGroup(group);
-        }
-        doc.restore();
+      this.beforeDrawing = function() {
+        if (link && this.getChildren().length) {warningMessage('SVGElemLink: links are not supported');}
       };
     };
 
     var SvgElemSvg = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemContainer.call(this, obj, inherits);
       let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
-          aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
-          viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
           x = this.getLength('x', this.getParentVWidth(), 0),
           y = this.getLength('y', this.getParentVHeight(), 0);
+      if (inherits instanceof SvgElemUse) {
+        width = inherits.getLength('width', inherits.getParentVWidth(), width);
+        height = inherits.getLength('height', inherits.getParentVHeight(), height);
+      }
+      let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+          viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
       if (this.isOuterElement && preserveAspectRatio) {
+        x = y = 0;
         width = viewportWidth;
         height = viewportHeight;
         aspectRatio = preserveAspectRatio;
@@ -1298,24 +1296,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
         );
       };
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
+      this.beforeDrawing = function() {
         if (this.get('overflow') === 'hidden') {
           doc.rect(x, y, width, height).clip();
         }
-        this.transform();
-        this.clip();
-        let masked = this.mask(), group;
-        if ((this.get('opacity') < 1 || masked) && !isClip) {
-          group = docBeginGroup();
-        }
-        this.drawChildren(isClip, isMask);
-        if (group) {
-          docEndGroup(group);
-          doc.fillOpacity(this.get('opacity'));
-          docInsertGroup(group);
-        }
-        doc.restore();
       };
     };
 

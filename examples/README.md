@@ -23,9 +23,9 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 28 | 12.2% |
-| Passed tests | 201 | 87.8% |
-| **Total tests** | **229** |  |
+|	Failed tests	| 26 | 11.7% |
+| Passed tests | 197 | 88.3% |
+| **Total tests** | **223** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
@@ -36,8 +36,6 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	pservers-grad-20-b.svg	|	Gradient fallback	|
 |	pservers-pattern-03-f.svg	|	Pattern fallback	|
 |	pservers-pattern-09-f.svg	|	Pattern fallback	|
-|	struct-symbol-01-b.svg	|	Symbol	|
-|	struct-use-09-b.svg	|	Symbol	|
 |	text-align-05-b.svg	|	Vertical text	|
 |	text-align-06-b.svg	|	Vertical text	|
 |	text-align-07-t.svg	|	Unicode	|
