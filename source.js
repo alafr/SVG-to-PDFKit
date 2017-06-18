@@ -1379,28 +1379,46 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemPattern = function(obj, inherits, bBox, gOpacity) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
-          bBoxUnitsContent = (this.attr('patternContentUnits') === 'objectBoundingBox'),
-          matrix = parseTranform(this.attr('patternTransform')),
-          x = this.getLength('x', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
-          y = this.getLength('y', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0),
-          width = this.getLength('width', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
-          height = this.getLength('height', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0),
-          viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
-          aspectRatio = (this.attr('preserveAspectRatio') || '').trim();
-      if (bBoxUnitsContent && !bBoxUnitsPattern) { // Use the same units for pattern & pattern content
-        x = (x - bBox[0]) / (bBox[2] - bBox[0]) || 0;
-        y = (y - bBox[1]) / (bBox[3] - bBox[1]) || 0;
-        width = width / (bBox[2] - bBox[0]) || 0;
-        height = height / (bBox[3] - bBox[1]) || 0;
-      } else if (!bBoxUnitsContent && bBoxUnitsPattern) {
-        x = bBox[0] + x * (bBox[2] - bBox[0]);
-        y = bBox[1] + y * (bBox[3] - bBox[1]);
-        width = width * (bBox[2] - bBox[0]);
-        height = height * (bBox[3] - bBox[1]);
-      }
+      this.ref = (function() {
+        let ref = this.getUrl('href') || this.getUrl('xlink:href');
+        if (ref && ref.nodeName === obj.nodeName) {
+          return new SvgElemPattern(ref, inherits, bBox, gOpacity);
+        }
+      }).call(this);
+      let _attr = this.attr;
+      this.attr = function(key) {
+        let attr = _attr.call(this, key);
+        if (attr !== null || key === 'href' || key === 'xlink:href') {return attr;}
+        return this.ref ? this.ref.attr(key) : null;
+      };
+      let _getChildren = this.getChildren;
+      this.getChildren = function() {
+        let children = _getChildren.call(this);
+        if (children.length > 0) {return children;}
+        return this.ref ? this.ref.getChildren() : [];
+      };
       this.getPattern = function(isClip, isMask) {
-        let aspectRatioMatrix = parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0);
+        let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
+            bBoxUnitsContent = (this.attr('patternContentUnits') === 'objectBoundingBox'),
+            x = this.getLength('x', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
+            y = this.getLength('y', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0),
+            width = this.getLength('width', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
+            height = this.getLength('height', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0);
+        if (bBoxUnitsContent && !bBoxUnitsPattern) { // Use the same units for pattern & pattern content
+          x = (x - bBox[0]) / (bBox[2] - bBox[0]) || 0;
+          y = (y - bBox[1]) / (bBox[3] - bBox[1]) || 0;
+          width = width / (bBox[2] - bBox[0]) || 0;
+          height = height / (bBox[3] - bBox[1]) || 0;
+        } else if (!bBoxUnitsContent && bBoxUnitsPattern) {
+          x = bBox[0] + x * (bBox[2] - bBox[0]);
+          y = bBox[1] + y * (bBox[3] - bBox[1]);
+          width = width * (bBox[2] - bBox[0]);
+          height = height * (bBox[3] - bBox[1]);
+        }
+        let viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
+            aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+            aspectRatioMatrix = parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0),
+            matrix = parseTranform(this.attr('patternTransform'));
         if (bBoxUnitsContent) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
@@ -1416,10 +1434,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.getVWidth = function() {
-        return viewBox[2];
+        let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
+            width = this.getLength('width', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0);
+        return this.getViewbox('viewBox', [0, 0, width, 0])[2];
       };
       this.getVHeight = function() {
-        return viewBox[3];
+        let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
+            height = this.getLength('height', (bBoxUnitsPattern ? 1 : this.getParentVHeight()), 0);
+        return this.getViewbox('viewBox', [0, 0, 0, height])[3];
       };
     };
 
