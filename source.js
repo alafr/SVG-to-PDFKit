@@ -1426,6 +1426,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemGradient = function(obj, inherits, bBox, gOpacity) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
+      this.ref = (function() {
+        let ref = this.getUrl('href') || this.getUrl('xlink:href');
+        if (ref && ref.nodeName === obj.nodeName) {
+          return new SvgElemGradient(ref, inherits, bBox, gOpacity);
+        }
+      }).call(this);
+      let _attr = this.attr;
+      this.attr = function(key) {
+        let attr = _attr.call(this, key);
+        if (attr !== null || key === 'href' || key === 'xlink:href') {return attr;}
+        return this.ref ? this.ref.attr(key) : null;
+      };
+      let _getChildren = this.getChildren;
+      this.getChildren = function() {
+        let children = _getChildren.call(this);
+        if (children.length > 0) {return children;}
+        return this.ref ? this.ref.getChildren() : [];
+      };
       this.getGradient = function(isClip, isMask) {
         let children = this.getChildren();
         if (children.length === 0) {return;}
@@ -1482,7 +1500,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             }
             nAfter = Math.ceil(nAfter);
             nBefore = Math.ceil(nBefore);
-            nTotal = nBefore + 1 + nAfter;
+            nTotal = nBefore + 1 + nAfter; // How many times the gradient needs to be repeated to fill the object bounding box
           }
           if (this.name === 'linearGradient') {
             grad = doc.linearGradient(x1 - nBefore * (x2 - x1), y1 - nBefore * (y2 - y1), x2 + nAfter * (x2 - x1), y2 + nAfter * (y2 - y1));
