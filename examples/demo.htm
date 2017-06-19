@@ -22,7 +22,7 @@ function createPdf() {
   if (textarea.value) { // Use the SVG code in the textarea
     if (document.getElementById('use-css').checked) {
       let hiddenDiv = document.getElementById('hidden-div');
-      hiddenDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' + textarea.value + '</svg>';
+      hiddenDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' + textarea.value.trim() + '</svg>';
       SVGtoPDF(doc, hiddenDiv.firstChild, 0, 0, {useCSS:true});
     } else {
       SVGtoPDF(doc, textarea.value, 0, 0);
