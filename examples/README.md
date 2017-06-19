@@ -23,8 +23,8 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 26 | 11.7% |
-| Passed tests | 197 | 88.3% |
+|	Failed tests	| 22 | 9.9% |
+| Passed tests | 201 | 90.1% |
 | **Total tests** | **223** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
@@ -32,10 +32,6 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	Failed tests	|	Comment	|
 |	---	|	---	|
 |	paths-data-20-f.svg	|	Special case in arcTo path	|
-|	pservers-grad-17-b.svg	|	Gradient fallback	|
-|	pservers-grad-20-b.svg	|	Gradient fallback	|
-|	pservers-pattern-03-f.svg	|	Pattern fallback	|
-|	pservers-pattern-09-f.svg	|	Pattern fallback	|
 |	text-align-05-b.svg	|	Vertical text	|
 |	text-align-06-b.svg	|	Vertical text	|
 |	text-align-07-t.svg	|	Unicode	|
@@ -76,7 +72,9 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	pservers-grad-14-b.svg	|	PDFjs bug	|
 |	pservers-grad-15-b.svg	|	PDFjs bug	|
 |	pservers-grad-16-b.svg	|	PDFjs bug	|
+|	pservers-grad-17-b.svg	|	PDFjs bug	|
 |	pservers-grad-18-b.svg	|	PDFjs bug	|
+|	pservers-grad-20-b.svg	|	PDFjs bug	|
 |	pservers-grad-21-b.svg	|	Chrome bug + PDFjs bug	|
 |	pservers-grad-22-b.svg	|	PDFjs bug	|
 |	pservers-pattern-01-b.svg	|	PDFjs bug	|
