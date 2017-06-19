@@ -456,6 +456,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let t = (i - (l2 - l) / (l2 - l1)) / divisions,
                   x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
                   dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
+              if (dx === 0 && dy === 0 && (t === 0 || t === 1)) {
+                dx = c2x - c1x;
+                dy = c2y - c1y;
+              }
               return [x, y, Math.atan2(dy, dx)];
             }
           }
@@ -1614,20 +1618,25 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               doc.stroke();
             }
           }
-          let markersPos = this.shape.getMarkers();
-          if (this.get('marker-start') !== 'none') {
-            let marker = new SvgElemMarker(this.get('marker-start'), null, markersPos[0], this.get('stroke-width'));
-            marker.drawInDocument();
-          }
-          if (this.get('marker-mid') !== 'none') {
-            for (let i = 1; i < markersPos.length - 1; i++) {
-              let marker = new SvgElemMarker(this.get('marker-mid'), null, markersPos[i], this.get('stroke-width'));
+          let markerStart = this.get('marker-start'),
+              markerMid = this.get('marker-mid'),
+              markerEnd = this.get('marker-end');
+          if (markerStart !== 'none' || markerMid !== 'none' || markerEnd !== 'none') {
+            let markersPos = this.shape.getMarkers();
+            if (markerStart !== 'none') {
+              let marker = new SvgElemMarker(markerStart, null, markersPos[0], this.get('stroke-width'));
               marker.drawInDocument();
             }
-          }
-          if (this.get('marker-end') !== 'none') {
-            let marker = new SvgElemMarker(this.get('marker-end'), null, markersPos[markersPos.length - 1], this.get('stroke-width'));
-            marker.drawInDocument();
+            if (markerMid !== 'none') {
+              for (let i = 1; i < markersPos.length - 1; i++) {
+                let marker = new SvgElemMarker(markerMid, null, markersPos[i], this.get('stroke-width'));
+                marker.drawInDocument();
+              }
+            }
+            if (markerEnd !== 'none') {
+              let marker = new SvgElemMarker(markerEnd, null, markersPos[markersPos.length - 1], this.get('stroke-width'));
+              marker.drawInDocument();
+            }
           }
           if (group) {
             docEndGroup(group);
