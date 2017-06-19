@@ -1635,17 +1635,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             let markersPos = this.shape.getMarkers();
             if (markerStart !== 'none') {
               let marker = new SvgElemMarker(markerStart, null, markersPos[0], this.get('stroke-width'));
-              marker.drawInDocument();
+              marker.drawInDocument(false, isMask);
             }
             if (markerMid !== 'none') {
               for (let i = 1; i < markersPos.length - 1; i++) {
                 let marker = new SvgElemMarker(markerMid, null, markersPos[i], this.get('stroke-width'));
-                marker.drawInDocument();
+                marker.drawInDocument(false, isMask);
               }
             }
             if (markerEnd !== 'none') {
               let marker = new SvgElemMarker(markerEnd, null, markersPos[markersPos.length - 1], this.get('stroke-width'));
-              marker.drawInDocument();
+              marker.drawInDocument(false, isMask);
             }
           }
           if (group) {
