@@ -858,6 +858,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else {
             warningMessage('SVGtoPDF: loop of circular references for id "' + id + '"');
           }
+          return null;
         }
       };
       this.computeLength = function(value, percent, initial) {
@@ -928,111 +929,118 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           result = keyInfo.values[value];
           if (result != null) {return cache[key] = result;}
         }
-        switch (key) {
-          case 'font-size':
-            result = (function() {
-              let parsed = this.parseLength(value);
-              if (parsed) {
-                if (parsed.unit === '%' || parsed.unit === 'em' || parsed.unit === 'ex') {
-                  let parentValue = (this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
-                  if (parsed.unit === '%') {return parsed.value / 100 * parentValue;}
-                  else if (parsed.unit === 'em') {return cache[key] = parsed.value * parentValue;}
-                  else if (parsed.unit === 'ex') {return cache[key] = parsed.value / 2 * parentValue;}
+        if (value !== null && value !== undefined) {
+          switch (key) {
+            case 'font-size':
+              result = (function() {
+                let parsed = this.parseLength(value);
+                if (parsed) {
+                  if (parsed.unit === '%' || parsed.unit === 'em' || parsed.unit === 'ex') {
+                    let parentValue = (this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
+                    if (parsed.unit === '%') {return parsed.value / 100 * parentValue;}
+                    else if (parsed.unit === 'em') {return cache[key] = parsed.value * parentValue;}
+                    else if (parsed.unit === 'ex') {return cache[key] = parsed.value / 2 * parentValue;}
+                  }
+                  return this.computeUnits(parsed.value, parsed.unit, this.getViewport());
                 }
-                return this.computeUnits(parsed.value, parsed.unit, this.getViewport());
-              }
-            }).call(this);
-            break;
-          case 'baseline-shift':
-            result = this.computeLength(value, this.get('font-size'));
-            break;
-          case 'font-family':
-            result = value || undefined;
-            break;
-          case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
-            result = (function() {
-              let parsed = parseFloat(value);
-              if (!isNaN(parsed)) {
-                return Math.max(0, Math.min(1, parsed));
-              }
-            }).call(this);
-            break;
-          case 'transform':
-            result = parseTranform(value);
-            break;
-          case 'stroke-dasharray':
-            result = (function() {
-              if (value === 'none') {return [];}
-              let dasharray = this.computeLengthList(value, this.getViewport()),
-                  sum = 0;
-              for (let j = 0; j < dasharray.length; j++) {
-                if (dasharray[j] < 0) {return;}
-                sum += dasharray[j];
-              }
-              return (sum === 0 ? [] : dasharray);
-            }).call(this);
-            break;
-          case 'color':
-            result = (function() {
-              if (value === 'none' || value === 'transparent') {return 'none';}
-              return parseColor(value);
-            }).call(this);
-            break;
-          case 'fill': case 'stroke':
-            result = (function() {
-              if (value === 'none' || value === 'transparent') {return 'none';}
-              if (value === 'currentColor') {return this.get('color');}
-              let color = parseColor(value);
-              if (color) {return color;}
-              let ref = this.resolveUrl(value);
-              if (ref) { // TODO implement fallback syntax : <funciri> <color>
-                if (ref.nodeName === 'linearGradient' || ref.nodeName === 'radialGradient' || ref.nodeName === 'pattern') {
-                  return ref;
+              }).call(this);
+              break;
+            case 'baseline-shift':
+              result = this.computeLength(value, this.get('font-size'));
+              break;
+            case 'font-family':
+              result = value || undefined;
+              break;
+            case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
+              result = (function() {
+                let parsed = parseFloat(value);
+                if (!isNaN(parsed)) {
+                  return Math.max(0, Math.min(1, parsed));
                 }
-                return 'none';
-              }
-            }).call(this);
-            break;
-          case 'stop-color':
-            result = (function() {
-              if (value === 'none' || value === 'transparent') {return 'none';}
-              if (value === 'currentColor') {return this.get('color');}
-              return parseColor(value);
-            }).call(this);
-            break;
-          case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
-            result = (function() {
-              if (value === 'none') {return 'none';}
-              return this.resolveUrl(value);
-            }).call(this);
-            break;
-          case 'stroke-width':
-            result = (function() {
-              let parsed = this.computeLength(value, this.getViewport());
-              if (parsed != null && parsed >= 0) {return parsed;}
-            }).call(this);
-            break;
-          case 'stroke-miterlimit':
-            result = (function() {
-              let parsed = parseFloat(value);
-              if (parsed != null && parsed >= 1) {return parsed;}
-            }).call(this);
-            break;
-          case 'word-spacing': case 'letter-spacing':
-            result = this.computeLength(value, this.getViewport());
-            break;
-          case 'stroke-dashoffset':
-            result = (function() {
-              let result = this.computeLength(value, this.getViewport());
-              if (result != null) {
-                if (result < 0) { // fix for crbug.com/660850
-                  let dasharray = this.get('stroke-dasharray');
-                  for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
+              }).call(this);
+              break;
+            case 'transform':
+              result = parseTranform(value);
+              break;
+            case 'stroke-dasharray':
+              result = (function() {
+                if (value === 'none') {return [];}
+                let dasharray = this.computeLengthList(value, this.getViewport()),
+                    sum = 0;
+                for (let j = 0; j < dasharray.length; j++) {
+                  if (dasharray[j] < 0) {return;}
+                  sum += dasharray[j];
                 }
-                return result;
-              }
-            }).call(this);
-            break;
+                return (sum === 0 ? [] : dasharray);
+              }).call(this);
+              break;
+            case 'color':
+              result = (function() {
+                if (value === 'none' || value === 'transparent') {return 'none';}
+                return parseColor(value);
+              }).call(this);
+              break;
+            case 'fill': case 'stroke':
+              result = (function() {
+                if (value === 'none' || value === 'transparent') {return 'none';}
+                if (value === 'currentColor') {return this.get('color');}
+                let color = parseColor(value);
+                if (color) {return color;}
+                value = (value || '').split(' ');
+                let object = this.resolveUrl(value[0]),
+                    fallbackColor = parseColor(value[1]);
+                if (object === undefined) {return;}           // resolveUrl() returns undefined if the string has not a correct url syntax
+                if (object === null) {return fallbackColor;}  // and it returns null if the syntax looks good but the element was not found
+                if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
+                  return new SvgElemGradient(object, null, fallbackColor);
+                }
+                if (object.nodeName === 'pattern') {
+                  return new SvgElemPattern(object, null, fallbackColor);
+                }
+                return fallbackColor;
+              }).call(this);
+              break;
+            case 'stop-color':
+              result = (function() {
+                if (value === 'none' || value === 'transparent') {return 'none';}
+                if (value === 'currentColor') {return this.get('color');}
+                return parseColor(value);
+              }).call(this);
+              break;
+            case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
+              result = (function() {
+                if (value === 'none') {return 'none';}
+                return this.resolveUrl(value);
+              }).call(this);
+              break;
+            case 'stroke-width':
+              result = (function() {
+                let parsed = this.computeLength(value, this.getViewport());
+                if (parsed != null && parsed >= 0) {return parsed;}
+              }).call(this);
+              break;
+            case 'stroke-miterlimit':
+              result = (function() {
+                let parsed = parseFloat(value);
+                if (parsed != null && parsed >= 1) {return parsed;}
+              }).call(this);
+              break;
+            case 'word-spacing': case 'letter-spacing':
+              result = this.computeLength(value, this.getViewport());
+              break;
+            case 'stroke-dashoffset':
+              result = (function() {
+                let result = this.computeLength(value, this.getViewport());
+                if (result != null) {
+                  if (result < 0) { // fix for crbug.com/660850
+                    let dasharray = this.get('stroke-dasharray');
+                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
+                  }
+                  return result;
+                }
+              }).call(this);
+              break;
+          }
         }
         if (result != null) {return cache[key] = result;}
         return cache[key] = (keyInfo.inherit && this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
@@ -1127,10 +1135,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             fill = this.get('fill'),
             fillOpacity = this.get('fill-opacity');
         if (fill !== 'none' && opacity && fillOpacity) {
-          if (fill.nodeName === 'linearGradient' || fill.nodeName === 'radialGradient') {
-            return new SvgElemGradient(fill, null, this.getBoundingBox(), fillOpacity * opacity).getGradient(isClip, isMask);
-          } else if (fill.nodeName === 'pattern') {
-            return new SvgElemPattern(fill, null, this.getBoundingBox(), fillOpacity * opacity).getPattern(isClip, isMask);
+          if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
+            return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
           }
           return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
         }
@@ -1140,10 +1146,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             stroke = this.get('stroke'),
             strokeOpacity = this.get('stroke-opacity');
         if (stroke !== 'none' && opacity && strokeOpacity) {
-          if (stroke.nodeName === 'linearGradient' || stroke.nodeName === 'radialGradient') {
-            return new SvgElemGradient(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getGradient(isClip, isMask);
-          } else if (stroke.nodeName === 'pattern') {
-            return new SvgElemPattern(stroke, null, this.getBoundingBox(), strokeOpacity * opacity).getPattern(isClip, isMask);
+          if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
+            return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
           }
           return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
         }
@@ -1360,13 +1364,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemPattern = function(obj, inherits, bBox, gOpacity) {
+    var SvgElemPattern = function(obj, inherits, fallback) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       this.ref = (function() {
         let ref = this.getUrl('href') || this.getUrl('xlink:href');
         if (ref && ref.nodeName === obj.nodeName) {
-          return new SvgElemPattern(ref, inherits, bBox, gOpacity);
+          return new SvgElemPattern(ref, inherits, fallback);
         }
       }).call(this);
       let _attr = this.attr;
@@ -1381,7 +1385,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (children.length > 0) {return children;}
         return this.ref ? this.ref.getChildren() : [];
       };
-      this.getPattern = function(isClip, isMask) {
+      this.getPaint = function(bBox, gOpacity, isClip, isMask) {
         let bBoxUnitsPattern = (this.attr('patternUnits') !== 'userSpaceOnUse'),
             bBoxUnitsContent = (this.attr('patternContentUnits') === 'objectBoundingBox'),
             x = this.getLength('x', (bBoxUnitsPattern ? 1 : this.getParentVWidth()), 0),
@@ -1406,15 +1410,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (bBoxUnitsContent) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
-        matrix = multiplyMatrix(matrix, [1, 0, 0, 1, x, y])
-        if ((matrix = validateMatrix(matrix)) && (width = validateNumber(width)) && (height = validateNumber(height))) {
+        matrix = multiplyMatrix(matrix, [1, 0, 0, 1, x, y]);
+        if ((matrix = validateMatrix(matrix)) && (aspectRatioMatrix = validateMatrix(aspectRatioMatrix)) && (width = validateNumber(width)) && (height = validateNumber(height))) {
           let group = docBeginGroup();
           doc.transform.apply(doc, aspectRatioMatrix);
           this.drawChildren(isClip, isMask);
           docEndGroup(group);
           return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
         } else {
-          return;
+          return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
         }
       };
       this.getVWidth = function() {
@@ -1429,13 +1433,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemGradient = function(obj, inherits, bBox, gOpacity) {
+    var SvgElemGradient = function(obj, inherits, fallback) {
       SvgElem.call(this, obj, inherits);
       this.allowedChildren = ['stop'];
       this.ref = (function() {
         let ref = this.getUrl('href') || this.getUrl('xlink:href');
         if (ref && ref.nodeName === obj.nodeName) {
-          return new SvgElemGradient(ref, inherits, bBox, gOpacity);
+          return new SvgElemGradient(ref, inherits, fallback);
         }
       }).call(this);
       let _attr = this.attr;
@@ -1450,7 +1454,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (children.length > 0) {return children;}
         return this.ref ? this.ref.getChildren() : [];
       };
-      this.getGradient = function(isClip, isMask) {
+      this.getPaint = function(bBox, gOpacity, isClip, isMask) {
         let children = this.getChildren();
         if (children.length === 0) {return;}
         if (children.length === 1) {
@@ -1542,7 +1546,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           grad.setTransform.apply(grad, matrix);
           return [grad, 1];
         } else {
-          return;
+          return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
         }
       }
     };
