@@ -28,7 +28,7 @@ function createPdf() {
   }
   if (options.useCSS) {
     let hiddenDiv = document.getElementById('hidden-div');
-    hiddenDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' + textarea.value + '</svg>';
+    hiddenDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' + textarea.value.trim() + '</svg>';
     SVGtoPDF(doc, hiddenDiv.firstChild.firstChild, x, y, options);
   } else {
     SVGtoPDF(doc, textarea.value, x, y, options);
