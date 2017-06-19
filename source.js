@@ -302,9 +302,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function validateMatrix(m) {
       let m0 = validateNumber(m[0]), m1 = validateNumber(m[1]), m2 = validateNumber(m[2]),
           m3 = validateNumber(m[3]), m4 = validateNumber(m[4]), m5 = validateNumber(m[5]);
-      if (m0 * m3 - m1 * m2 !== 0) {
+      if (isNotEqual(m0 * m3 - m1 * m2, 0)) {
         return [m0, m1, m2, m3, m4, m5];
       }
+    }
+    function isEqual(number, ref) {
+      return Math.abs(number - ref) < 1e-10;
+    }
+    function isNotEqual(number, ref) {
+      return Math.abs(number - ref) >= 1e-10;
     }
     function validateNumber(n) {
       return n > -1e21 && n < 1e21 ? Math.round(n * 1e6) / 1e6 : 0;
@@ -389,15 +395,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var BezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
       let solveEquation = function(curve) {
         let a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
-        if (Math.abs(a) < 1e-10 && Math.abs(b) < 1e-10) {
+        if (isEqual(a, 0) && isEqual(b, 0)) {
           return [];
-        } else if (Math.abs(a) < 1e-10) {
+        } else if (isEqual(a, 0)) {
           return [(-c) / b];
         } else {
           let d = b * b - 4 * a * c;
           if (d > 0) {
             return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
-          } else if (d === 0) {
+          } else if (isEqual(d, 0)) {
             return [(-b) / (2 * a)];
           } else {
             return [];
@@ -456,7 +462,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let t = (i - (l2 - l) / (l2 - l1)) / divisions,
                   x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
                   dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
-              if (dx === 0 && dy === 0 && (t === 0 || t === 1)) {
+              if (isEqual(dx, 0) && isEqual(dy, 0) && (isEqual(t, 0) || isEqual(t, 1))) {
                 dx = c2x - c1x;
                 dy = c2y - c1y;
               }
@@ -740,7 +746,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let subPath = subPaths[i], subPathMarkers = [];
           for (let j = 0; j < subPath.pathSegments.length; j++) {
             let segment = subPath.pathSegments[j];
-            if (segment.totalLength !== 0 || j === 0 || j === subPath.pathSegments.length - 1) {
+            if (isNotEqual(segment.totalLength, 0) || j === 0 || j === subPath.pathSegments.length - 1) {
               if (segment.hasStart) {
                 let startMarker = segment.getPointAtLength(0), prevEndMarker = subPathMarkers.pop();
                 if (prevEndMarker) {startMarker[2] = 0.5 * (prevEndMarker[2] + startMarker[2]);}
@@ -1578,7 +1584,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               fill = this.getFill(isClip, isMask),
               stroke = this.getStroke(isClip, isMask);
           for (let j = 0; j < subPaths.length; j++) {
-            if (stroke && subPaths[j].totalLength === 0) {
+            if (stroke && isEqual(subPaths[j].totalLength, 0)) {
               let LineWidth = this.get('stroke-width'), LineCap = this.get('stroke-linecap');
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
                 let x = subPaths[j].boundingBox[0],
@@ -2113,7 +2119,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 pathLength = pathElem.getLength('pathLength', pathElem.getViewport(), undefined),
                 pathLengthScale = (pathElem.pathLength !== undefined ? pathComputedLength / pathElem.pathLength : 1);
             for (let j = 0; j < currentElem._pos.length; j++) {
-              if (pathLengthScale !== 1) {
+              if (isNotEqual(pathLengthScale, 1)) {
                 currentElem._pos[j].scale *= pathLengthScale;
                 currentElem._pos[j].xAdvance *= pathLengthScale;
                 currentElem._pos[j].width *= pathLengthScale;
@@ -2205,7 +2211,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                     docSetTextMode(true, false);
                   }
                   for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
-                    if (!pos[j].hidden && pos[j].width !== 0) {
+                    if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
                       let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxItalic ? -0.25 : 0);
                       docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
                       docWriteGlyph(pos[j].glyphid);
