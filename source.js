@@ -392,6 +392,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return parser.match(/^[\s\S]+/);
       };
     };
+
     var BezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
       let solveEquation = function(curve) {
         let a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
@@ -401,7 +402,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return [(-c) / b];
         } else {
           let d = b * b - 4 * a * c;
-          if (d > 0) {
+          if (isNotEqual(d, 0) && d > 0) {
             return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
           } else if (isEqual(d, 0)) {
             return [(-b) / (2 * a)];
@@ -472,6 +473,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
     };
+
     var LineSegment = function(p1x, p1y, p2x, p2y) {
       let totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
       this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
@@ -484,6 +486,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
     };
+
     var SvgPath = function(d) {
       SvgShape.call(this);
       let ArgumentsNumber = {A:7,a:7, C:6,c:6, H:1,h:1, L:2,l:2, M:2,m:2, Q:4,q:4, S:4,s:4, T:2,t:2, V:1,v:1, Z:0,z:0};
@@ -512,6 +515,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningMessage('SvgPath: unexpected string ' + temp);
       }
     };
+
     var SvgShape = function(commands) {
       let pathCommands = this.pathCommands = [], startX = 0, startY = 0, currX = 0, currY = 0, lastCom, lastCtrlX, lastCtrlY;
       if (commands && commands.length) {
