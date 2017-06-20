@@ -99,9 +99,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function docEndText() {
       return doc.addContent('ET');
     }
-    function warningMessage(str) {
-      if (typeof console !== undefined && typeof console.warn === 'function') {console.warn(str);}
-    }
     function docFillColor(color, opacity) {
       if (color.constructor.name === 'PDFPattern') {
         doc.fillOpacity(opacity);
@@ -191,7 +188,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             if (!node.attributes.hasOwnProperty(attr)) {
               node.attributes[attr] = value;
             } else {
-              warningMessage('parseXml: duplicate attribute "' + attr + '"');
+              warningCallback('parseXml: duplicate attribute "' + attr + '"');
             }
           }
           if (parser.match(/^>/)) { // End of opening tag
@@ -203,19 +200,19 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (temp[1] === node.nodeName) {
                 return node;
               } else {
-                warningMessage('parseXml: tag not matching, opening "' + node.nodeName + '" & closing "' + temp[1] + '"');
+                warningCallback('parseXml: tag not matching, opening "' + node.nodeName + '" & closing "' + temp[1] + '"');
                 node.error = true;
                 return node;
               }
             } else {
-              warningMessage('parseXml: tag not matching, opening "' + node.nodeName + '" & not closing');
+              warningCallback('parseXml: tag not matching, opening "' + node.nodeName + '" & not closing');
               node.error = true;
               return node;
             }
           } else if (parser.match(/^\/>/)) { // Self-closing tag
             return node;
           } else {
-            warningMessage('parseXml: tag could not be parsed "' + node.nodeName + '"');
+            warningCallback('parseXml: tag could not be parsed "' + node.nodeName + '"');
           }
         } else if (temp = parser.match(/^([^<]+)/, true)) { // Text node
           node = new SvgNode('#text');
@@ -224,7 +221,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       })();
       if (parser.matchAll()) {
-        warningMessage('parseXml: data after document end has been discarded');
+        warningCallback('parseXml: data after document end has been discarded');
       }
       return result;
     };
@@ -508,11 +505,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (values.length === argsNumber) {
           this[command].apply(this, values);
         } else {
-          warningMessage('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); break;
+          warningCallback('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); break;
         }
       }
       if (temp = parser.matchAll()) {
-        warningMessage('SvgPath: unexpected string ' + temp);
+        warningCallback('SvgPath: unexpected string ' + temp);
       }
     };
 
@@ -870,7 +867,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (this.getStack().indexOf(svgObj) === -1) {
             return svgObj;
           } else {
-            warningMessage('SVGtoPDF: loop of circular references for id "' + id + '"');
+            warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
           }
           return null;
         }
@@ -1279,7 +1276,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return this.get('transform');
       };
       this.beforeDrawing = function() {
-        if (link && this.getChildren().length) {warningMessage('SVGElemLink: links are not supported');}
+        if (link && this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
       };
     };
 
@@ -1333,7 +1330,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       try {
         image = doc.openImage(link);
       } catch(e) {
-        warningMessage('SVGElemImage: failed to open image "' + link + '" in PDFKit');
+        warningCallback('SVGElemImage: failed to open image "' + link + '" in PDFKit');
       }
       this.getTransformation2 = function() {
         let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
@@ -2026,7 +2023,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           try {
             doc.font(fontNameorLink);
           } catch(e) {
-            warningMessage('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit');
+            warningCallback('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit');
           }
           currentElem._pos = [];
           currentElem._index = 0;
@@ -2244,19 +2241,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     options = options || {};
-    if (typeof svg === 'string') {svg = parseXml(svg);}
-
     var assumePt = options.assumePt || false, // setting this to true disables the px to pt translation
         pxToPt = assumePt ? 1 : (72/96), // 1px = 72/96pt, but only if assumePt is false
         viewportWidth = (options.width || doc.page.width) / pxToPt,
         viewportHeight = (options.height || doc.page.height) / pxToPt,
         preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
         useCSS = options.useCSS && typeof SVGElement !== 'undefined' && svg instanceof SVGElement && typeof getComputedStyle === 'function',
+        warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback;
 
-    if (options.useCSS && !useCSS) {
-      warningMessage('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
+    if (typeof warningCallback !== 'function') {
+      warningCallback = function(str) {
+        if (typeof console !== undefined && typeof console.warn === 'function') {console.warn(str);}
+      };
     }
     if (typeof fontCallback !== 'function') {
       fontCallback = function(family, bold, italic, fontOptions) {
@@ -2283,17 +2281,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return link.replace(/\s+/g, '');
       };
     }
+
+    if (typeof svg === 'string') {svg = parseXml(svg);}
     if (svg) {
       let elem = new SvgElem(svg, null);
       if (typeof elem.drawInDocument === 'function') {
+        if (options.useCSS && !useCSS) {
+          warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
+        }
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
         elem.drawInDocument();
         doc.restore();
       } else {
-        warningMessage('SVGtoPDF: this element can\'t be rendered directly: ' + svg.nodeName);
+        warningCallback('SVGtoPDF: this element can\'t be rendered directly: ' + svg.nodeName);
       }
     } else {
-      warningMessage('SVGtoPDF: the input does not look like a valid SVG');
+      warningCallback('SVGtoPDF: the input does not look like a valid SVG');
     }
 
 };
