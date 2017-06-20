@@ -26,6 +26,7 @@ Insert SVG into a PDF document created with PDFKit.
       - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
       - fontCallback [function] = function called to get the fonts, see source code
       - imageCallback [function] = same as above for the images (for Node.js)
+      - warningCallback [function] = function called when there is a warning
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
 
 #### Demos:
