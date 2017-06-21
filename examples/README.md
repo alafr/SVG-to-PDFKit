@@ -23,9 +23,9 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 22 | 9.9% |
-| Passed tests | 201 | 90.1% |
-| **Total tests** | **223** |  |
+|	Failed tests	| 22 | 9.8% |
+| Passed tests | 202 | 90.2% |
+| **Total tests** | **224** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
@@ -80,3 +80,4 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	pservers-pattern-01-b.svg	|	PDFjs bug	|
 |	styling-inherit-01-b.svg	|	PDFjs bug	|
 |	text-text-01-b.svg	|	Chrome bug	|
+| additional-test-01.svg	| Chrome bug	|
