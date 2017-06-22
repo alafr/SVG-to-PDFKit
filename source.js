@@ -505,7 +505,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (values.length === argsNumber) {
           this[command].apply(this, values);
         } else {
-          warningCallback('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); break;
+          warningCallback('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); return;
         }
       }
       if (temp = parser.matchAll()) {
@@ -977,6 +977,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 for (let j = 0; j < dasharray.length; j++) {
                   if (dasharray[j] < 0) {return;}
                   sum += dasharray[j];
+                }
+                if (dasharray.length % 2 === 1) {
+                  dasharray = dasharray.concat(dasharray);
                 }
                 return (sum === 0 ? [] : dasharray);
               }).call(this);
@@ -1561,6 +1564,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemBasicShape = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
+      this.dashScale = 1;
       this.getBoundingShape = function() {
         return this.shape.clone();
       };
@@ -1601,12 +1605,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               docFillColor.apply(doc, fill);
             }
             if (stroke) {
+              let dashArray = this.get('stroke-dasharray'),
+                  dashOffset = this.get('stroke-dashoffset');
+              if (isNotEqual(this.dashScale, 1)) {
+                for (let j = 0; j < dashArray.length; j++) {
+                  dashArray[j] *= this.dashScale;
+                }
+                dashOffset *= this.dashScale;
+              }
               docStrokeColor.apply(doc, stroke);
               doc.lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(this.get('stroke-linecap'))
-                 .dash(this.get('stroke-dasharray'), {phase: this.get('stroke-dashoffset')});
+                 .dash(dashArray, {phase: dashOffset});
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
@@ -1776,6 +1788,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
       this.shape = new SvgPath(this.attr('d'));
+      this.pathLength = Math.max(0, this.getLength('pathLength', this.getViewport(), 0)) || undefined;
+      this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
 
     var SvgElemMarker = function(obj, inherits, posArray, strokeWidth) {
@@ -2112,16 +2126,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (pathElem) {
             let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
                 pathComputedLength = pathObject.totalLength,
-                textOffset = currentElem.getLength('startOffset', pathComputedLength, 0),
-                pathLength = pathElem.getLength('pathLength', pathElem.getViewport(), undefined),
-                pathLengthScale = (pathElem.pathLength !== undefined ? pathComputedLength / pathElem.pathLength : 1);
+                pathLength = pathElem.chooseValue(pathElem.pathLength, pathComputedLength),
+                pathLengthScale = pathComputedLength / pathLength,
+                textOffset = currentElem.getLength('startOffset', pathLength, 0) * pathLengthScale;
             for (let j = 0; j < currentElem._pos.length; j++) {
               if (isNotEqual(pathLengthScale, 1)) {
+                currentElem._pos[j].x *= pathLengthScale;
                 currentElem._pos[j].scale *= pathLengthScale;
                 currentElem._pos[j].xAdvance *= pathLengthScale;
                 currentElem._pos[j].width *= pathLengthScale;
               }
-              let charMidX = textOffset + currentElem._pos[j].x * pathLengthScale + 0.5 * currentElem._pos[j].width;
+              let charMidX = textOffset + currentElem._pos[j].x + 0.5 * currentElem._pos[j].width;
               if (charMidX > pathComputedLength || charMidX < 0) {
                 currentElem._pos[j].hidden = true;
               } else {
