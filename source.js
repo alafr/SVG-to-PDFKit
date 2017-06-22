@@ -572,56 +572,52 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.q = function(c1x, c1y, x, y) {return this.Q(currX + c1x, currY + c1y, currX + x, currY + y);};
       this.T = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), x, y);};
       this.t = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), currX + x, currY + y);};
-      this.A = function(rx, ry, rotAngle, arcLarge, arcSweep, x, y) { // From PDFKit
-        let xInit = currX, yInit = currY, xEnd = x, yEnd = y;
-        rx = Math.abs(rx); ry = Math.abs(ry); arcLarge = 1*!!arcLarge; arcSweep = 1*!!arcSweep;
-        let th = rotAngle * (Math.PI / 180), sin_th = Math.sin(th), cos_th = Math.cos(th);
-        let px = cos_th * (xInit - xEnd) * 0.5 + sin_th * (yInit - yEnd) * 0.5,
-            py = cos_th * (yInit - yEnd) * 0.5 - sin_th * (xInit - xEnd) * 0.5,
-            pl = (px * px) / (rx * rx) + (py * py) / (ry * ry);
-        if (pl > 1) {pl = Math.sqrt(pl); rx *= pl; ry *= pl;}
-        let a00 = cos_th / rx, a01 = sin_th / rx, a10 = -sin_th / ry, a11 = cos_th / ry,
-            _a00 = cos_th * rx, _a01 = -sin_th * ry, _a10 = sin_th * rx, _a11 = cos_th * ry;
-        let x0 = a00 * xInit + a01 * yInit,
-            y0 = a10 * xInit + a11 * yInit,
-            x1 = a00 * xEnd + a01 * yEnd,
-            y1 = a10 * xEnd + a11 * yEnd;
-        let sfactor = Math.sqrt(Math.max(0, 1 / ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) - 0.25));
-        if (arcSweep === arcLarge) {sfactor = -sfactor;}
-        let xc = 0.5 * (x0 + x1) - sfactor * (y1 - y0),
-            yc = 0.5 * (y0 + y1) + sfactor * (x1 - x0);
-        let th0 = Math.atan2(y0 - yc, x0 - xc),
-            th1 = Math.atan2(y1 - yc, x1 - xc),
-            th_arc = th1 - th0;
-        if (th_arc < 0 && arcSweep === 1) {
-          th_arc += 2 * Math.PI;
-        } else if (th_arc > 0 && arcSweep === 0) {
-          th_arc -= 2 * Math.PI;
-        }
-        let segments = Math.ceil(Math.abs(th_arc / (Math.PI * 0.5 + 0.001)));
-        for (let i = 0; i < segments; i++) {
-          let th2 = th0 + i * th_arc / segments,
-              th3 = th0 + (i + 1) * th_arc / segments,
-              th_half = 0.5 * (th3 - th2);
-          let t = 8/3 * Math.sin(th_half * 0.5) * Math.sin(th_half * 0.5) / Math.sin(th_half);
-          let _x1 = xc + Math.cos(th2) - t * Math.sin(th2),
-              _y1 = yc + Math.sin(th2) + t * Math.cos(th2),
-              _x3 = xc + Math.cos(th3),
-              _y3 = yc + Math.sin(th3),
-              _x2 = _x3 + t * Math.sin(th3),
-              _y2 = _y3 - t * Math.cos(th3);
-          let c1x = _a00 * _x1 + _a01 * _y1,
-              c1y = _a10 * _x1 + _a11 * _y1,
-              c2x = _a00 * _x2 + _a01 * _y2,
-              c2y = _a10 * _x2 + _a11 * _y2,
-              ex = _a00 * _x3 + _a01 * _y3,
-              ey = _a10 * _x3 + _a11 * _y3;
-          pathCommands.push(['C', (i === 0), (i === segments - 1), c1x, c1y, c2x, c2y, ex, ey]);
+      this.A = function(rx, ry, fi, fa, fs, x, y) {
+        if (isEqual(rx, 0) || isEqual(ry, 0)) {
+          pathCommands.push(['L', true, true, x, y]);
+        } else {
+          fi = fi * (Math.PI / 180);
+          rx = Math.abs(rx);
+          ry = Math.abs(ry);
+          fa = 1 * !!fa;
+          fs = 1 * !!fs;
+          let x1 = Math.cos(fi) * (currX - x) / 2 + Math.sin(fi) * (currY - y) / 2,
+              y1 = Math.cos(fi) * (currY - y) / 2 - Math.sin(fi) * (currX - x) / 2,
+              lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry);
+          if (lambda > 1) {
+            rx *= Math.sqrt(lambda);
+            ry *= Math.sqrt(lambda);
+          }
+          let r = Math.sqrt(Math.max(0, rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1) / (rx * rx * y1 * y1 + ry * ry * x1 * x1)),
+              x2 = (fa === fs ? -1 : 1) * r * rx * y1 / ry,
+              y2 = (fa === fs ? 1 : -1) * r * ry * x1 / rx;
+          let cx = Math.cos(fi) * x2 - Math.sin(fi) * y2 + (currX + x) / 2,
+              cy = Math.sin(fi) * x2 + Math.cos(fi) * y2 + (currY + y) / 2,
+              th1 = Math.atan2((y1 - y2) / ry, (x1 - x2) / rx),
+              th2 = Math.atan2((-y1 - y2) / ry, (-x1 - x2) / rx);
+          if (fs === 0 && th2 - th1 > 0) {
+            th2 -= 2 * Math.PI;
+          } else if (fs === 1 && th2 - th1 < 0) {
+            th2 += 2 * Math.PI;
+          }
+          let segms = Math.ceil(Math.abs(th2 - th1) / (Math.PI / 3));
+          for (let i = 0; i < segms; i++) {
+            let th3 = th1 + i * (th2 - th1) / segms,
+                th4 = th1 + (i + 1) * (th2 - th1) / segms,
+                t = 4/3 * Math.tan((th4 - th3) / 4);
+            let c1x = cx + Math.cos(fi) * rx * (Math.cos(th3) - t * Math.sin(th3)) - Math.sin(fi) * ry * (Math.sin(th3) + t * Math.cos(th3)),
+                c1y = cy + Math.sin(fi) * rx * (Math.cos(th3) - t * Math.sin(th3)) + Math.cos(fi) * ry * (Math.sin(th3) + t * Math.cos(th3)),
+                c2x = cx + Math.cos(fi) * rx * (Math.cos(th4) + t * Math.sin(th4)) - Math.sin(fi) * ry * (Math.sin(th4) - t * Math.cos(th4)),
+                c2y = cy + Math.sin(fi) * rx * (Math.cos(th4) + t * Math.sin(th4)) + Math.cos(fi) * ry * (Math.sin(th4) - t * Math.cos(th4)),
+                endX = cx + Math.cos(fi) * rx * Math.cos(th4) - Math.sin(fi) * ry * Math.sin(th4),
+                endY = cy + Math.sin(fi) * rx * Math.cos(th4) + Math.cos(fi) * ry * Math.sin(th4);
+            pathCommands.push(['C', (i === 0), (i === segms - 1), c1x, c1y, c2x, c2y, endX, endY]);
+          }
         }
         currX = x; currY = y; lastCom = 'A';
         return this.resetProperties();
       };
-      this.a = function(rx, ry, rot, fa, fs, x, y) {return this.A(rx, ry, rot, fa, fs, currX + x, currY + y);};
+      this.a = function(rx, ry, fi, fa, fs, x, y) {return this.A(rx, ry, fi, fa, fs, currX + x, currY + y);};
       // Shape properties
       let pathSegments = null; Object.defineProperty(this, 'pathSegments', {get: function() {
         if (pathSegments !== null) {return pathSegments;}
