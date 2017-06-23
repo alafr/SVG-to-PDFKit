@@ -93,8 +93,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let mode = fill && stroke ? 2 : stroke ? 1 : fill ? 0 : 3;
       return doc.addContent(mode + ' Tr');
     }
-    function docWriteGlyph(glyphid) {
-      return doc.addContent('<' + glyphid + '> Tj');
+    function docWriteGlyph(glyph) {
+      return doc.addContent('<' + glyph + '> Tj');
     }
     function docEndText() {
       return doc.addContent('ET');
@@ -1941,19 +1941,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return dy1 - dy2;
         }
         function getTextPos(font, size, text) {
-          let unit = size / 1000, fontascent = getAscent(font, size), fontdescent = getDescent(font, size);
           let encoded = font.encode('' + text), hex = encoded[0], pos = encoded[1], data = [];
           for (let i = 0; i < hex.length; i++) {
             let unicode = font.unicode ? font.unicode[parseInt(hex[i], 16)] : [text.charCodeAt(i)];
             data.push({
-              glyphid: hex[i],
+              glyph: hex[i],
               unicode: unicode,
-              numchars: unicode.length,
-              width: pos[i].advanceWidth * unit,
-              ascent: fontascent,
-              descent: fontdescent,
-              xAdvance: pos[i].xAdvance * unit,
-              yAdvance: pos[i].yAdvance * unit
+              width: pos[i].advanceWidth * size / 1000,
+              xOffset: pos[i].xOffset * size / 1000,
+              yOffset: pos[i].yOffset * size / 1000,
+              xAdvance: pos[i].xAdvance * size / 1000,
+              yAdvance: pos[i].yAdvance * size / 1000
             });
           }
           return data;
@@ -1978,7 +1976,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             if (textScale > 0 && textScale < Infinity) {
               for (let j = 0; j < pos.length; j++) {
                 pos[j].x = startX + textScale * (pos[j].x - startX);
-                pos[j].xAdvance *= textScale;
                 pos[j].scale *= textScale;
                 pos[j].width *= textScale;
               }
@@ -1988,7 +1985,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let spaceDiff = (length - (endX - startX)) / (pos.length - 1);
               for (let j = 0; j < pos.length; j++) {
                 pos[j].x += j * spaceDiff;
-                pos[j].xAdvance += spaceDiff;
               }
             }
           }
@@ -2056,15 +2052,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                     if (currentElem._y[index] !== undefined) {doAnchoring(); currentY = currentElem._y[index];}
                     currentX += (currentElem._dx[index] || 0);
                     currentY += (currentElem._dy[index] || 0);
-                    pos[j].rotate = (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[index], currentElem._defRot);
-                    pos[j].x = currentX;
-                    pos[j].y = currentY + baseline;
-                    pos[j].scale = 1;
-                    pos[j].hidden = false;
-                    currentChunk.push(pos[j]);
-                    childElem._pos.push(pos[j]);
-                    currentElem._pos.push(pos[j]);
-                    currentElem._index += pos[j].numchars;
+                    let position = {
+                      glyph: pos[j].glyph,
+                      rotate: (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[index], currentElem._defRot),
+                      x: currentX + pos[j].xOffset,
+                      y: currentY + baseline + pos[j].yOffset,
+                      width: pos[j].width,
+                      ascent: getAscent(currentElem._font.font, currentElem._font.size),
+                      descent: getDescent(currentElem._font.font, currentElem._font.size),
+                      scale: 1,
+                      hidden: false
+                    };
+                    currentChunk.push(position);
+                    childElem._pos.push(position);
+                    currentElem._pos.push(position);
+                    currentElem._index += pos[j].unicode.length;
                     if (currentChunk.length === 1) {
                       currentAnchor = textAnchor;
                       currentDirection = textDirection;
@@ -2107,7 +2109,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (isNotEqual(pathLengthScale, 1)) {
                 currentElem._pos[j].x *= pathLengthScale;
                 currentElem._pos[j].scale *= pathLengthScale;
-                currentElem._pos[j].xAdvance *= pathLengthScale;
                 currentElem._pos[j].width *= pathLengthScale;
               }
               let charMidX = textOffset + currentElem._pos[j].x + 0.5 * currentElem._pos[j].width;
@@ -2200,7 +2201,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                     if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
                       let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxItalic ? -0.25 : 0);
                       docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
-                      docWriteGlyph(pos[j].glyphid);
+                      docWriteGlyph(pos[j].glyph);
                     }
                   }
                   docEndText();
