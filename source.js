@@ -411,7 +411,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let getCurveValue = function(t, curve) {
         return (curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t;
       };
-      let divisions = 15; // the accuracy isn't perfect but comparable to the arc-to-bezier conversion
+      let divisions = 6 * precision;
       let equationX = [p1x, -3*p1x+3*c1x, 3*p1x-6*c1x+3*c2x, -p1x+3*c1x-3*c2x+p2x];
       let equationY = [p1y, -3*p1y+3*c1y, 3*p1y-6*c1y+3*c2y, -p1y+3*c1y-3*c2y+p2y];
       let derivativeX = [-3*p1x+3*c1x, 6*p1x-12*c1x+6*c2x, -3*p1x+9*c1x-9*c2x+3*p2x];
@@ -600,7 +600,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else if (fs === 1 && th2 - th1 < 0) {
             th2 += 2 * Math.PI;
           }
-          let segms = Math.ceil(Math.abs(th2 - th1) / (Math.PI / 3));
+          let segms = Math.ceil(Math.abs(th2 - th1) / (Math.PI / precision));
           for (let i = 0; i < segms; i++) {
             let th3 = th1 + i * (th2 - th1) / segms,
                 th4 = th1 + (i + 1) * (th2 - th1) / segms,
@@ -1681,25 +1681,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (rx && ry) {
           rx = Math.min(rx, 0.5 * w);
           ry = Math.min(ry, 0.5 * h);
-          let k = (4 / 3) * (Math.sqrt(2) - 1), cx = rx * (1.0 - k), cy = ry * (1.0 - k);
-          this.shape = new SvgShape()
-                        .M(x + rx, y)
-                        .L(x + w - rx, y)
-                        .C(x + w - cx, y, x + w, y + cy, x + w, y + ry)
-                        .L(x + w, y + h - ry)
-                        .C(x + w, y + h - cy, x + w - cx, y + h, x + w - rx, y + h)
-                        .L(x + rx, y + h)
-                        .C(x + cx, y + h, x, y + h - cy, x, y + h - ry)
-                        .L(x, y + ry)
-                        .C(x, y + cy, x + cx, y, x + rx, y)
-                        .Z();
+          this.shape = new SvgShape().M(x + rx, y).L(x + w - rx, y).A(rx, ry, 0, 0, 1, x + w, y + ry)
+                            .L(x + w, y + h - ry).A(rx, ry, 0, 0, 1, x + w - rx, y + h).L(x + rx, y + h)
+                            .A(rx, ry, 0, 0, 1, x, y + h - ry).L(x, y + ry).A(rx, ry, 0, 0, 1, x + rx, y).Z();
         } else {
-          this.shape = new SvgShape()
-                        .M(x, y)
-                        .L(x + w, y)
-                        .L(x + w, y + h)
-                        .L(x, y + h)
-                        .Z();
+          this.shape = new SvgShape().M(x, y).L(x + w, y).L(x + w, y + h).L(x, y + h).Z();
         }
       } else {
         this.shape = new SvgShape();
@@ -1710,16 +1696,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemBasicShape.call(this, obj, inherits);
       let cx = this.getLength('cx', this.getVWidth(), 0),
           cy = this.getLength('cy', this.getVHeight(), 0),
-          r = this.getLength('r', this.getViewport(), 0),
-          k = (4 / 3) * (Math.sqrt(2) - 1);
+          r = this.getLength('r', this.getViewport(), 0);
       if (r > 0) {
-        this.shape = new SvgShape()
-                      .M(cx + r, cy)
-                      .C(cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r)
-                      .C(cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy)
-                      .C(cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r)
-                      .C(cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy)
-                      .Z();
+        this.shape = new SvgShape().M(cx + r, cy).A(r, r, 0, 0, 1, cx - r, cy).A(r, r, 0, 0, 1, cx + r, cy).Z();
       } else {
         this.shape = new SvgShape();
       }
@@ -1730,16 +1709,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let cx = this.getLength('cx', this.getVWidth(), 0),
           cy = this.getLength('cy', this.getVHeight(), 0),
           rx = this.getLength('rx', this.getVWidth(), 0),
-          ry = this.getLength('ry', this.getVHeight(), 0),
-          k = (4 / 3) * (Math.sqrt(2) - 1);
+          ry = this.getLength('ry', this.getVHeight(), 0);
       if (rx > 0 && ry > 0) {
-        this.shape = new SvgShape()
-                      .M(cx + rx, cy)
-                      .C(cx + rx, cy + ry * k, cx + rx * k, cy + ry, cx, cy + ry)
-                      .C(cx - rx * k, cy + ry, cx - rx, cy + ry * k, cx - rx, cy)
-                      .C(cx - rx, cy - ry * k, cx - rx * k, cy - ry, cx, cy - ry)
-                      .C(cx + rx * k, cy - ry, cx + rx, cy - ry * k, cx + rx, cy)
-                      .Z();
+        this.shape = new SvgShape().M(cx + rx, cy).A(rx, ry, 0, 0, 1, cx - rx, cy).A(rx, ry, 0, 0, 1, cx + rx, cy).Z();
       } else {
         this.shape = new SvgShape();
       }
@@ -1767,6 +1739,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           this.shape.L(x, y);
         }
       }
+      if (points.length % 2 === 1) {warningCallback('SvgElemPolyline: uneven number of coordinates');}
     };
 
     var SvgElemPolygon = function(obj, inherits) {
@@ -1783,6 +1756,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       }
       this.shape.Z();
+      if (points.length % 2 === 1) {warningCallback('SvgElemPolygon: uneven number of coordinates');}
     };
 
     var SvgElemPath = function(obj, inherits) {
@@ -2260,7 +2234,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         useCSS = options.useCSS && typeof SVGElement !== 'undefined' && svg instanceof SVGElement && typeof getComputedStyle === 'function',
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
-        imageCallback = options.imageCallback;
+        imageCallback = options.imageCallback,
+        precision = Math.ceil(Math.max(1, options.precision)) || 3;
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
