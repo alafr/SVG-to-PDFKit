@@ -7,8 +7,11 @@
 <script src="../source.js"></script>
 <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
 <script src="https://huddle.github.io/Resemble.js/resemble.js"></script>
-<script src="tests.js"></script>
+<script src="tests1.js"></script>
+<script src="tests2.js"></script>
 <script>
+var Tests = Tests2.concat(Tests1);
+
 // Previous results to check for regression (tests ran with Chrome) are inserted below and updated periodically.
 // Then, when the tests are ran, any different result will appear in bold. All bold values need to be checked manually
 // because a green value (less difference between svg-to-pdfkit's and the browser's output) could potentially indicate 
