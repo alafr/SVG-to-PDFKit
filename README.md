@@ -28,6 +28,7 @@ Insert SVG into a PDF document created with PDFKit.
       - imageCallback [function] = same as above for the images (for Node.js)
       - warningCallback [function] = function called when there is a warning
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
+      - precision [number] = precision factor for approximative calculations (default = 3)
 
 #### Demos:
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm</a>

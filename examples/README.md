@@ -13,7 +13,7 @@ You will also find an updated PDFKit version, prebuilt and ready for use in `<sc
 &nbsp; &nbsp;
 
 ### Tests
-Tests are SVG files downloaded from https://www.w3.org/Graphics/SVG/WG/wiki/Test_Suite_Overview and embeded into a javascript 'Tests.js' file. Test files containing animations, filters, scripting, CSS styling or links have been removed, as these SVG features are out of this repository's scope.
+Tests are SVG files downloaded from https://www.w3.org/Graphics/SVG/WG/wiki/Test_Suite_Overview and embeded into a javascript `tests1.js` file. Test files containing animations, filters, scripting, CSS styling or links have been removed, as these SVG features are out of this repository's scope. Other new tests are added in the `tests2.js` file.
 
 Each SVG file is converted into PDF with SVG-to-PDFKit and <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, and the resulting PDF is rendered as an image with <a href="https://github.com/mozilla/pdf.js/">PDFjs</a>. The same SVG file is drawn into a canvas by the browser (it only works in Chrome). The two images are then compared with <a href="https://github.com/Huddle/Resemble.js/">Resemble.js</a>.
 
@@ -23,15 +23,14 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 22 | 9.8% |
-| Passed tests | 202 | 90.2% |
-| **Total tests** | **224** |  |
+|	Failed tests	| 21 | 9.3% |
+| Passed tests | 206 | 90.7% |
+| **Total tests** | **227** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
 |	Failed tests	|	Comment	|
 |	---	|	---	|
-|	paths-data-20-f.svg	|	Special case in arcTo path	|
 |	text-align-05-b.svg	|	Vertical text	|
 |	text-align-06-b.svg	|	Vertical text	|
 |	text-align-07-t.svg	|	Unicode	|
@@ -58,26 +57,27 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Passed tests	|	Comment	|
 |	---	|	---	|
-|	color-prop-05-t.svg	|	Chrome bug	|
-|	pservers-grad-02-b.svg	|	PDFjs bug	|
-|	pservers-grad-04-b.svg	|	PDFjs bug	|
+| additional-test-01.svg	| Chrome bug https://crbug.com/450368	|
+| additional-test-02.svg	| Chrome bug	|
+|	color-prop-05-t.svg	|	Specifications conflict	|
+|	pservers-grad-02-b.svg	|	PDFjs bug https://git.io/vQqgG	|
+|	pservers-grad-04-b.svg	|	PDFjs bug https://git.io/vQqgG	|
 |	pservers-grad-05-b.svg	|	PDFjs bug	|
-|	pservers-grad-06-b.svg	|	PDFjs bug	|
+|	pservers-grad-06-b.svg	|	PDFjs bug https://git.io/vQqgG	|
 |	pservers-grad-07-b.svg	|	PDFjs bug	|
 |	pservers-grad-08-b.svg	|	PDFjs bug	|
 |	pservers-grad-10-b.svg	|	PDFjs bug	|
-|	pservers-grad-11-b.svg	|	PDFjs bug	|
-|	pservers-grad-12-b.svg	|	PDFjs bug	|
+|	pservers-grad-11-b.svg	|	PDFjs bug https://git.io/vQqgG	|
+|	pservers-grad-12-b.svg	|	PDFjs bug https://git.io/vQqgG	|
 |	pservers-grad-13-b.svg	|	PDFjs bug	|
-|	pservers-grad-14-b.svg	|	PDFjs bug	|
-|	pservers-grad-15-b.svg	|	PDFjs bug	|
+|	pservers-grad-14-b.svg	|	PDFjs bug https://git.io/vQqgG	|
+|	pservers-grad-15-b.svg	|	PDFjs bug https://git.io/vQqgG	|
 |	pservers-grad-16-b.svg	|	PDFjs bug	|
 |	pservers-grad-17-b.svg	|	PDFjs bug	|
 |	pservers-grad-18-b.svg	|	PDFjs bug	|
 |	pservers-grad-20-b.svg	|	PDFjs bug	|
 |	pservers-grad-21-b.svg	|	Chrome bug + PDFjs bug	|
-|	pservers-grad-22-b.svg	|	PDFjs bug	|
+|	pservers-grad-22-b.svg	|	PDFjs bug https://git.io/vQqgG	|
 |	pservers-pattern-01-b.svg	|	PDFjs bug	|
 |	styling-inherit-01-b.svg	|	PDFjs bug	|
 |	text-text-01-b.svg	|	Chrome bug	|
-| additional-test-01.svg	| Chrome bug	|
