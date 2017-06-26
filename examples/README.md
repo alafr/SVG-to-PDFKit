@@ -23,15 +23,14 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 22 | 9.7% |
-| Passed tests | 205 | 90.3% |
+|	Failed tests	| 21 | 9.3% |
+| Passed tests | 206 | 90.7% |
 | **Total tests** | **227** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
 |	Failed tests	|	Comment	|
 |	---	|	---	|
-|	paths-data-20-f.svg	|	Special case in arcTo path	|
 |	text-align-05-b.svg	|	Vertical text	|
 |	text-align-06-b.svg	|	Vertical text	|
 |	text-align-07-t.svg	|	Unicode	|
