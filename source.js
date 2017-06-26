@@ -876,33 +876,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.attr = function(key) {
         return obj.getAttribute(key);
       };
-      this.computeUnits = function(value, unit, percent) {
-        if (unit === '%') {
-          if (typeof percent === 'number') {
-            return parseFloat(value) / 100 * percent;
-          } else {
-            return parseFloat(value) / 100 * this.getViewport();
-          }
-        } else if (unit === 'ex' || unit === 'em') {
-          return value * {'em':1, 'ex':0.5}[unit] * this.get('font-size');
-        } else {
-          return value * {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'pc':96/6}[unit];
-        }
-      };
-      this.parseLength = function(value) {
-        let parser = new StringParser((value || '').trim()), temp1, temp2;
-        if (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string' && !parser.matchAll()) {
-          return {value: temp1, unit: temp2};
-        }
-      };
-      this.parseLengthList = function(value) {
-        let parser = new StringParser((value || '').trim()), result = [], temp1, temp2;
-        while (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
-          result.push({value: temp1, unit: temp2});
-          parser.matchSeparator();
-        }
-        if (!parser.matchAll()) {return result;}
-      };
       this.resolveUrl = function(value) {
         let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
         let id = temp[1] || temp[2] || temp[3] || temp[4];
@@ -916,18 +889,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return null;
         }
       };
-      this.computeLength = function(value, percent, initial) {
-        let parsed = this.parseLength(value);
-        if (parsed) {
-          return this.computeUnits(parsed.value, parsed.unit, percent);
+      this.computeUnits = function(value, unit, percent, isFontSize) {
+        if (unit === '%') {
+          return parseFloat(value) / 100 * (isFontSize || percent != null ? percent : this.getViewport());
+        } else if (unit === 'ex' || unit === 'em') {
+          return value * {'em':1, 'ex':0.5}[unit] * (isFontSize ? percent : this.get('font-size'));
+        } else {
+          return value * {'':1, 'px':1, 'pt':96/72, 'cm':96/2.54, 'mm':96/25.4, 'in':96, 'pc':96/6}[unit];
+        }
+      };
+      this.computeLength = function(value, percent, initial, isFontSize) {
+        let parser = new StringParser((value || '').trim()), temp1, temp2;
+        if (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string' && !parser.matchAll()) {
+          return this.computeUnits(temp1, temp2, percent, isFontSize);
         }
         return initial;
       };
       this.computeLengthList = function(value, percent) {
-        let parsed = this.parseLengthList(value), result = [];
-        for (let i = 0; i < parsed.length; i++) {
-          result.push(this.computeUnits(parsed[i].value, parsed[i].unit, percent));
+        let parser = new StringParser((value || '').trim()), result = [], temp1, temp2;
+        while (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
+          result.push(this.computeUnits(temp1, temp2, percent));
+          parser.matchSeparator();
         }
+        result.error = parser.matchAll();
         return result;
       };
       this.getLength = function(key, percent, initial) {
@@ -945,6 +929,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           result.push(Number(temp));
           parser.matchSeparator();
         }
+        result.error = parser.matchAll();
         return result;
       }
       this.getViewbox = function(key, initial) {
@@ -987,18 +972,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (value !== null && value !== undefined) {
           switch (key) {
             case 'font-size':
-              result = (function() {
-                let parsed = this.parseLength(value);
-                if (parsed) {
-                  if (parsed.unit === '%' || parsed.unit === 'em' || parsed.unit === 'ex') {
-                    let parentValue = (this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
-                    if (parsed.unit === '%') {return parsed.value / 100 * parentValue;}
-                    else if (parsed.unit === 'em') {return cache[key] = parsed.value * parentValue;}
-                    else if (parsed.unit === 'ex') {return cache[key] = parsed.value / 2 * parentValue;}
-                  }
-                  return this.computeUnits(parsed.value, parsed.unit, this.getViewport());
-                }
-              }).call(this);
+              result = this.computeLength(value, this.getInherit() ? this.getInherit().get(key) : keyInfo.initial, undefined, true);
               break;
             case 'baseline-shift':
               result = this.computeLength(value, this.get('font-size'));
@@ -1020,8 +994,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             case 'stroke-dasharray':
               result = (function() {
                 if (value === 'none') {return [];}
-                let dasharray = this.computeLengthList(value, this.getViewport()),
-                    sum = 0;
+                let dasharray = this.computeLengthList(value, this.getViewport());
+                if (dasharray.error) {return;}
+                let sum = 0;
                 for (let j = 0; j < dasharray.length; j++) {
                   if (dasharray[j] < 0) {return;}
                   sum += dasharray[j];
@@ -1776,34 +1751,32 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemPolyline = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
-      let points = this.parseLengthList(this.attr('points'));
+      let points = this.getNumberList('points');
       this.shape = new SvgShape();
-      for (let i = 0; i < points.length - 1; i+=2) {
-        let x = this.computeUnits(points[i].value, points[i].unit, this.getVWidth()),
-            y = this.computeUnits(points[i+1].value, points[i+1].unit, this.getVHeight());
+      for (let i = 0; i < points.length - 1; i += 2) {
         if (i === 0) {
-          this.shape.M(x, y);
+          this.shape.M(points[i], points[i+1]);
         } else {
-          this.shape.L(x, y);
+          this.shape.L(points[i], points[i+1]);
         }
       }
+      if (points.error) {warningCallback('SvgElemPolygon: unexpected string ' + points.error);}
       if (points.length % 2 === 1) {warningCallback('SvgElemPolyline: uneven number of coordinates');}
     };
 
     var SvgElemPolygon = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
-      let points = this.parseLengthList(this.attr('points'));
+      let points = this.getNumberList('points');
       this.shape = new SvgShape();
-      for (let i = 0; i < points.length - 1; i+=2) {
-        let x = this.computeLength(points[i].value, points[i].unit, this.getVWidth()),
-            y = this.computeLength(points[i+1].value, points[i+1].unit, this.getVHeight());
+      for (let i = 0; i < points.length - 1; i += 2) {
         if (i === 0) {
-          this.shape.M(x, y);
+          this.shape.M(points[i], points[i+1]);
         } else {
-          this.shape.L(x, y);
+          this.shape.L(points[i], points[i+1]);
         }
       }
       this.shape.Z();
+      if (points.error) {warningCallback('SvgElemPolygon: unexpected string ' + points.error);}
       if (points.length % 2 === 1) {warningCallback('SvgElemPolygon: uneven number of coordinates');}
     };
 
