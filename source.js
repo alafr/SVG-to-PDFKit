@@ -1,5 +1,5 @@
-"use strict";
 var SVGtoPDF = function(doc, svg, x, y, options) {
+    "use strict";
 
     doc.addContent = function(data) {
       (this._currentGroup && this._currentGroup.xobj || this.page).write(data);
@@ -364,6 +364,54 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return [scaleX, 0, 0, scaleY, dx * (availWidth - elemWidth * scaleX), dy * (availHeight - elemHeight * scaleY)];
     }
+    function combineArrays(array1, array2) {
+      return array1.concat(array2.slice(array1.length));
+    }
+    function getAscent(font, size) {
+      return Math.max(font.ascender, (font.bbox[3] || font.bbox.maxY) * (font.scale || 1)) * size / 1000;
+    }
+    function getDescent(font, size) {
+      return Math.min(font.descender, (font.bbox[1] || font.bbox.minY) * (font.scale || 1)) * size / 1000;
+    }
+    function getXHeight(font, size) {
+      return (font.xHeight || 0.5 * (font.ascender - font.descender)) * size / 1000;
+    }
+    function getBaseline(font, size, baseline, shift) {
+      let dy1, dy2;
+      switch (baseline) {
+        case 'middle': dy1 = 0.5 * getXHeight(font, size); break;
+        case 'central': dy1 = 0.5 * (getDescent(font, size) + getAscent(font, size)); break;
+        case 'after-edge': case 'text-after-edge': dy1 = getDescent(font, size); break;
+        case 'alphabetic': case 'auto': case 'baseline': dy1 = 0; break;
+        case 'mathematical': dy1 = 0.5 * getAscent(font, size); break;
+        case 'hanging': dy1 = 0.8 * getAscent(font, size); break;
+        case 'before-edge': case 'text-before-edge': dy1 = getAscent(font, size); break;
+        default: dy1 = 0; break;
+      }
+      switch (shift) {
+        case 'baseline': dy2 = 0; break;
+        case 'super': dy2 = 0.6 * size; break;
+        case 'sub': dy2 = -0.6 * size; break;
+        default: dy2 = shift; break;
+      }
+      return dy1 - dy2;
+    }
+    function getTextPos(font, size, text) {
+      let encoded = font.encode('' + text), hex = encoded[0], pos = encoded[1], data = [];
+      for (let i = 0; i < hex.length; i++) {
+        let unicode = font.unicode ? font.unicode[parseInt(hex[i], 16)] : [text.charCodeAt(i)];
+        data.push({
+          glyph: hex[i],
+          unicode: unicode,
+          width: pos[i].advanceWidth * size / 1000,
+          xOffset: pos[i].xOffset * size / 1000,
+          yOffset: pos[i].yOffset * size / 1000,
+          xAdvance: pos[i].xAdvance * size / 1000,
+          yAdvance: pos[i].yAdvance * size / 1000
+        });
+      }
+      return data;
+    }
 
     var StringParser = function(str) {
       let parser = this;
@@ -428,8 +476,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return lengthMap;
       })();
       let totalLength = this.totalLength = lengthMap[divisions];
-      this.startPoint = [p1x, p1y];
-      this.endPoint = [p2x, p2y];
+      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ? 
+                               Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
+      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ? 
+                               Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
       this.boundingBox = (function() {
         let temp;
         let minX = getCurveValue(0, equationX), minY = getCurveValue(0, equationY),
@@ -453,19 +503,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return [minX, minY, maxX, maxY];
       })();
       this.getPointAtLength = function(l) {
-        if (l >= 0 && l <= totalLength) {
-          for (let i = 1; i <= divisions; i++) {
-            let l1 = lengthMap[i-1], l2 = lengthMap[i];
-            if (l1 <= l && l <= l2) {
-              let t = (i - (l2 - l) / (l2 - l1)) / divisions,
-                  x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
-                  dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
-              if (isEqual(dx, 0) && isEqual(dy, 0) && (isEqual(t, 0) || isEqual(t, 1))) {
-                dx = c2x - c1x;
-                dy = c2y - c1y;
-              }
-              return [x, y, Math.atan2(dy, dx)];
-            }
+        if (isEqual(l, 0)) {return this.startPoint;}
+        if (isEqual(l, totalLength)) {return this.endPoint;}
+        if (l < 0 || l > totalLength) {return;}
+        for (let i = 1; i <= divisions; i++) {
+          let l1 = lengthMap[i-1], l2 = lengthMap[i];
+          if (l1 <= l && l <= l2) {
+            let t = (i - (l2 - l) / (l2 - l1)) / divisions,
+                x = getCurveValue(t, equationX), y = getCurveValue(t, equationY),
+                dx = getCurveValue(t, derivativeX), dy = getCurveValue(t, derivativeY);
+            return [x, y, Math.atan2(dy, dx)];
           }
         }
       };
@@ -474,8 +521,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var LineSegment = function(p1x, p1y, p2x, p2y) {
       let totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
       this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
-      this.startPoint = [p1x, p1y];
-      this.endPoint = [p2x, p2y];
+      this.startPoint = [p1x, p1y, Math.atan2(p2y - p1y, p2x - p1x)];
+      this.endPoint = [p2x, p2y, Math.atan2(p2y - p1y, p2x - p1x)];
       this.getPointAtLength = function(l) {
         if (l >= 0 && l <= totalLength) {
           let r = l / totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
@@ -1884,6 +1931,64 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getBoundingShape = function() {
         return this.getInherit().getBoundingShape();
       };
+      this.drawTextInDocument = function(isClip, isMask) {
+        let fill = this.getFill(isClip, isMask),
+            stroke = this.getStroke(isClip, isMask),
+            strokeWidth = this.get('stroke-width');
+        if (this._font.fauxBold) {
+          if (!stroke) {
+            stroke = fill;
+            strokeWidth = this._font.size * 0.03;
+          } else {
+            strokeWidth += this._font.size * 0.03;
+          }
+        }
+        let children = this.getChildren();
+        for (let i = 0; i < children.length; i++) {
+          let childElem = children[i];
+          switch(childElem.name) {
+            case 'tspan': case 'textPath':
+              if (childElem.get('display') !== 'none') {
+                childElem.drawTextInDocument(isClip, isMask);
+              }
+              break;
+            case '#text':
+              if (this.get('visibility') === 'hidden') {continue;}
+              if (fill || stroke || isClip) {
+                if (!isClip) {
+                  if (fill) {
+                    docFillColor.apply(doc, fill);
+                  }
+                  if (stroke && strokeWidth) {
+                    docStrokeColor.apply(doc, stroke);
+                    doc.lineWidth(strokeWidth)
+                       .miterLimit(this.get('stroke-miterlimit'))
+                       .lineJoin(this.get('stroke-linejoin'))
+                       .lineCap(this.get('stroke-linecap'))
+                       .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
+                  }
+                } else {
+                  doc.fillColor('white');
+                }
+                docBeginText(this._font.font, this._font.size);
+                if (!isClip) {
+                  docSetTextMode(!!fill, !!stroke);
+                } else {
+                  docSetTextMode(true, false);
+                }
+                for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
+                  if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
+                    let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (this._font.fauxItalic ? -0.25 : 0);
+                    docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
+                    docWriteGlyph(pos[j].glyph);
+                  }
+                }
+                docEndText();
+              }
+              break;
+          }
+        }
+      };
     };
 
     var SvgElemTextNode = function(obj, inherits) {
@@ -1910,52 +2015,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.allowedChildren = ['textPath', 'tspan', '#text'];
       (function (textParentElem) {
         let processedText = '', remainingText = obj.textContent, textPaths = [], currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
-        function combineArrays(array1, array2) {return array1.concat(array2.slice(array1.length));}
-        function getAscent(font, size) {
-          return Math.max(font.ascender, (font.bbox[3] || font.bbox.maxY) * (font.scale || 1)) * size / 1000;
-        }
-        function getDescent(font, size) {
-          return Math.min(font.descender, (font.bbox[1] || font.bbox.minY) * (font.scale || 1)) * size / 1000;
-        }
-        function getXHeight(font, size) {
-          return (font.xHeight || 0.5 * (font.ascender - font.descender)) * size / 1000;
-        }
-        function getBaseline(font, size, baseline, shift) {
-          let dy1, dy2;
-          switch (baseline) {
-            case 'middle': dy1 = 0.5 * getXHeight(font, size); break;
-            case 'central': dy1 = 0.5 * (getDescent(font, size) + getAscent(font, size)); break;
-            case 'after-edge': case 'text-after-edge': dy1 = getDescent(font, size); break;
-            case 'alphabetic': case 'auto': case 'baseline': dy1 = 0; break;
-            case 'mathematical': dy1 = 0.5 * getAscent(font, size); break;
-            case 'hanging': dy1 = 0.8 * getAscent(font, size); break;
-            case 'before-edge': case 'text-before-edge': dy1 = getAscent(font, size); break;
-            default: dy1 = 0; break;
-          }
-          switch (shift) {
-            case 'baseline': dy2 = 0; break;
-            case 'super': dy2 = 0.6 * size; break;
-            case 'sub': dy2 = -0.6 * size; break;
-            default: dy2 = shift; break;
-          }
-          return dy1 - dy2;
-        }
-        function getTextPos(font, size, text) {
-          let encoded = font.encode('' + text), hex = encoded[0], pos = encoded[1], data = [];
-          for (let i = 0; i < hex.length; i++) {
-            let unicode = font.unicode ? font.unicode[parseInt(hex[i], 16)] : [text.charCodeAt(i)];
-            data.push({
-              glyph: hex[i],
-              unicode: unicode,
-              width: pos[i].advanceWidth * size / 1000,
-              xOffset: pos[i].xOffset * size / 1000,
-              yOffset: pos[i].yOffset * size / 1000,
-              xAdvance: pos[i].xAdvance * size / 1000,
-              yAdvance: pos[i].yAdvance * size / 1000
-            });
-          }
-          return data;
-        }
         function doAnchoring() {
           if (currentChunk.length) {
             let last = currentChunk[currentChunk.length - 1];
@@ -2091,6 +2150,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           if (currentElem.name === 'textPath') {
             textPaths.push(currentElem);
+            let pathElem = currentElem.path;
+            if (pathElem) {
+              let pathObject = pathElem.shape.clone().transform(pathElem.get('transform'));
+              currentX = pathObject.endPoint[0]; currentY = pathObject.endPoint[1];
+            }
           }
           if (parentElem) {
             parentElem._pos = parentElem._pos.concat(currentElem._pos);
@@ -2121,8 +2185,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
               }
             }
-            let endPoint = pathObject.getPointAtLength(pathComputedLength);
-            currentX = endPoint[0]; currentY = endPoint[1];
           } else {
             for (let j = 0; j < currentElem._pos.length; j++) {
               currentElem._pos[j].hidden = true;
@@ -2152,64 +2214,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return this.get('transform');
       };
       this.drawInDocument = function(isClip, isMask) {
-        function recursive(elem) {
-          let fill = elem.getFill(isClip, isMask),
-              stroke = elem.getStroke(isClip, isMask),
-              strokeWidth = elem.get('stroke-width');
-          if (elem._font.fauxBold) {
-            if (!stroke) {
-              stroke = fill;
-              strokeWidth = elem._font.size * 0.03;
-            } else {
-              strokeWidth += elem._font.size * 0.03;
-            }
-          }
-          let children = elem.getChildren();
-          for (let i = 0; i < children.length; i++) {
-            let childElem = children[i];
-            switch(childElem.name) {
-              case 'tspan': case 'textPath':
-                if (childElem.get('display') !== 'none') {
-                  recursive(childElem);
-                }
-                break;
-              case '#text':
-                if (elem.get('visibility') === 'hidden') {continue;}
-                if (fill || stroke || isClip) {
-                  if (!isClip) {
-                    if (fill) {
-                      docFillColor.apply(doc, fill);
-                    }
-                    if (stroke && strokeWidth) {
-                      docStrokeColor.apply(doc, stroke);
-                      doc.lineWidth(strokeWidth)
-                         .miterLimit(elem.get('stroke-miterlimit'))
-                         .lineJoin(elem.get('stroke-linejoin'))
-                         .lineCap(elem.get('stroke-linecap'))
-                         .dash(elem.get('stroke-dasharray'), {phase:elem.get('stroke-dashoffset')});
-                    }
-                  } else {
-                    doc.fillColor('white');
-                  }
-                  docBeginText(elem._font.font, elem._font.size);
-                  if (!isClip) {
-                    docSetTextMode(!!fill, !!stroke);
-                  } else {
-                    docSetTextMode(true, false);
-                  }
-                  for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
-                    if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
-                      let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (elem._font.fauxItalic ? -0.25 : 0);
-                      docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
-                      docWriteGlyph(pos[j].glyph);
-                    }
-                  }
-                  docEndText();
-                }
-                break;
-            }
-          }
-        }
         doc.save();
         doc.transform.apply(doc, this.getTransformation());
         this.clip();
@@ -2217,7 +2221,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (masked) {
           group = docBeginGroup();
         }
-        recursive(this);
+        this.drawTextInDocument(isClip, isMask);
         if (group) {
           docEndGroup(group);
           docInsertGroup(group);
@@ -2287,7 +2291,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
 
 };
-
 
 if (typeof module !== 'undefined' && module && typeof module.exports !== 'undefined') {
   module.exports = SVGtoPDF;
