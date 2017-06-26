@@ -534,12 +534,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgPath = function(d) {
       SvgShape.call(this);
       let ArgumentsNumber = {A:7,a:7, C:6,c:6, H:1,h:1, L:2,l:2, M:2,m:2, Q:4,q:4, S:4,s:4, T:2,t:2, V:1,v:1, Z:0,z:0};
+      let Flags = {A3:true, A4:true, a3:true, a4:true};
       let command, value, values, argsNumber, temp, parser = new StringParser((d || '').trim());
       while (command = parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
         parser.matchSeparator();
         argsNumber = ArgumentsNumber[command];
         values = [];
-        while (value = parser.matchNumber()) {
+        while (value = (Flags[command + values.length] ? parser.match(/^[01]/) : parser.matchNumber())) {
           parser.matchSeparator();
           if (values.length === argsNumber) {
             this[command].apply(this, values);
