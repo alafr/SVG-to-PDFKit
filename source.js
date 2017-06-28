@@ -1255,12 +1255,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getTransformation = function() {
         return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
       };
-      this.getBoundingShape = function() {
-        if (child && typeof child.getBoundingShape === 'function') {
-          return child.getBoundingShape().clone();
-        }
-        return new SvgShape();
-      };
     };
 
     var SvgElemSymbol = function(obj, inherits) {
