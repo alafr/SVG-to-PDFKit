@@ -1662,18 +1662,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (markerStart !== 'none' || markerMid !== 'none' || markerEnd !== 'none') {
             let markersPos = this.shape.getMarkers();
             if (markerStart !== 'none') {
-              let marker = new SvgElemMarker(markerStart, null, markersPos[0], this.get('stroke-width'));
-              marker.drawInDocument(false, isMask);
+              let marker = new SvgElemMarker(markerStart, null);
+              marker.drawMarker(false, isMask, markersPos[0], this.get('stroke-width'));
             }
             if (markerMid !== 'none') {
               for (let i = 1; i < markersPos.length - 1; i++) {
-                let marker = new SvgElemMarker(markerMid, null, markersPos[i], this.get('stroke-width'));
-                marker.drawInDocument(false, isMask);
+                let marker = new SvgElemMarker(markerMid, null);
+                marker.drawMarker(false, isMask, markersPos[i], this.get('stroke-width'));
               }
             }
             if (markerEnd !== 'none') {
-              let marker = new SvgElemMarker(markerEnd, null, markersPos[markersPos.length - 1], this.get('stroke-width'));
-              marker.drawInDocument(false, isMask);
+              let marker = new SvgElemMarker(markerEnd, null);
+              marker.drawMarker(false, isMask, markersPos[markersPos.length - 1], this.get('stroke-width'));
             }
           }
           if (group) {
@@ -1787,7 +1787,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
 
-    var SvgElemMarker = function(obj, inherits, posArray, strokeWidth) {
+    var SvgElemMarker = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       let width = this.getLength('markerWidth', this.getParentVWidth(), 3),
@@ -1799,26 +1799,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getVHeight = function() {
         return viewBox[3];
       };
-      this.getTransformation = function() {
+      this.drawMarker = function(isClip, isMask, posArray, strokeWidth) {
+        doc.save();
         let orient = this.attr('orient'),
             units = this.attr('markerUnits'),
             rotate = (orient === 'auto' ? posArray[2] : (parseFloat(orient) || 0) * Math.PI / 180),
             scale = (units === 'userSpaceOnUse' ? 1 : strokeWidth);
-        return [ Math.cos(rotate)*scale, Math.sin(rotate)*scale, -Math.sin(rotate)*scale, Math.cos(rotate)*scale, posArray[0], posArray[1] ];
-      };
-      this.getTransformation2 = function() {
-        return parseAspectRatio(this.attr('preserveAspectRatio'), width, height, viewBox[2], viewBox[3], 0.5);
-      };
-      this.drawInDocument = function(isClip, isMask) {
+        doc.transform(Math.cos(rotate) * scale, Math.sin(rotate) * scale, -Math.sin(rotate) * scale, Math.cos(rotate) * scale, posArray[0], posArray[1]);
         let refX = this.getLength('refX', this.getVWidth(), 0),
             refY = this.getLength('refY', this.getVHeight(), 0),
-            transform2 = this.getTransformation2();
-        doc.save();
-        doc.transform.apply(doc, this.getTransformation());
+            aspectRatioMatrix = parseAspectRatio(this.attr('preserveAspectRatio'), width, height, viewBox[2], viewBox[3], 0.5);
         if (this.get('overflow') === 'hidden') {
-          doc.rect(-width/2 + transform2[0] * (viewBox[0] + viewBox[2]/2 - refX), -height/2 + transform2[3] * (viewBox[1] + viewBox[3]/2 - refY), width, height).clip();
+          doc.rect(aspectRatioMatrix[0] * (viewBox[0] + viewBox[2] / 2 - refX) - width / 2, aspectRatioMatrix[3] * (viewBox[1] + viewBox[3] / 2 - refY) - height / 2, width, height).clip();
         }
-        doc.transform.apply(doc, transform2);
+        doc.transform.apply(doc, aspectRatioMatrix);
         doc.translate(-refX, -refY);
         let group;
         if (this.get('opacity') < 1 && !isClip) {
