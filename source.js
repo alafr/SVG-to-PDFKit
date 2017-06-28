@@ -1151,15 +1151,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.clip = function() {
         if (this.get('clip-path') !== 'none') {
-          let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
-          clipPath.drawInDocument();
+          let clipPath = new SvgElemClipPath(this.get('clip-path'), null);
+          clipPath.useMask(this.getBoundingBox());
           return true;
         }
       };
       this.mask = function() {
         if (this.get('mask') !== 'none') {
-          let mask = new SvgElemMask(this.get('mask'), null, this.getBoundingBox());
-          mask.drawInDocument();
+          let mask = new SvgElemMask(this.get('mask'), null);
+          mask.useMask(this.getBoundingBox());
           return true;
         }
       };
@@ -1834,42 +1834,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemClipPath = function(obj, inherits, bBox) {
+    var SvgElemClipPath = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
-      this.getTransformation = function() {
-        if (this.attr('clipPathUnits') === 'objectBoundingBox') {
-          return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
-        } else {
-          return [1, 0, 0, 1, 0, 0];
-        }
-      };
-      this.drawInDocument = function() {
+      this.useMask = function(bBox) {
         let group = docBeginGroup();
         doc.save();
-        doc.transform.apply(doc, this.getTransformation());
+        if (this.attr('clipPathUnits') === 'objectBoundingBox') {
+          doc.transform(bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]);
+        }
         this.clip();
         this.drawChildren(true, false);
         doc.restore();
-        if (group) {
-          docEndGroup(group);
-          docApplyMask(group, true);
-        }
+        docEndGroup(group);
+        docApplyMask(group, true);
       };
     };
 
-    var SvgElemMask = function(obj, inherits, bBox) {
+    var SvgElemMask = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
-      this.getTransformation = function() {
-        if (this.attr('maskContentUnits') === 'objectBoundingBox') {
-          return [bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]];
-        } else {
-          return [1, 0, 0, 1, 0, 0];
-        }
-      };
-      this.drawInDocument = function() {
+      SvgElemStylable.call(this, obj);
+      this.useMask = function(bBox) {
         let group = docBeginGroup();
         doc.save();
         let x, y, w, h;
@@ -1885,17 +1872,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           h = this.getLength('height', this.getVHeight(), 1.2) * (bBox[3] - bBox[1]);
         }
         doc.rect(x, y, w, h).clip();
-        doc.transform.apply(doc, this.getTransformation());
-        if (this.get('clip-path') !== 'none') {
-          let clipPath = new SvgElemClipPath(this.get('clip-path'), null, this.getBoundingBox());
-          clipPath.drawInDocument();
+        if (this.attr('maskContentUnits') === 'objectBoundingBox') {
+          doc.transform(bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]);
         }
+        this.clip();
         this.drawChildren(false, true);
-        doc.restore()
-        if (group) {
-          docEndGroup(group);
-          docApplyMask(group, true);
-        }
+        doc.restore();
+        docEndGroup(group);
+        docApplyMask(group, true);
       };
     };
 
