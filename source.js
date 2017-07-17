@@ -1432,7 +1432,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         let viewBox = this.getViewbox('viewBox', [0, 0, width, height]),
             aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
-            aspectRatioMatrix = parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0),
+            aspectRatioMatrix = multiplyMatrix(
+              parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3], 0),
+              [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
+            ),
             matrix = parseTranform(this.attr('patternTransform'));
         if (bBoxUnitsContent) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
