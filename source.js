@@ -14,7 +14,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         Subtype: 'Form',
         FormType: 1,
         BBox: [-1000000, -1000000, 1000000, 1000000],
-        Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false}
+        Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false},
+        Resources: doc.page.resources
       });
       group.parentGroup = doc._currentGroup;
       group.savedCtm = doc._ctm;
