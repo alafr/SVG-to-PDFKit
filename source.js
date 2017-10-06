@@ -1226,15 +1226,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
-      this.beforeDrawing = function() {};
-      this.afterDrawing = function() {};
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
-        this.beforeDrawing();
-        this.transform();
-        this.clip();
-        let masked = this.mask(), group;
-        if ((this.get('opacity') < 1 || masked) && !isClip) {
+      this.drawContent = function(isClip, isMask) {
+        doc.transform.apply(doc, this.getTransformation());
+        let clipped = this.clip(),
+            masked = this.mask(),
+            group;
+        if ((this.get('opacity') < 1 || clipped || masked) && !isClip) {
           group = docBeginGroup();
         }
         this.drawChildren(isClip, isMask);
@@ -1243,8 +1240,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.fillOpacity(this.get('opacity'));
           docInsertGroup(group);
         }
-        this.afterDrawing();
-        doc.restore();
       };
     };
 
@@ -1256,6 +1251,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       if (child) {child = new SvgElem(child, this);}
       this.getChildren  = function() {
         return child ? [child] : [];
+      };
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        this.drawContent(isClip, isMask);
+        doc.restore();
       };
       this.getTransformation = function() {
         return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
@@ -1278,6 +1278,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getVHeight = function() {
         return viewBox[3];
       };
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        this.drawContent(isClip, isMask);
+        doc.restore();
+      };
       this.getTransformation = function() {
         return multiplyMatrix(parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]), [1, 0, 0, 1, -viewBox[0], -viewBox[1]]);
       };
@@ -1285,6 +1290,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemGroup = function(obj, inherits) {
       SvgElemContainer.call(this, obj, inherits);
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        this.drawContent(isClip, isMask);
+        doc.restore();
+      };
       this.getTransformation = function() {
         return this.get('transform');
       };
@@ -1293,11 +1303,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemLink = function(obj, inherits) {
       SvgElemContainer.call(this, obj, inherits);
       let link = this.attr('href') || this.attr('xlink:href');
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        if (link && this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
+        doc.transform.apply(doc, this.getTransformation());
+        this.drawContent(isClip, isMask);
+        doc.restore();
+      };
       this.getTransformation = function() {
         return this.get('transform');
-      };
-      this.beforeDrawing = function() {
-        if (link && this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
       };
     };
 
@@ -1311,7 +1325,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         width = inherits.getLength('width', inherits.getParentVWidth(), width);
         height = inherits.getLength('height', inherits.getParentVHeight(), height);
       }
-      let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
+      let aspectRatio = this.attr('preserveAspectRatio'),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
       if (this.isOuterElement && preserveAspectRatio) {
         x = y = 0;
@@ -1325,17 +1339,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getVHeight = function() {
         return viewBox[3];
       };
+      this.drawInDocument = function(isClip, isMask) {
+        doc.save();
+        if (this.get('overflow') === 'hidden') {
+          new SvgShape().M(x, y).L(x + width, y).L(x + width, y + height).L(x, y + height).Z()
+                        .transform(this.get('transform'))
+                        .insertInDocument();
+          doc.clip();
+        }
+        this.drawContent(isClip, isMask);
+        doc.restore();
+      };
       this.getTransformation = function() {
         return multiplyMatrix(
+          this.get('transform'),
           [1, 0, 0, 1, x, y],
           parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]),
           [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
         );
-      };
-      this.beforeDrawing = function() {
-        if (this.get('overflow') === 'hidden') {
-          doc.rect(x, y, width, height).clip();
-        }
       };
     };
 
@@ -1353,25 +1374,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       } catch(e) {
         warningCallback('SVGElemImage: failed to open image "' + link + '" in PDFKit');
       }
-      this.getTransformation2 = function() {
-        let aspectRatio = (this.attr('preserveAspectRatio') || '').trim(),
-            temp = aspectRatio.match(/^(none)$|^x(Min|Mid|Max)Y(Min|Mid|Max)(?:\s+(meet|slice))?$/) || [],
-            ratioType = temp[1] || temp[4] || 'meet',
-            xAlign = temp[2] || 'Mid',
-            yAlign = temp[3] || 'Mid',
-            scaleX = (image ? width / image.width : 1),
-            scaleY = (image ? height / image.height : 1),
-            dx = {'Min':0, 'Mid':0.5, 'Max':1}[xAlign],
-            dy = {'Min':0, 'Mid':0.5, 'Max':1}[yAlign];
-        if (ratioType === 'slice') {
-          scaleY = scaleX = Math.max(scaleX, scaleY);
-        } else if (ratioType === 'meet') {
-          scaleY = scaleX = Math.min(scaleX, scaleY);
-        }
-        return [scaleX, 0, 0, scaleY, x + dx * (width - (image ? image.width : width) * scaleX) - scaleX * 0, y + dy * (height - (image ? image.height : height) * scaleY) - scaleY * 0];
-      };
       this.getTransformation = function() {
-        return this.get('transform');
+        return multiplyMatrix(
+          this.get('transform'),
+          [1, 0, 0, 1, x, y],
+          parseAspectRatio(this.attr('preserveAspectRatio'), width, height, image ? image.width : width, image ? image.height : height)
+        );
       };
       this.getBoundingShape = function() {
         return new SvgShape().M(x, y).L(x + width, y).L(x + width, y + height).L(x, y + height).Z();
@@ -1379,13 +1387,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !image) {return;}
         doc.save();
-        this.transform();
+        doc.transform.apply(doc, this.get('transform'));
         this.clip();
         this.mask();
+        doc.transform.apply(doc, [1, 0, 0, 1, x, y]);
         if (this.get('overflow') === 'hidden') {
-          doc.rect(x, y, width, height).clip();
+          doc.rect(0, 0, width, height).clip();
         }
-        doc.transform.apply(doc, this.getTransformation2());
+        doc.transform.apply(doc, parseAspectRatio(this.attr('preserveAspectRatio'), width, height, image ? image.width : width, image ? image.height : height));
         if (!isClip) {
           doc.fillOpacity(this.get('opacity'));
           doc.image(image, 0, 0);
@@ -1602,7 +1611,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.transform();
         this.clip();
         if (!isClip) {
-          let masked = this.mask(), group;
+          let masked = this.mask(),
+              group;
           if (masked) {
             group = docBeginGroup();
           }
