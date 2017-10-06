@@ -369,6 +369,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return [scaleX, 0, 0, scaleY, dx * (availWidth - elemWidth * scaleX), dy * (availHeight - elemHeight * scaleY)];
     }
+    function parseStyleAttr(v) {
+      let result = {};
+      v = (v || '').trim().split(/;/);
+      for (let i = 0; i < v.length; i++) {
+        let key = (v[i].split(':')[0] || '').trim(),
+            value = (v[i].split(':')[1] || '').trim();
+        if (key) {
+          result[key] = value;
+        }
+      }
+      return result;
+    }
     function combineArrays(array1, array2) {
       return array1.concat(array2.slice(array1.length));
     }
@@ -873,10 +885,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
         case '#text': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
       }
-      let cache = Object.create(null);
+      let styleCache = Object.create(null);
+      let childrenCache = null;
       this.name = obj.nodeName;
       this.node = obj;
       this.isOuterElement = obj === svg || !obj.parentNode;
+      this.inherits = inherits || (!this.isOuterElement ? new SvgElem(obj.parentNode, null) : null);
+      this.stack = (this.inherits ? this.inherits.stack.concat(obj) : [obj]);
+      this.style = parseStyleAttr(obj.getAttribute('style'));
       this.allowedChildren = [];
       this.attr = function(key) {
         return obj.getAttribute(key);
@@ -886,7 +902,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let id = temp[1] || temp[2] || temp[3] || temp[4];
         if (id) {
           let svgObj = svg.getElementById(id);
-          if (this.getStack().indexOf(svgObj) === -1) {
+          if (this.stack.indexOf(svgObj) === -1) {
             return svgObj;
           } else {
             warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
@@ -958,26 +974,26 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return arguments[arguments.length - 1];
       };
       this.get = function(key) {
-        if (cache[key] !== undefined) {return cache[key];}
+        if (styleCache[key] !== undefined) {return styleCache[key];}
         let keyInfo = Properties[key] || {}, value, result;
         if (useCSS && key !== 'transform') { // the CSS transform behaves strangely
           if (!this.css) {this.css = getComputedStyle(obj);}
           value = this.css[keyInfo.css || key] || this.attr(key);
         } else {
-          value = this.attr(key);
+          value = this.style[key] || this.attr(key);
         }
         if (value === 'inherit') {
-          result = (this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
-          if (result != null) {return cache[key] = result;}
+          result = (this.inherits ? this.inherits.get(key) : keyInfo.initial);
+          if (result != null) {return styleCache[key] = result;}
         }
         if (keyInfo.values != null) {
           result = keyInfo.values[value];
-          if (result != null) {return cache[key] = result;}
+          if (result != null) {return styleCache[key] = result;}
         }
         if (value !== null && value !== undefined) {
           switch (key) {
             case 'font-size':
-              result = this.computeLength(value, this.getInherit() ? this.getInherit().get(key) : keyInfo.initial, undefined, true);
+              result = this.computeLength(value, this.inherits ? this.inherits.get(key) : keyInfo.initial, undefined, true);
               break;
             case 'baseline-shift':
               result = this.computeLength(value, this.get('font-size'));
@@ -1080,27 +1096,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               break;
           }
         }
-        if (result != null) {return cache[key] = result;}
-        return cache[key] = (keyInfo.inherit && this.getInherit() ? this.getInherit().get(key) : keyInfo.initial);
-      };
-      this.getInherit = function() {
-        if (cache['<inherit>'] !== undefined) {return cache['<inherit>'];}
-        if (!inherits && obj !== svg && obj.parentNode) {
-          inherits = new SvgElem(obj.parentNode, null);
-        }
-        return cache['<inherit>'] = inherits;
-      };
-      this.getStack = function() {
-        if (cache['<stack>'] !== undefined) {return cache['<stack>'];}
-        let inherit = this.getInherit();
-        if (inherit) {
-          return cache['<stack>'] = inherit.getStack().concat(obj);
-        } else {
-          return cache['<stack>'] = [obj];
-        }
+        if (result != null) {return styleCache[key] = result;}
+        return styleCache[key] = (keyInfo.inherit && this.inherits ? this.inherits.get(key) : keyInfo.initial);
       };
       this.getChildren = function() {
-        if (cache['<children>'] !== undefined) {return cache['<children>'];}
+        if (childrenCache !== null) {return childrenCache;}
         let children = [];
         for (let i = 0; i < obj.childNodes.length; i++) {
           let child = obj.childNodes[i];
@@ -1108,41 +1108,25 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             children.push(new SvgElem(child, this));
           }
         }
-        return cache['<children>'] = children;
+        return childrenCache = children;
       };
       this.getParentVWidth = function() {
-        if (cache['<parentVWidth>'] !== undefined) {return cache['<parentVWidth>'];}
-        let inherit = this.getInherit();
-        if (inherit) {
-          return cache['<parentVWidth>'] = inherit.getVWidth();
-        } else {
-          return cache['<parentVWidth>'] = viewportWidth;
-        }
+        return (this.inherits ? this.inherits.getVWidth(): viewportWidth);
       };
       this.getParentVHeight = function() {
-        if (cache['<parentVHeight>'] !== undefined) {return cache['<parentVHeight>'];}
-        let inherit = this.getInherit();
-        if (inherit) {
-          return cache['<parentVHeight>'] = inherit.getVHeight();
-        } else {
-          return cache['<parentVHeight>'] = viewportHeight;
-        }
+        return (this.inherits ? this.inherits.getVHeight() : viewportHeight);
       };
       this.getParentViewport = function() {
-        if (cache['<parentViewport>'] !== undefined) {return cache['<parentViewport>'];}
-        return cache['<parentViewport>'] = Math.sqrt(0.5 * this.getParentVWidth() * this.getParentVWidth() + 0.5 * this.getParentVHeight() * this.getParentVHeight());
+        return Math.sqrt(0.5 * this.getParentVWidth() * this.getParentVWidth() + 0.5 * this.getParentVHeight() * this.getParentVHeight());
       };
       this.getVWidth = function() {
-        if (cache['<vWidth>'] !== undefined) {return cache['<vWidth>'];}
-        return cache['<vWidth>'] = this.getParentVWidth();
+        return this.getParentVWidth();
       };
       this.getVHeight = function() {
-        if (cache['<vHeight>'] !== undefined) {return cache['<vHeight>'];}
-        return cache['<vHeight>'] = this.getParentVHeight();
+        return this.getParentVHeight();
       };
       this.getViewport = function() {
-        if (cache['<viewport>'] !== undefined) {return cache['<viewport>'];}
-        return cache['<viewport>'] = Math.sqrt(0.5 * this.getVWidth() * this.getVWidth() + 0.5 * this.getVHeight() * this.getVHeight());
+        return Math.sqrt(0.5 * this.getVWidth() * this.getVWidth() + 0.5 * this.getVHeight() * this.getVHeight());
       };
       this.getBoundingBox = function() {
         let shape = this.getBoundingShape();
@@ -1893,7 +1877,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
       this.getBoundingShape = function() {
-        return this.getInherit().getBoundingShape();
+        return this.inherits.getBoundingShape();
       };
       this.drawTextInDocument = function(isClip, isMask) {
         let fill = this.getFill(isClip, isMask),
