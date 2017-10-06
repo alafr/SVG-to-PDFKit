@@ -9,14 +9,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let group = new (function PDFGroup() {})();
       group.name = 'G' + (doc._groupCount = (doc._groupCount || 0) + 1);
       group.closed = false;
+      group.resources = doc.ref();
       group.xobj = doc.ref({
         Type: 'XObject',
         Subtype: 'Form',
         FormType: 1,
         BBox: [-1000000, -1000000, 1000000, 1000000],
         Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false},
-        Resources: doc.page.resources
+        Resources: group.resources
       });
+      group.xobj.write('');
       group.parentGroup = doc._currentGroup;
       group.savedCtm = doc._ctm;
       doc._currentGroup = group;
@@ -25,6 +27,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
     function docEndGroup(group) {
       if (group !== doc._currentGroup || group.closed) {throw new Error('Group not matching or already closed');}
+      group.resources.data = doc.page.resources.data;
+      group.resources.end();
       group.xobj.end();
       group.closed = true;
       doc._currentGroup = group.parentGroup;
@@ -179,7 +183,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         })(this, '' + id) || null;
       };
-      let parser = new StringParser(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').trim());
+      let parser = new StringParser(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').replace(/<\?[\s\S]*?\?>/g, '').trim());
       let result = (function recursive() {
         let temp, child, node, attr, value;
         if (temp = parser.match(/^<([\w:.-]+)\s*/, true)) { // Opening tag
