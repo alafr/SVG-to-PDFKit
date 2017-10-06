@@ -370,7 +370,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return [scaleX, 0, 0, scaleY, dx * (availWidth - elemWidth * scaleX), dy * (availHeight - elemHeight * scaleY)];
     }
     function parseStyleAttr(v) {
-      let result = {};
+      let result = Object.create(null);
       v = (v || '').trim().split(/;/);
       for (let i = 0; i < v.length; i++) {
         let key = (v[i].split(':')[0] || '').trim(),
@@ -892,10 +892,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.isOuterElement = obj === svg || !obj.parentNode;
       this.inherits = inherits || (!this.isOuterElement ? new SvgElem(obj.parentNode, null) : null);
       this.stack = (this.inherits ? this.inherits.stack.concat(obj) : [obj]);
-      this.style = parseStyleAttr(obj.getAttribute('style'));
+      this.style = parseStyleAttr(typeof obj.getAttribute === 'function' && obj.getAttribute('style'));
       this.allowedChildren = [];
       this.attr = function(key) {
-        return obj.getAttribute(key);
+        if (typeof obj.getAttribute === 'function') {
+          return obj.getAttribute(key);
+        }
       };
       this.resolveUrl = function(value) {
         let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
