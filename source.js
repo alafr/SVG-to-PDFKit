@@ -379,6 +379,47 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           result[key] = value;
         }
       }
+      if (result['marker']) {
+        if (!result['marker-start']) {result['marker-start'] = result['marker'];}
+        if (!result['marker-mid']) {result['marker-mid'] = result['marker'];}
+        if (!result['marker-end']) {result['marker-end'] = result['marker'];}
+      }
+      if (result['font']) {
+        let fontFamily = null, fontSize = null, fontStyle = "normal", fontWeight = "normal", fontVariant = "normal";
+        let parts = result['font'].split(/\s+/);
+        for (let i = 0; i < parts.length; i++) {
+          switch (parts[i]) {
+            case "normal":
+              break;
+            case "italic": case "oblique":
+              fontStyle = parts[i];
+              break;
+            case "small-caps":
+              fontVariant = parts[i];
+              break;
+            case "bold": case "bolder": case "lighter": case "100": case "200": case "300":
+            case "400": case "500": case "600": case "700": case "800": case "900":
+              fontWeight = parts[i];
+              break;
+            default:
+              if (!fontSize) {
+                fontSize = parts[i].split('/')[0];
+              } else {
+                if (!fontFamily) {
+                  fontFamily = parts[i];
+                } else {
+                  fontFamily += ' ' + parts[i];
+                }
+              }
+              break;
+          }
+        }
+        if (!result['font-style']) {result['font-style'] = fontStyle;}
+        if (!result['font-variant']) {result['font-variant'] = fontVariant;}
+        if (!result['font-weight']) {result['font-weight'] = fontWeight;}
+        if (!result['font-size']) {result['font-size'] = fontSize;}
+        if (!result['font-family']) {result['font-family'] = fontFamily;}
+      }
       return result;
     }
     function combineArrays(array1, array2) {
