@@ -5,7 +5,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       (this._currentGroup && this._currentGroup.xobj || this.page).write(data);
       return this;
     };
-    function docBeginGroup() {
+    function docBeginGroup(bbox) {
       let group = new (function PDFGroup() {})();
       group.name = 'G' + (doc._groupCount = (doc._groupCount || 0) + 1);
       group.closed = false;
@@ -14,13 +14,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         Type: 'XObject',
         Subtype: 'Form',
         FormType: 1,
-        BBox: [-1000000, -1000000, 1000000, 1000000],
+        BBox: bbox,
         Group: {S: 'Transparency', CS: 'DeviceRGB', I: true, K: false},
         Resources: group.resources
       });
       group.xobj.write('');
       group.parentGroup = doc._currentGroup;
-      group.savedCtm = doc._ctm;
+      group.parentMatrix = doc._ctm;
       doc._currentGroup = group;
       doc._ctm = [1, 0, 0, 1, 0, 0];
       return group;
@@ -32,7 +32,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       group.xobj.end();
       group.closed = true;
       doc._currentGroup = group.parentGroup;
-      doc._ctm = group.savedCtm;
+      doc._ctm = group.parentMatrix;
       return doc;
     };
     function docInsertGroup(group) {
@@ -293,9 +293,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return result;
     }
-    function transformBBox(bbox, m) {
-      return [m[0] * bbox[0] + m[2] * bbox[1] + m[4],   m[1] * bbox[0] + m[3] * bbox[1] + m[5],
-              m[0] * bbox[2] + m[2] * bbox[3] + m[4],   m[1] * bbox[2] + m[3] * bbox[3] + m[5]];
+    function transformPoint(p, m) {
+      return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
+    }
+    function getGlobalMatrix() {
+      let group = doc._currentGroup,
+          ctm = doc._ctm;
+      while (group) {
+        ctm = multiplyMatrix(group.parentMatrix, ctm);
+        group = group.parentGroup;
+      }
+      return ctm;
+    }
+    function getPageBBox() {
+      return new SvgShape().M(0, 0).L(doc.page.width, 0).L(doc.page.width, doc.page.height).L(0, doc.page.height)
+                           .transform(inverseMatrix(getGlobalMatrix())).boundingBox;
     }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
@@ -800,12 +812,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       // Shape functions
       this.transform = function(m) {
-        for (var i = 0; i < pathCommands.length; i++) {
+        for (let i = 0; i < pathCommands.length; i++) {
           let data = pathCommands[i];
-          for (var j = 3; j < data.length; j+=2) {
-            var x = data[j], y = data[j+1];
-            data[j] = m[0] * x + m[2] * y + m[4];
-            data[j+1] = m[1] * x + m[3] * y + m[5];
+          for (let j = 3; j < data.length; j+=2) {
+            let p = transformPoint([data[j], data[j + 1]], m)
+            data[j] = p[0];
+            data[j + 1] = p[1];
           }
         }
         return this.resetCommands().resetProperties();
@@ -1260,7 +1272,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             masked = this.mask(),
             group;
         if ((this.get('opacity') < 1 || clipped || masked) && !isClip) {
-          group = docBeginGroup();
+          group = docBeginGroup(getPageBBox());
         }
         this.drawChildren(isClip, isMask);
         if (group) {
@@ -1484,7 +1496,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         matrix = multiplyMatrix(matrix, [1, 0, 0, 1, x, y]);
         if ((matrix = validateMatrix(matrix)) && (aspectRatioMatrix = validateMatrix(aspectRatioMatrix)) && (width = validateNumber(width)) && (height = validateNumber(height))) {
-          let group = docBeginGroup();
+          let group = docBeginGroup([0, 0, width, height]);
           doc.transform.apply(doc, aspectRatioMatrix);
           this.drawChildren(isClip, isMask);
           docEndGroup(group);
@@ -1562,26 +1574,30 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
           }
           if (spread === 'reflect' || spread === 'repeat') {
-            var tbbox = transformBBox(bBox, inverseMatrix(matrix));
-            if (this.name === 'linearGradient') {
-              nAfter  = Math.max((tbbox[0] - x2) * (x2 - x1) + (tbbox[1] - y2) * (y2 - y1),
-                                 (tbbox[0] - x2) * (x2 - x1) + (tbbox[3] - y2) * (y2 - y1),
-                                 (tbbox[2] - x2) * (x2 - x1) + (tbbox[1] - y2) * (y2 - y1),
-                                 (tbbox[2] - x2) * (x2 - x1) + (tbbox[3] - y2) * (y2 - y1))
-                                   / ((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
-              nBefore = Math.max((tbbox[0] - x1) * (x1 - x2) + (tbbox[1] - y1) * (y1 - y2),
-                                 (tbbox[0] - x1) * (x1 - x2) + (tbbox[3] - y1) * (y1 - y2),
-                                 (tbbox[2] - x1) * (x1 - x2) + (tbbox[1] - y1) * (y1 - y2),
-                                 (tbbox[2] - x1) * (x1 - x2) + (tbbox[3] - y1) * (y1 - y2))
-                                   / ((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+            let inv = inverseMatrix(matrix),
+                corner1 = transformPoint([bBox[0], bBox[1]], inv),
+                corner2 = transformPoint([bBox[2], bBox[1]], inv),  
+                corner3 = transformPoint([bBox[2], bBox[3]], inv),
+                corner4 = transformPoint([bBox[0], bBox[3]], inv);
+            if (this.name === 'linearGradient') { // See file 'gradient-repeat-maths.png'
+              nAfter  = Math.max((corner1[0] - x2) * (x2 - x1) + (corner1[1] - y2) * (y2 - y1),
+                                 (corner2[0] - x2) * (x2 - x1) + (corner2[1] - y2) * (y2 - y1),
+                                 (corner3[0] - x2) * (x2 - x1) + (corner3[1] - y2) * (y2 - y1),
+                                 (corner4[0] - x2) * (x2 - x1) + (corner4[1] - y2) * (y2 - y1))
+                                / (Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+              nBefore = Math.max((corner1[0] - x1) * (x1 - x2) + (corner1[1] - y1) * (y1 - y2),
+                                 (corner2[0] - x1) * (x1 - x2) + (corner2[1] - y1) * (y1 - y2),
+                                 (corner3[0] - x1) * (x1 - x2) + (corner3[1] - y1) * (y1 - y2),
+                                 (corner4[0] - x1) * (x1 - x2) + (corner4[1] - y1) * (y1 - y2))
+                                / (Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
             } else {
-              nAfter  = Math.sqrt(Math.max(Math.pow(tbbox[0] - x2, 2) + Math.pow(tbbox[1] - y2, 2),
-                                           Math.pow(tbbox[0] - x2, 2) + Math.pow(tbbox[3] - y2, 2),
-                                           Math.pow(tbbox[2] - x2, 2) + Math.pow(tbbox[1] - y2, 2),
-                                           Math.pow(tbbox[2] - x2, 2) + Math.pow(tbbox[3] - y2, 2))) / r2;
+              nAfter  = Math.sqrt(Math.max(Math.pow(corner1[0] - x2, 2) + Math.pow(corner1[1] - y2, 2),
+                                           Math.pow(corner2[0] - x2, 2) + Math.pow(corner2[1] - y2, 2),
+                                           Math.pow(corner3[0] - x2, 2) + Math.pow(corner3[1] - y2, 2),
+                                           Math.pow(corner4[0] - x2, 2) + Math.pow(corner4[1] - y2, 2))) / r2 - 1;
             }
-            nAfter = Math.ceil(nAfter);
-            nBefore = Math.ceil(nBefore);
+            nAfter = Math.ceil(nAfter + 0.5); // Add a little more because the stroke can extend outside of the bounding box
+            nBefore = Math.ceil(nBefore + 0.5);
             nTotal = nBefore + 1 + nAfter; // How many times the gradient needs to be repeated to fill the object bounding box
           }
           if (this.name === 'linearGradient') {
@@ -1642,7 +1658,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let masked = this.mask(),
               group;
           if (masked) {
-            group = docBeginGroup();
+            group = docBeginGroup(getPageBBox());
           }
           let subPaths = this.shape.getSubPaths(),
               fill = this.getFill(isClip, isMask),
@@ -1856,7 +1872,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.translate(-refX, -refY);
         let group;
         if (this.get('opacity') < 1 && !isClip) {
-          group = docBeginGroup();
+          group = docBeginGroup(getPageBBox());
         }
         this.drawChildren(isClip, isMask);
         if (group) {
@@ -1873,7 +1889,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
       this.useMask = function(bBox) {
-        let group = docBeginGroup();
+        let group = docBeginGroup(getPageBBox());
         doc.save();
         if (this.attr('clipPathUnits') === 'objectBoundingBox') {
           doc.transform(bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]);
@@ -1891,7 +1907,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
       this.useMask = function(bBox) {
-        let group = docBeginGroup();
+        let group = docBeginGroup(getPageBBox());
         doc.save();
         let x, y, w, h;
         if (this.attr('maskUnits') === 'userSpaceOnUse') {
@@ -1923,6 +1939,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getBoundingShape = function() {
         return this.inherits.getBoundingShape();
       };
+      this.getDecorationShape = function(dy, w) {
+        let shape = new SvgShape();
+        for (let i = 0, pos = this._pos; i < pos.length; i++) {
+          let pos = this._pos[i];
+          if (!pos.hidden) {
+            let dx0 = (dy + w/2) * Math.sin(pos.rotate), dy0 = -(dy + w/2) * Math.cos(pos.rotate),
+                dx1 = (dy - w/2) * Math.sin(pos.rotate), dy1 = -(dy - w/2) * Math.cos(pos.rotate),
+                dx2 = pos.width * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
+            shape.M(pos.x + dx0, pos.y + dy0).L(pos.x + dx0 + dx2, pos.y + dy0 + dy2)
+                 .L(pos.x + dx1 + dx2, pos.y + dy1 + dy2).L(pos.x + dx1, pos.y + dy1).Z();
+          }
+        }
+        return shape;
+      }
       this.drawTextInDocument = function(isClip, isMask) {
         let fill = this.getFill(isClip, isMask),
             stroke = this.getStroke(isClip, isMask),
@@ -2211,7 +2241,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.clip();
         let masked = this.mask(), group;
         if (masked) {
-          group = docBeginGroup();
+          group = docBeginGroup(getPageBBox());
         }
         this.drawTextInDocument(isClip, isMask);
         if (group) {
