@@ -35,6 +35,9 @@ Insert SVG into a PDF document created with PDFKit.
 
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/options.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/options.htm</a>
 
+#### NodeJS example:
+&nbsp; &nbsp; <a href="https://runkit.com/alafr/5a1377ff160182001232a91d" target="_blank">https://runkit.com/alafr/5a1377ff160182001232a91d</a>
+
 #### Supported:
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
  - special elements: use, nested svg
