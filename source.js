@@ -1,13 +1,9 @@
 var SVGtoPDF = function(doc, svg, x, y, options) {
     "use strict";
 
-    doc.addContent = function(data) {
-      (this._currentGroup && this._currentGroup.xobj || this.page).write(data);
-      return this;
-    };
     function docBeginGroup(bbox) {
       let group = new (function PDFGroup() {})();
-      group.name = 'G' + (doc._groupCount = (doc._groupCount || 0) + 1);
+      group.name = 'G' + (++groupCount);
       group.closed = false;
       group.resources = doc.ref();
       group.xobj = doc.ref({
@@ -19,31 +15,34 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         Resources: group.resources
       });
       group.xobj.write('');
-      group.parentGroup = doc._currentGroup;
-      group.parentMatrix = doc._ctm;
-      doc._currentGroup = group;
+      group.savedMatrix = doc._ctm;
+      group.savedPage = doc.page;
+      groupStack.push(group);
       doc._ctm = [1, 0, 0, 1, 0, 0];
+      doc.page = {
+        width: doc.page.width, height: doc.page.height,
+        write: function(data) {group.xobj.write(data);},
+        fonts: {}, xobjects: {}, ext_gstates: {}, patterns: {}
+      };
       return group;
     };
     function docEndGroup(group) {
-      if (group !== doc._currentGroup || group.closed) {throw new Error('Group not matching or already closed');}
-      group.resources.data = doc.page.resources.data;
+      if (group !== groupStack.pop()) {throw('Group not matching');}
+      if (Object.keys(doc.page.fonts).length) {group.resources.data.Font = doc.page.fonts;}
+      if (Object.keys(doc.page.xobjects).length) {group.resources.data.XObject = doc.page.xobjects;}
+      if (Object.keys(doc.page.ext_gstates).length) {group.resources.data.ExtGState = doc.page.ext_gstates;}
+      if (Object.keys(doc.page.patterns).length) {group.resources.data.Pattern = doc.page.patterns;}
       group.resources.end();
       group.xobj.end();
-      group.closed = true;
-      doc._currentGroup = group.parentGroup;
-      doc._ctm = group.parentMatrix;
-      return doc;
+      doc._ctm = group.savedMatrix;
+      doc.page = group.savedPage;
     };
     function docInsertGroup(group) {
-      if (!group.closed) {throw new Error('Group not closed');}
       doc.page.xobjects[group.name] = group.xobj;
       doc.addContent('/' + group.name + ' Do');
-      return doc;
     };
     function docApplyMask(group, clip) {
-      if (!group.closed) {throw new Error('Group not closed');}
-      let name = 'M'+ (doc._maskCount = (doc._maskCount || 0) + 1);
+      let name = 'M'+ (++maskCount);
       let gstate = doc.ref({
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
         SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
@@ -51,10 +50,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       gstate.end();
       doc.page.ext_gstates[name] = gstate;
       doc.addContent('/' + name + ' gs');
-      return doc;
     };
     function docCreatePattern(group, x, y, dx, dy, matrix) {
-      if (!group.closed) {throw new Error('Group not closed');}
       let pattern = new (function PDFPattern() {})();
       pattern.group = group;
       pattern.x = x;
@@ -65,7 +62,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return pattern;
     };
     function docUsePattern(pattern, stroke) {
-      let name = 'P' + (doc._patternCount = (doc._patternCount || 0) + 1);
+      let name = 'P' + (++patternCount);
       let ref = doc.ref({
         Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
         BBox: [pattern.x, pattern.y, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
@@ -85,24 +82,23 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.addContent('/Pattern cs');
         doc.addContent('/' + name + ' scn');
       }
-      return doc;
     };
     function docBeginText(font, size) {
       if (!doc.page.fonts[font.id]) {doc.page.fonts[font.id] = font.ref();}
-      return doc.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
+      doc.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
     }
     function docSetTextMatrix(a, b, c, d, e, f) {
-      return doc.addContent(validateNumber(a) + ' ' + validateNumber(b) + ' ' + validateNumber(-c) + ' '  + validateNumber(-d) + ' ' + validateNumber(e) + ' ' + validateNumber(f) + ' Tm');
+      doc.addContent(validateNumber(a) + ' ' + validateNumber(b) + ' ' + validateNumber(-c) + ' '  + validateNumber(-d) + ' ' + validateNumber(e) + ' ' + validateNumber(f) + ' Tm');
     }
     function docSetTextMode(fill, stroke) {
       let mode = fill && stroke ? 2 : stroke ? 1 : fill ? 0 : 3;
-      return doc.addContent(mode + ' Tr');
+      doc.addContent(mode + ' Tr');
     }
     function docWriteGlyph(glyph) {
-      return doc.addContent('<' + glyph + '> Tj');
+      doc.addContent('<' + glyph + '> Tj');
     }
     function docEndText() {
-      return doc.addContent('ET');
+      doc.addContent('ET');
     }
     function docFillColor(color, opacity) {
       if (color.constructor.name === 'PDFPattern') {
@@ -297,11 +293,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
     }
     function getGlobalMatrix() {
-      let group = doc._currentGroup,
-          ctm = doc._ctm;
-      while (group) {
-        ctm = multiplyMatrix(group.parentMatrix, ctm);
-        group = group.parentGroup;
+      let ctm = doc._ctm;
+      for (let i = groupStack.length - 1; i >= 0; i--) {
+        ctm = multiplyMatrix(groupStack[i].savedMatrix, ctm);
       }
       return ctm;
     }
@@ -907,6 +901,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'baseline-shift':     {inherit: true, initial: 'baseline', values: {'baseline':'baseline', 'sub':'sub', 'super':'super'}},
       'word-spacing':       {inherit: true, initial: 0, values: {normal:0}},
       'letter-spacing':     {inherit: true, initial: 0, values: {normal:0}},
+      'text-decoration':    {inherit: false, initial: 'none', values: {'none':'none', 'underline':'underline', 'overline':'overline', 'line-through':'line-through'}},
       'xml:space':          {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
       'marker-start':       {inherit: true, initial: 'none'},
       'marker-mid':         {inherit: true, initial: 'none'},
@@ -1212,6 +1207,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let opacity = this.get('opacity'),
             fill = this.get('fill'),
             fillOpacity = this.get('fill-opacity');
+        if (isClip) {return ['white', 1];}
         if (fill !== 'none' && opacity && fillOpacity) {
           if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
             return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
@@ -1223,6 +1219,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let opacity = this.get('opacity'),
             stroke = this.get('stroke'),
             strokeOpacity = this.get('stroke-opacity');
+        if (isClip) {return;}
         if (stroke !== 'none' && opacity && strokeOpacity) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
@@ -1939,21 +1936,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getBoundingShape = function() {
         return this.inherits.getBoundingShape();
       };
-      this.getDecorationShape = function(dy, w) {
-        let shape = new SvgShape();
-        for (let i = 0, pos = this._pos; i < pos.length; i++) {
-          let pos = this._pos[i];
-          if (!pos.hidden) {
-            let dx0 = (dy + w/2) * Math.sin(pos.rotate), dy0 = -(dy + w/2) * Math.cos(pos.rotate),
-                dx1 = (dy - w/2) * Math.sin(pos.rotate), dy1 = -(dy - w/2) * Math.cos(pos.rotate),
-                dx2 = pos.width * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
-            shape.M(pos.x + dx0, pos.y + dy0).L(pos.x + dx0 + dx2, pos.y + dy0 + dy2)
-                 .L(pos.x + dx1 + dx2, pos.y + dy1 + dy2).L(pos.x + dx1, pos.y + dy1).Z();
-          }
-        }
-        return shape;
-      }
       this.drawTextInDocument = function(isClip, isMask) {
+        if (this.get('text-decoration') === 'underline') {
+          this.decorate(0.05 * this._font.size, -0.075 * this._font.size, isClip, isMask);
+        }
+        if (this.get('text-decoration') === 'overline') {
+          this.decorate(0.05 * this._font.size, getAscent(this._font.font, this._font.size) + 0.075 * this._font.size, isClip, isMask);
+        }
         let fill = this.getFill(isClip, isMask),
             stroke = this.getStroke(isClip, isMask),
             strokeWidth = this.get('stroke-width');
@@ -1977,20 +1966,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             case '#text':
               if (this.get('visibility') === 'hidden') {continue;}
               if (fill || stroke || isClip) {
-                if (!isClip) {
-                  if (fill) {
-                    docFillColor.apply(doc, fill);
-                  }
-                  if (stroke && strokeWidth) {
-                    docStrokeColor.apply(doc, stroke);
-                    doc.lineWidth(strokeWidth)
-                       .miterLimit(this.get('stroke-miterlimit'))
-                       .lineJoin(this.get('stroke-linejoin'))
-                       .lineCap(this.get('stroke-linecap'))
-                       .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
-                  }
-                } else {
-                  doc.fillColor('white');
+                if (fill) {
+                  docFillColor.apply(doc, fill);
+                }
+                if (stroke && strokeWidth) {
+                  docStrokeColor.apply(doc, stroke);
+                  doc.lineWidth(strokeWidth)
+                     .miterLimit(this.get('stroke-miterlimit'))
+                     .lineJoin(this.get('stroke-linejoin'))
+                     .lineCap(this.get('stroke-linecap'))
+                     .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
                 }
                 docBeginText(this._font.font, this._font.size);
                 if (!isClip) {
@@ -2008,6 +1993,46 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 docEndText();
               }
               break;
+          }
+        }
+        if (this.get('text-decoration') === 'line-through') {
+          this.decorate(0.05 * this._font.size, 0.5 * (getAscent(this._font.font, this._font.size) + getDescent(this._font.font, this._font.size)), isClip, isMask);
+        }
+      };
+      this.decorate = function(lineWidth, linePosition, isClip, isMask) {
+        let fill = this.getFill(isClip, isMask),
+            stroke = this.getStroke(isClip, isMask);
+        if (fill) {
+          docFillColor.apply(doc, fill);
+        }
+        if (stroke) {
+          docStrokeColor.apply(doc, stroke);
+          doc.lineWidth(this.get('stroke-width'))
+             .miterLimit(this.get('stroke-miterlimit'))
+             .lineJoin(this.get('stroke-linejoin'))
+             .lineCap(this.get('stroke-linecap'))
+             .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
+        }
+        for (let j = 0, pos = this._pos; j < pos.length; j++) {
+          if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
+            let dx0 = (linePosition + lineWidth / 2) * Math.sin(pos[j].rotate),
+                dy0 = -(linePosition + lineWidth / 2) * Math.cos(pos[j].rotate),
+                dx1 = (linePosition - lineWidth / 2) * Math.sin(pos[j].rotate),
+                dy1 = -(linePosition - lineWidth / 2) * Math.cos(pos[j].rotate),
+                dx2 = pos[j].width * Math.cos(pos[j].rotate),
+                dy2 = pos[j].width * Math.sin(pos[j].rotate);
+            new SvgShape().M(pos[j].x + dx0, pos[j].y + dy0)
+                          .L(pos[j].x + dx0 + dx2, pos[j].y + dy0 + dy2)
+                          .L(pos[j].x + dx1 + dx2, pos[j].y + dy1 + dy2)
+                          .L(pos[j].x + dx1, pos[j].y + dy1).Z()
+                          .insertInDocument();
+            if (fill && stroke) {
+              doc.fillAndStroke();
+            } else if (fill) {
+              doc.fill();
+            } else if (stroke) {
+              doc.stroke();
+            }
           }
         }
       };
@@ -2128,21 +2153,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 for (let w = 0; w < words.length; w++) {
                   let pos = getTextPos(currentElem._font.font, currentElem._font.size, words[w]);
                   for (let j = 0; j < pos.length; j++) {
-                    let index = currentElem._index;
-                    if (currentElem._x[index] !== undefined) {doAnchoring(); currentX = currentElem._x[index];}
-                    if (currentElem._y[index] !== undefined) {doAnchoring(); currentY = currentElem._y[index];}
-                    currentX += (currentElem._dx[index] || 0);
-                    currentY += (currentElem._dy[index] || 0);
+                    let index = currentElem._index,
+                        xAttr = currentElem._x[index],
+                        yAttr = currentElem._y[index],
+                        dxAttr = currentElem._dx[index],
+                        dyAttr = currentElem._dy[index],
+                        rotAttr = currentElem._rot[index],
+                        continuous = !(w === 0 && j === 0);
+                    if (xAttr !== undefined) {continuous = false; doAnchoring(); currentX = xAttr;}
+                    if (yAttr !== undefined) {continuous = false; doAnchoring(); currentY = yAttr;}
+                    if (dxAttr !== undefined) {continuous = false; currentX += dxAttr;}
+                    if (dyAttr !== undefined) {continuous = false; currentY += dyAttr;}
+                    if (rotAttr !== undefined || currentElem._defRot !== 0) {continuous = false;}
                     let position = {
                       glyph: pos[j].glyph,
-                      rotate: (Math.PI / 180) * currentElem.chooseValue(currentElem._rot[index], currentElem._defRot),
+                      rotate: (Math.PI / 180) * currentElem.chooseValue(rotAttr, currentElem._defRot),
                       x: currentX + pos[j].xOffset,
                       y: currentY + baseline + pos[j].yOffset,
                       width: pos[j].width,
                       ascent: getAscent(currentElem._font.font, currentElem._font.size),
                       descent: getDescent(currentElem._font.font, currentElem._font.size),
                       scale: 1,
-                      hidden: false
+                      hidden: false,
+                      continuous: continuous
                     };
                     currentChunk.push(position);
                     childElem._pos.push(position);
@@ -2205,6 +2238,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
                 currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
                 currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
+                currentElem._pos[j].continuous = false;
               }
             }
           } else {
@@ -2262,7 +2296,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback,
-        precision = Math.ceil(Math.max(1, options.precision)) || 3;
+        precision = Math.ceil(Math.max(1, options.precision)) || 3,
+        groupStack = [],
+        groupCount = 0,
+        maskCount = 0,
+        patternCount = 0;
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
