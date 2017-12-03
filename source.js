@@ -931,7 +931,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'path': if (this instanceof SvgElemPath) {break;} else {return new SvgElemPath(obj, inherits);}
         case 'text': if (this instanceof SvgElemText) {break;} else {return new SvgElemText(obj, inherits);}
         case 'tspan': if (this instanceof SvgElemTspan) {break;} else {return new SvgElemTspan(obj, inherits);}
-        case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
+        case 'textPath': if (this instanceof SvgElemTextPath || this instanceof SvgElemPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
         case '#text': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
       }
       let styleCache = Object.create(null);
@@ -1850,7 +1850,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
-      this.shape = new SvgPath(this.attr('d'));
+      this.shape = new SvgPath(this.attr('path') || this.attr('d'));
       this.pathLength = Math.max(0, this.getLength('pathLength', this.getViewport(), 0)) || undefined;
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
@@ -2066,9 +2066,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
-      if (pathObj && pathObj.nodeName === 'path') {
-        this.path = new SvgElemPath(pathObj, this);
+      if (this.attr('path') || this.attr('d')) {
+        this.path = new SvgElemPath(obj, this);
+      } else {
+        let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
+        if (pathObj && pathObj.nodeName === 'path') {
+          this.path = new SvgElemPath(pathObj, this);
+        }
       }
     };
 
