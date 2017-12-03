@@ -4,7 +4,7 @@ Insert SVG into a PDF document created with PDFKit.
 #### Use:
 
     SVGtoPDF(doc, svg, x, y, options);
-    
+
 &nbsp; &nbsp; If you prefer, you can add the function to the PDFDocument prototype:
 
     PDFDocument.prototype.addSVG = function(svg, x, y, options) {
@@ -12,7 +12,7 @@ Insert SVG into a PDF document created with PDFKit.
     };
 
 &nbsp; &nbsp; And then simply call:
-    
+
     doc.addSVG(svg, x, y, options);
 
 #### Parameters:
@@ -26,6 +26,7 @@ Insert SVG into a PDF document created with PDFKit.
       - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
       - fontCallback [function] = function called to get the fonts, see source code
       - imageCallback [function] = same as above for the images (for Node.js)
+      - resolveUrlCallback [function] = called to resolve an href to either an id fragment or SvgElem object
       - warningCallback [function] = function called when there is a warning
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
       - precision [number] = precision factor for approximative calculations (default = 3)
@@ -63,7 +64,7 @@ Insert SVG into a PDF document created with PDFKit.
 #### Warning:
  - Use an updated PDFKit version (≥0.8.1): see <a href="https://github.com/alafr/pdfkit/wiki/How-to-install-and-build-a-PDFKit-branch">here</a> how to build it, or use the prebuilt file in the <a href="https://github.com/alafr/SVG-to-PDFKit/tree/master/examples">examples</a> folder.
  - There are bugs, please send issues and/or pull requests.
- 
+
 #### License:
 &nbsp; &nbsp; <a href="http://choosealicense.com/licenses/mit/">MIT</a>
 

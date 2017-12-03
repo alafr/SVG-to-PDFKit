@@ -540,9 +540,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return lengthMap;
       })();
       let totalLength = this.totalLength = lengthMap[divisions];
-      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ? 
+      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
-      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ? 
+      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
       this.boundingBox = (function() {
         let temp;
@@ -931,7 +931,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'path': if (this instanceof SvgElemPath) {break;} else {return new SvgElemPath(obj, inherits);}
         case 'text': if (this instanceof SvgElemText) {break;} else {return new SvgElemText(obj, inherits);}
         case 'tspan': if (this instanceof SvgElemTspan) {break;} else {return new SvgElemTspan(obj, inherits);}
-        case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
+        case 'textPath': if (this instanceof SvgElemTextPath || this instanceof SvgElemPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
         case '#text': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
       }
       let styleCache = Object.create(null);
@@ -949,8 +949,23 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.resolveUrl = function(value) {
-        let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
-        let id = temp[1] || temp[2] || temp[3] || temp[4];
+        let id;
+        if (resolveUrlCallback) {
+            const resolved = resolveUrlCallback(value);
+            switch (typeof resolved) {
+              case 'object':
+                return resolved;
+              case 'string':
+                id = resolved;
+                break;
+              default:
+                warningCallback('SVGtoPDF: unknown resolved value for ' + value);
+            }
+        }
+        if (!id) {
+            const temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
+            id = temp[1] || temp[2] || temp[3] || temp[4];
+        }
         if (id) {
           let svgObj = svg.getElementById(id);
           if (this.stack.indexOf(svgObj) === -1) {
@@ -1573,7 +1588,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (spread === 'reflect' || spread === 'repeat') {
             let inv = inverseMatrix(matrix),
                 corner1 = transformPoint([bBox[0], bBox[1]], inv),
-                corner2 = transformPoint([bBox[2], bBox[1]], inv),  
+                corner2 = transformPoint([bBox[2], bBox[1]], inv),
                 corner3 = transformPoint([bBox[2], bBox[3]], inv),
                 corner4 = transformPoint([bBox[0], bBox[3]], inv);
             if (this.name === 'linearGradient') { // See file 'gradient-repeat-maths.png'
@@ -1835,7 +1850,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
-      this.shape = new SvgPath(this.attr('d'));
+      this.shape = new SvgPath(this.attr('path') || this.attr('d'));
       this.pathLength = Math.max(0, this.getLength('pathLength', this.getViewport(), 0)) || undefined;
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
@@ -2051,9 +2066,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
-      if (pathObj && pathObj.nodeName === 'path') {
-        this.path = new SvgElemPath(pathObj, this);
+      if (this.attr('path') || this.attr('d')) {
+        this.path = new SvgElemPath(obj, this);
+      } else {
+        let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
+        if (pathObj && pathObj.nodeName === 'path') {
+          this.path = new SvgElemPath(pathObj, this);
+        }
       }
     };
 
@@ -2296,6 +2315,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback,
+        resolveUrlCallback = options.resolveUrlCallback,
         precision = Math.ceil(Math.max(1, options.precision)) || 3,
         groupStack = [],
         groupCount = 0,
