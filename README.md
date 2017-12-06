@@ -1,7 +1,12 @@
 # SVG-to-PDFKit
 Insert SVG into a PDF document created with PDFKit.
 
-#### Use:
+## Install
+```
+npm install svg-to-pdfkit --save
+```
+
+## Use
 
     SVGtoPDF(doc, svg, x, y, options);
     
@@ -15,7 +20,7 @@ Insert SVG into a PDF document created with PDFKit.
     
     doc.addSVG(svg, x, y, options);
 
-#### Parameters:
+## Parameters
 
     doc [PDFDocument] = the PDF document created with PDFKit
     svg [SVGElement or string] = the SVG object or XML code
@@ -30,15 +35,15 @@ Insert SVG into a PDF document created with PDFKit.
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
       - precision [number] = precision factor for approximative calculations (default = 3)
 
-#### Demos:
+## Demos
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/demo.htm</a>
 
 &nbsp; &nbsp; <a href="https://alafr.github.io/SVG-to-PDFKit/examples/options.htm" target="_blank">https://alafr.github.io/SVG-to-PDFKit/examples/options.htm</a>
 
-#### NodeJS example:
+## NodeJS example
 &nbsp; &nbsp; <a href="https://runkit.com/alafr/5a1377ff160182001232a91d" target="_blank">https://runkit.com/alafr/5a1377ff160182001232a91d</a>
 
-#### Supported:
+## Supported
  - shapes: rect, circle, path, ellipse, line, polyline, polygon
  - special elements: use, nested svg
  - text elements: text, tspan, textPath
@@ -53,21 +58,21 @@ Insert SVG into a PDF document created with PDFKit.
  - gradients
  - patterns
 
-#### Unsupported:
+## Unsupported
  - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
  - filters
  - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
 
-#### Warning:
+## Warning
  - Use an updated PDFKit version (≥0.8.1): see <a href="https://github.com/alafr/pdfkit/wiki/How-to-install-and-build-a-PDFKit-branch">here</a> how to build it, or use the prebuilt file in the <a href="https://github.com/alafr/SVG-to-PDFKit/tree/master/examples">examples</a> folder.
  - There are bugs, please send issues and/or pull requests.
  
-#### License:
+## License
 &nbsp; &nbsp; <a href="http://choosealicense.com/licenses/mit/">MIT</a>
 
-#### Other useful projects:
+## Other useful projects
  - <a href="https://github.com/devongovett/pdfkit">PDFKit</a>, the JavaScript PDF generation library for Node and the browser.
  - For inserting SVG graphics into a PDFKit document there is also <a href="https://github.com/devongovett/svgkit">svgkit</a>.
  - For the opposite conversion, from PDF to SVG, you can use <a href="https://github.com/mozilla/pdf.js">Mozilla's PDF.js</a>.
