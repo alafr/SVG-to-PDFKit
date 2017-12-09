@@ -2,9 +2,8 @@
 Insert SVG into a PDF document created with PDFKit.
 
 ## Install
-```
-npm install svg-to-pdfkit --save
-```
+
+    npm install svg-to-pdfkit --save
 
 ## Use
 
@@ -61,7 +60,7 @@ npm install svg-to-pdfkit --save
 ## Unsupported
  - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
  - filters
- - text attributes: text-decoration, font-variant, writing-mode, unicode-bidi
+ - text attributes: font-variant, writing-mode, unicode-bidi
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
 
