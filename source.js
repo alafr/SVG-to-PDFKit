@@ -949,16 +949,43 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.resolveUrl = function(value) {
-        let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
-        let id = temp[1] || temp[2] || temp[3] || temp[4];
+        let temp = (value || '').match(/^\s*(?:url\((.*)#(.*)\)|url\("(.*)#(.*)"\)|url\('(.*)#(.*)'\)|(.*)#(.*))\s*$/) || [];
+        let file = temp[1] || temp[3] || temp[5] || temp[7],
+            id = temp[2] || temp[4] || temp[6] || temp[8];
         if (id) {
-          let svgObj = svg.getElementById(id);
-          if (this.stack.indexOf(svgObj) === -1) {
-            return svgObj;
-          } else {
-            warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
+          if (!file) {
+            let svgObj = svg.getElementById(id);
+            if (svgObj) {
+              if (this.stack.indexOf(svgObj) === -1) {
+                return svgObj;
+              } else {
+                warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
+                return;
+              }
+            }
           }
-          return null;
+          if (documentCallback) {
+            let svgs = documentCache[file];
+            if (!svgs) {
+              svgs = documentCallback(file);
+              if (!Array.isArray(svgs)) {svgs = [svgs];}
+              for (let i = 0; i < svgs.length; i++) {
+                if (typeof svgs[i] === 'string') {svgs[i] = parseXml(svgs[i]);}
+              }
+              documentCache[file] = svgs;
+            }
+            for (let i = 0; i < svgs.length; i++) {
+              let svgObj = svgs[i].getElementById(id);
+              if (svgObj) {
+                if (this.stack.indexOf(svgObj) === -1) {
+                  return svgObj;
+                } else {
+                  warningCallback('SVGtoPDF: loop of circular references for id "' + file + '#' + id + '"');
+                  return;
+                }
+              }
+            }
+          }
         }
       };
       this.computeUnits = function(value, unit, percent, isFontSize) {
@@ -1836,7 +1863,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
       this.shape = new SvgPath(this.attr('d'));
-      this.pathLength = Math.max(0, this.getLength('pathLength', this.getViewport(), 0)) || undefined;
+      let pathLength = this.getLength('pathLength', this.getViewport());
+      this.pathLength = pathLength > 0 ? pathLength : undefined;
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
 
@@ -1978,11 +2006,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                      .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
                 }
                 docBeginText(this._font.font, this._font.size);
-                if (!isClip) {
-                  docSetTextMode(!!fill, !!stroke);
-                } else {
-                  docSetTextMode(true, false);
-                }
+                docSetTextMode(!!fill, !!stroke);
                 for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
                   if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
                     let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (this._font.fauxItalic ? -0.25 : 0);
@@ -2051,9 +2075,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
-      if (pathObj && pathObj.nodeName === 'path') {
-        this.path = new SvgElemPath(pathObj, this);
+      let pathObject, pathLength, temp;
+      if ((temp = this.attr('path')) && temp.trim() !== '') {
+        let pathLength = this.getLength('pathLength', this.getViewport());
+        this.pathObject = new SvgPath(temp);
+        this.pathLength = pathLength > 0 ? pathLength : this.pathObject.totalLength;
+        this.pathScale = this.pathObject.totalLength / this.pathLength;
+      } else if ((temp = this.getUrl('href') || this.getUrl('xlink:href')) && temp.nodeName === 'path') {
+        let pathElem = new SvgElemPath(temp, this);
+        this.pathObject = pathElem.shape.transform(pathElem.get('transform'));
+        this.pathLength = this.chooseValue(pathElem.pathLength, this.pathObject.totalLength);
+        this.pathScale = this.pathObject.totalLength / this.pathLength;
       }
     };
 
@@ -2217,28 +2249,25 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         }
         function textOnPath(currentElem) {
-          let pathElem = currentElem.path;
-          if (pathElem) {
-            let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
-                pathComputedLength = pathObject.totalLength,
-                pathLength = pathElem.chooseValue(pathElem.pathLength, pathComputedLength),
-                pathLengthScale = pathComputedLength / pathLength,
-                textOffset = currentElem.getLength('startOffset', pathLength, 0) * pathLengthScale;
+          let pathObject = currentElem.pathObject,
+              pathLength = currentElem.pathLength,
+              pathScale = currentElem.pathScale;
+          if (pathObject) {
+            let textOffset = currentElem.getLength('startOffset', pathLength, 0);
             for (let j = 0; j < currentElem._pos.length; j++) {
-              if (isNotEqual(pathLengthScale, 1)) {
-                currentElem._pos[j].x *= pathLengthScale;
-                currentElem._pos[j].scale *= pathLengthScale;
-                currentElem._pos[j].width *= pathLengthScale;
-              }
               let charMidX = textOffset + currentElem._pos[j].x + 0.5 * currentElem._pos[j].width;
-              if (charMidX > pathComputedLength || charMidX < 0) {
+              if (charMidX > pathLength || charMidX < 0) {
                 currentElem._pos[j].hidden = true;
               } else {
-                let pointOnPath = pathObject.getPointAtLength(charMidX);
+                let pointOnPath = pathObject.getPointAtLength(charMidX * pathScale);
                 currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
                 currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
                 currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
                 currentElem._pos[j].continuous = false;
+                if (isNotEqual(pathScale, 1)) {
+                  currentElem._pos[j].scale *= pathScale;
+                  currentElem._pos[j].width *= pathScale;
+                }
               }
             }
           } else {
@@ -2296,11 +2325,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback,
+        documentCallback = options.documentCallback,
         precision = Math.ceil(Math.max(1, options.precision)) || 3,
         groupStack = [],
         groupCount = 0,
         maskCount = 0,
-        patternCount = 0;
+        patternCount = 0,
+        documentCache = {};
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
@@ -2331,6 +2362,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       imageCallback = function(link) {
         return link.replace(/\s+/g, '');
       };
+    }
+    if (typeof documentCallback !== 'function') {
+      documentCallback = null;
     }
 
     if (typeof svg === 'string') {svg = parseXml(svg);}
