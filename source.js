@@ -51,11 +51,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       doc.page.ext_gstates[name] = gstate;
       doc.addContent('/' + name + ' gs');
     };
-    function docCreatePattern(group, x, y, dx, dy, matrix) {
+    function docCreatePattern(group, dx, dy, matrix) {
       let pattern = new (function PDFPattern() {})();
       pattern.group = group;
-      pattern.x = x;
-      pattern.y = y;
       pattern.dx = dx;
       pattern.dy = dy;
       pattern.matrix = matrix || [1, 0, 0, 1, 0, 0];
@@ -65,7 +63,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let name = 'P' + (++patternCount);
       let ref = doc.ref({
         Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
-        BBox: [pattern.x, pattern.y, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
+        BBox: [0, 0, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
         Matrix: multiplyMatrix(doc._ctm, pattern.matrix),
         Resources: {
           ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
@@ -1527,7 +1525,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.transform.apply(doc, aspectRatioMatrix);
           this.drawChildren(isClip, isMask);
           docEndGroup(group);
-          return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
+          return [docCreatePattern(group, width, height, matrix), gOpacity];
         } else {
           return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
         }
