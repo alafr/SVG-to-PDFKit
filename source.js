@@ -2261,14 +2261,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 currentElem._pos[j].hidden = true;
               } else {
                 let pointOnPath = pathObject.getPointAtLength(charMidX * pathScale);
-                currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
-                currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
-                currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
-                currentElem._pos[j].continuous = false;
                 if (isNotEqual(pathScale, 1)) {
                   currentElem._pos[j].scale *= pathScale;
                   currentElem._pos[j].width *= pathScale;
                 }
+                currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
+                currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
+                currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
+                currentElem._pos[j].continuous = false;
               }
             }
           } else {
