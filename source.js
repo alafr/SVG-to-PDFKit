@@ -51,11 +51,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       doc.page.ext_gstates[name] = gstate;
       doc.addContent('/' + name + ' gs');
     };
-    function docCreatePattern(group, x, y, dx, dy, matrix) {
+    function docCreatePattern(group, dx, dy, matrix) {
       let pattern = new (function PDFPattern() {})();
       pattern.group = group;
-      pattern.x = x;
-      pattern.y = y;
       pattern.dx = dx;
       pattern.dy = dy;
       pattern.matrix = matrix || [1, 0, 0, 1, 0, 0];
@@ -65,7 +63,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let name = 'P' + (++patternCount);
       let ref = doc.ref({
         Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
-        BBox: [pattern.x, pattern.y, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
+        BBox: [0, 0, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
         Matrix: multiplyMatrix(doc._ctm, pattern.matrix),
         Resources: {
           ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
@@ -323,6 +321,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function validateNumber(n) {
       return n > -1e21 && n < 1e21 ? Math.round(n * 1e6) / 1e6 : 0;
     }
+    function isArrayLike(v) {
+      return typeof v === 'object' && v !== null && typeof v.length === 'number';
+    }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
       while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
@@ -540,9 +541,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return lengthMap;
       })();
       let totalLength = this.totalLength = lengthMap[divisions];
-      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ? 
+      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
-      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ? 
+      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
       this.boundingBox = (function() {
         let temp;
@@ -949,16 +950,43 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.resolveUrl = function(value) {
-        let temp = (value || '').match(/^\s*(?:url\(#(.*)\)|url\("#(.*)"\)|url\('#(.*)'\)|#(.*))\s*$/) || [];
-        let id = temp[1] || temp[2] || temp[3] || temp[4];
+        let temp = (value || '').match(/^\s*(?:url\((.*)#(.*)\)|url\("(.*)#(.*)"\)|url\('(.*)#(.*)'\)|(.*)#(.*))\s*$/) || [];
+        let file = temp[1] || temp[3] || temp[5] || temp[7],
+            id = temp[2] || temp[4] || temp[6] || temp[8];
         if (id) {
-          let svgObj = svg.getElementById(id);
-          if (this.stack.indexOf(svgObj) === -1) {
-            return svgObj;
-          } else {
-            warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
+          if (!file) {
+            let svgObj = svg.getElementById(id);
+            if (svgObj) {
+              if (this.stack.indexOf(svgObj) === -1) {
+                return svgObj;
+              } else {
+                warningCallback('SVGtoPDF: loop of circular references for id "' + id + '"');
+                return;
+              }
+            }
           }
-          return null;
+          if (documentCallback) {
+            let svgs = documentCache[file];
+            if (!svgs) {
+              svgs = documentCallback(file);
+              if (!isArrayLike(svgs)) {svgs = [svgs];}
+              for (let i = 0; i < svgs.length; i++) {
+                if (typeof svgs[i] === 'string') {svgs[i] = parseXml(svgs[i]);}
+              }
+              documentCache[file] = svgs;
+            }
+            for (let i = 0; i < svgs.length; i++) {
+              let svgObj = svgs[i].getElementById(id);
+              if (svgObj) {
+                if (this.stack.indexOf(svgObj) === -1) {
+                  return svgObj;
+                } else {
+                  warningCallback('SVGtoPDF: loop of circular references for id "' + file + '#' + id + '"');
+                  return;
+                }
+              }
+            }
+          }
         }
       };
       this.computeUnits = function(value, unit, percent, isFontSize) {
@@ -1094,8 +1122,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 value = (value || '').split(' ');
                 let object = this.resolveUrl(value[0]),
                     fallbackColor = parseColor(value[1]);
-                if (object === undefined) {return;}           // resolveUrl() returns undefined if the string has not a correct url syntax
-                if (object === null) {return fallbackColor;}  // and it returns null if the syntax looks good but the element was not found
+                if (object === undefined) {return fallbackColor;}
                 if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
                   return new SvgElemGradient(object, null, fallbackColor);
                 }
@@ -1497,7 +1524,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.transform.apply(doc, aspectRatioMatrix);
           this.drawChildren(isClip, isMask);
           docEndGroup(group);
-          return [docCreatePattern(group, 0, 0, width, height, matrix), gOpacity];
+          return [docCreatePattern(group, width, height, matrix), gOpacity];
         } else {
           return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
         }
@@ -1573,7 +1600,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (spread === 'reflect' || spread === 'repeat') {
             let inv = inverseMatrix(matrix),
                 corner1 = transformPoint([bBox[0], bBox[1]], inv),
-                corner2 = transformPoint([bBox[2], bBox[1]], inv),  
+                corner2 = transformPoint([bBox[2], bBox[1]], inv),
                 corner3 = transformPoint([bBox[2], bBox[3]], inv),
                 corner4 = transformPoint([bBox[0], bBox[3]], inv);
             if (this.name === 'linearGradient') { // See file 'gradient-repeat-maths.png'
@@ -1836,7 +1863,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
       this.shape = new SvgPath(this.attr('d'));
-      this.pathLength = Math.max(0, this.getLength('pathLength', this.getViewport(), 0)) || undefined;
+      let pathLength = this.getLength('pathLength', this.getViewport());
+      this.pathLength = pathLength > 0 ? pathLength : undefined;
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
     };
 
@@ -1978,11 +2006,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                      .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
                 }
                 docBeginText(this._font.font, this._font.size);
-                if (!isClip) {
-                  docSetTextMode(!!fill, !!stroke);
-                } else {
-                  docSetTextMode(true, false);
-                }
+                docSetTextMode(!!fill, !!stroke);
                 for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
                   if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
                     let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (this._font.fauxItalic ? -0.25 : 0);
@@ -2051,9 +2075,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text'];
-      let pathObj = this.getUrl('href') || this.getUrl('xlink:href');
-      if (pathObj && pathObj.nodeName === 'path') {
-        this.path = new SvgElemPath(pathObj, this);
+      let pathObject, pathLength, temp;
+      if ((temp = this.attr('path')) && temp.trim() !== '') {
+        let pathLength = this.getLength('pathLength', this.getViewport());
+        this.pathObject = new SvgPath(temp);
+        this.pathLength = pathLength > 0 ? pathLength : this.pathObject.totalLength;
+        this.pathScale = this.pathObject.totalLength / this.pathLength;
+      } else if ((temp = this.getUrl('href') || this.getUrl('xlink:href')) && temp.nodeName === 'path') {
+        let pathElem = new SvgElemPath(temp, this);
+        this.pathObject = pathElem.shape.transform(pathElem.get('transform'));
+        this.pathLength = this.chooseValue(pathElem.pathLength, this.pathObject.totalLength);
+        this.pathScale = this.pathObject.totalLength / this.pathLength;
       }
     };
 
@@ -2217,24 +2249,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         }
         function textOnPath(currentElem) {
-          let pathElem = currentElem.path;
-          if (pathElem) {
-            let pathObject = pathElem.shape.clone().transform(pathElem.get('transform')),
-                pathComputedLength = pathObject.totalLength,
-                pathLength = pathElem.chooseValue(pathElem.pathLength, pathComputedLength),
-                pathLengthScale = pathComputedLength / pathLength,
-                textOffset = currentElem.getLength('startOffset', pathLength, 0) * pathLengthScale;
+          let pathObject = currentElem.pathObject,
+              pathLength = currentElem.pathLength,
+              pathScale = currentElem.pathScale;
+          if (pathObject) {
+            let textOffset = currentElem.getLength('startOffset', pathLength, 0);
             for (let j = 0; j < currentElem._pos.length; j++) {
-              if (isNotEqual(pathLengthScale, 1)) {
-                currentElem._pos[j].x *= pathLengthScale;
-                currentElem._pos[j].scale *= pathLengthScale;
-                currentElem._pos[j].width *= pathLengthScale;
-              }
               let charMidX = textOffset + currentElem._pos[j].x + 0.5 * currentElem._pos[j].width;
-              if (charMidX > pathComputedLength || charMidX < 0) {
+              if (charMidX > pathLength || charMidX < 0) {
                 currentElem._pos[j].hidden = true;
               } else {
-                let pointOnPath = pathObject.getPointAtLength(charMidX);
+                let pointOnPath = pathObject.getPointAtLength(charMidX * pathScale);
+                if (isNotEqual(pathScale, 1)) {
+                  currentElem._pos[j].scale *= pathScale;
+                  currentElem._pos[j].width *= pathScale;
+                }
                 currentElem._pos[j].x = pointOnPath[0] - 0.5 * currentElem._pos[j].width * Math.cos(pointOnPath[2]) - currentElem._pos[j].y * Math.sin(pointOnPath[2]);
                 currentElem._pos[j].y = pointOnPath[1] - 0.5 * currentElem._pos[j].width * Math.sin(pointOnPath[2]) + currentElem._pos[j].y * Math.cos(pointOnPath[2]);
                 currentElem._pos[j].rotate = pointOnPath[2] + currentElem._pos[j].rotate;
@@ -2296,11 +2325,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback = options.warningCallback,
         fontCallback = options.fontCallback,
         imageCallback = options.imageCallback,
+        documentCallback = options.documentCallback,
         precision = Math.ceil(Math.max(1, options.precision)) || 3,
         groupStack = [],
         groupCount = 0,
         maskCount = 0,
-        patternCount = 0;
+        patternCount = 0,
+        documentCache = {};
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
@@ -2331,6 +2362,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       imageCallback = function(link) {
         return link.replace(/\s+/g, '');
       };
+    }
+    if (typeof documentCallback !== 'function') {
+      documentCallback = null;
     }
 
     if (typeof svg === 'string') {svg = parseXml(svg);}
