@@ -323,6 +323,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function validateNumber(n) {
       return n > -1e21 && n < 1e21 ? Math.round(n * 1e6) / 1e6 : 0;
     }
+    function isArrayLike(v) {
+      return typeof v === 'object' && v !== null && typeof v.length === 'number';
+    }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
       while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
@@ -968,7 +971,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             let svgs = documentCache[file];
             if (!svgs) {
               svgs = documentCallback(file);
-              if (!Array.isArray(svgs)) {svgs = [svgs];}
+              if (!isArrayLike(svgs)) {svgs = [svgs];}
               for (let i = 0; i < svgs.length; i++) {
                 if (typeof svgs[i] === 'string') {svgs[i] = parseXml(svgs[i]);}
               }
