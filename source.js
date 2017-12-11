@@ -541,9 +541,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return lengthMap;
       })();
       let totalLength = this.totalLength = lengthMap[divisions];
-      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ? 
+      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
-      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ? 
+      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ?
                                Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
       this.boundingBox = (function() {
         let temp;
@@ -1122,8 +1122,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 value = (value || '').split(' ');
                 let object = this.resolveUrl(value[0]),
                     fallbackColor = parseColor(value[1]);
-                if (object === undefined) {return;}           // resolveUrl() returns undefined if the string has not a correct url syntax
-                if (object === null) {return fallbackColor;}  // and it returns null if the syntax looks good but the element was not found
+                if (object === undefined) {return fallbackColor;}
                 if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
                   return new SvgElemGradient(object, null, fallbackColor);
                 }
@@ -1601,7 +1600,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (spread === 'reflect' || spread === 'repeat') {
             let inv = inverseMatrix(matrix),
                 corner1 = transformPoint([bBox[0], bBox[1]], inv),
-                corner2 = transformPoint([bBox[2], bBox[1]], inv),  
+                corner2 = transformPoint([bBox[2], bBox[1]], inv),
                 corner3 = transformPoint([bBox[2], bBox[3]], inv),
                 corner4 = transformPoint([bBox[0], bBox[3]], inv);
             if (this.name === 'linearGradient') { // See file 'gradient-repeat-maths.png'
