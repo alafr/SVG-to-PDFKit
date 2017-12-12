@@ -4,7 +4,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function docBeginGroup(bbox) {
       let group = new (function PDFGroup() {})();
       group.name = 'G' + (++groupCount);
-      group.closed = false;
       group.resources = doc.ref();
       group.xobj = doc.ref({
         Type: 'XObject',
