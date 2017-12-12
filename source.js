@@ -86,8 +86,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             Matrix: multiplyMatrix(doc._ctm, pattern.matrix),
             Resources: {
                 ProcSet: ['PDF', 'Text', 'ImageB', 'ImageC', 'ImageI'],
-                XObject: (function() { let temp = {};
-                    temp[pattern.group.name] = pattern.group.xobj; return temp; })()
+                XObject: (function() {
+                    let temp = {};
+                    temp[pattern.group.name] = pattern.group.xobj;
+                    return temp;
+                })()
             }
         });
         ref.write('/' + pattern.group.name + ' Do');
@@ -1059,12 +1062,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 minY = getCurveValue(0, equationY),
                 maxX = getCurveValue(1, equationX),
                 maxY = getCurveValue(1, equationY);
-            if (minX > maxX) { temp = maxX;
+            if (minX > maxX) {
+                temp = maxX;
                 maxX = minX;
-                minX = temp; }
-            if (minY > maxY) { temp = maxY;
+                minX = temp;
+            }
+            if (minY > maxY) {
+                temp = maxY;
                 maxY = minY;
-                minY = temp; }
+                minY = temp;
+            }
             solveEquation(derivativeX).forEach(function(t) {
                 if (t >= 0 && t <= 1) {
                     let x = getCurveValue(t, equationX);
@@ -2792,16 +2799,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                                         dyAttr = currentElem._dy[index],
                                         rotAttr = currentElem._rot[index],
                                         continuous = !(w === 0 && j === 0);
-                                    if (xAttr !== undefined) { continuous = false;
+                                    if (xAttr !== undefined) {
+                                        continuous = false;
                                         doAnchoring();
-                                        currentX = xAttr; }
-                                    if (yAttr !== undefined) { continuous = false;
+                                        currentX = xAttr;
+                                    }
+                                    if (yAttr !== undefined) {
+                                        continuous = false;
                                         doAnchoring();
-                                        currentY = yAttr; }
-                                    if (dxAttr !== undefined) { continuous = false;
-                                        currentX += dxAttr; }
-                                    if (dyAttr !== undefined) { continuous = false;
-                                        currentY += dyAttr; }
+                                        currentY = yAttr;
+                                    }
+                                    if (dxAttr !== undefined) {
+                                        continuous = false;
+                                        currentX += dxAttr;
+                                    }
+                                    if (dyAttr !== undefined) {
+                                        continuous = false;
+                                        currentY += dyAttr;
+                                    }
                                     if (rotAttr !== undefined || currentElem._defRot !== 0) { continuous = false; }
                                     let position = {
                                         glyph: pos[j].glyph,
