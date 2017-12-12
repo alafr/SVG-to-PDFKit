@@ -37,6 +37,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (Object.keys(doc.page.xobjects).length) { group.resources.data.XObject = doc.page.xobjects; }
         if (Object.keys(doc.page.ext_gstates).length) { group.resources.data.ExtGState = doc.page.ext_gstates; }
         if (Object.keys(doc.page.patterns).length) { group.resources.data.Pattern = doc.page.patterns; }
+        group.resources.data.ColorSpace = (function() {
+            var output = {};
+            var i = 1;
+            for (var item in doc.spotColors) {
+                item = doc.spotColors[item];
+                output[`CS${i++}`] = `${item.id} 0 R`;
+            };
+            return output;
+        })();
         group.resources.end();
         group.xobj.end();
         doc._ctm = group.savedMatrix;
@@ -1717,7 +1726,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                             value = (value || '').split(' ');
                             let object = this.resolveUrl(value[0]),
                                 fallbackColor = parseColor(value[1]);
-                            if (object === undefined) { return; } // resolveUrl() returns undefined if the string has not a correct url syntax
+                            if (object === undefined) {
+                                return doc.spotColors[value[0]] ? value[0] : undefined;
+                            } // resolveUrl() returns undefined if the string has not a correct url syntax
                             if (object === null) { return fallbackColor; } // and it returns null if the syntax looks good but the element was not found
                             if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
                                 return new SvgElemGradient(object, null, fallbackColor);
@@ -1839,6 +1850,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             if (fill !== 'none' && opacity && fillOpacity) {
                 if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
                     return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
+                } else if (typeof fill === 'string') {
+                    return fill;
                 }
                 return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
             }
@@ -2303,7 +2316,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 }
                 if (fill || stroke) {
                     if (fill) {
-                        docFillColor.apply(doc, fill);
+                        docFillColor.apply(doc, typeof fill === 'string' ? [fill] : fill);
                     }
                     if (stroke) {
                         let dashArray = this.get('stroke-dasharray'),
