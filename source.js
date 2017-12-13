@@ -101,16 +101,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       if (color.constructor.name === 'PDFPattern') {
         doc.fillOpacity(opacity);
         docUsePattern(color, false);
-      } else {
+      } else if (colorCallback) {
         doc.fillColor(colorCallback(color), opacity);
+      } else {
+        doc.fillColor(color, opacity);
       }
     }
     function docStrokeColor(color, opacity) {
       if (color.constructor.name === 'PDFPattern') {
         doc.strokeOpacity(opacity);
         docUsePattern(color, true);
-      } else {
+      } else if (colorCallback) {
         doc.strokeColor(colorCallback(color), opacity);
+      } else {
+        doc.strokeColor(color, opacity);
       }
     }
     function parseXml(xml) {
@@ -2364,9 +2368,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     }
     if (typeof colorCallback !== 'function') {
-      colorCallback = function(color) {
-        return color;
-      };
+      colorCallback = null;
     }
     if (typeof documentCallback !== 'function') {
       documentCallback = null;
