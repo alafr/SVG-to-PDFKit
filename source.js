@@ -1,6 +1,68 @@
 var SVGtoPDF = function(doc, svg, x, y, options) {
     "use strict";
 
+    const NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0],
+      chocolate: [210,105,30], coral: [255,127,80], cornflowerblue: [100,149,237], cornsilk: [255,248,220], crimson: [220,20,60], cyan: [0,255,255], darkblue: [0,0,139], darkcyan: [0,139,139], darkgoldenrod: [184,134,11], darkgray: [169,169,169], darkgrey: [169,169,169], darkgreen: [0,100,0], darkkhaki: [189,183,107], darkmagenta: [139,0,139], darkolivegreen: [85,107,47],
+      darkorange: [255,140,0], darkorchid: [153,50,204], darkred: [139,0,0], darksalmon: [233,150,122], darkseagreen: [143,188,143], darkslateblue: [72,61,139], darkslategray: [47,79,79], darkslategrey: [47,79,79], darkturquoise: [0,206,209], darkviolet: [148,0,211], deeppink: [255,20,147], deepskyblue: [0,191,255], dimgray: [105,105,105], dimgrey: [105,105,105],
+      dodgerblue: [30,144,255], firebrick: [178,34,34], floralwhite: [255,250,240], forestgreen: [34,139,34], fuchsia: [255,0,255], gainsboro: [220,220,220], ghostwhite: [248,248,255], gold: [255,215,0], goldenrod: [218,165,32], gray: [128,128,128], grey: [128,128,128], green: [0,128,0], greenyellow: [173,255,47], honeydew: [240,255,240], hotpink: [255,105,180],
+      indianred: [205,92,92], indigo: [75,0,130], ivory: [255,255,240], khaki: [240,230,140], lavender: [230,230,250], lavenderblush: [255,240,245], lawngreen: [124,252,0], lemonchiffon: [255,250,205], lightblue: [173,216,230], lightcoral: [240,128,128], lightcyan: [224,255,255], lightgoldenrodyellow: [250,250,210], lightgray: [211,211,211], lightgrey: [211,211,211],
+      lightgreen: [144,238,144], lightpink: [255,182,193], lightsalmon: [255,160,122], lightseagreen: [32,178,170], lightskyblue: [135,206,250], lightslategray: [119,136,153], lightslategrey: [119,136,153], lightsteelblue: [176,196,222], lightyellow: [255,255,224], lime: [0,255,0], limegreen: [50,205,50], linen: [250,240,230], magenta: [255,0,255], maroon: [128,0,0],
+      mediumaquamarine: [102,205,170], mediumblue: [0,0,205], mediumorchid: [186,85,211], mediumpurple: [147,112,219], mediumseagreen: [60,179,113], mediumslateblue: [123,104,238], mediumspringgreen: [0,250,154], mediumturquoise: [72,209,204], mediumvioletred: [199,21,133], midnightblue: [25,25,112], mintcream: [245,255,250], mistyrose: [255,228,225], moccasin: [255,228,181],
+      navajowhite: [255,222,173], navy: [0,0,128], oldlace: [253,245,230], olive: [128,128,0], olivedrab: [107,142,35], orange: [255,165,0], orangered: [255,69,0], orchid: [218,112,214], palegoldenrod: [238,232,170], palegreen: [152,251,152], paleturquoise: [175,238,238], palevioletred: [219,112,147], papayawhip: [255,239,213], peachpuff: [255,218,185], peru: [205,133,63],
+      pink: [255,192,203], plum: [221,160,221], powderblue: [176,224,230], purple: [128,0,128], rebeccapurple: [102,51,153], red: [255,0,0], rosybrown: [188,143,143], royalblue: [65,105,225], saddlebrown: [139,69,19], salmon: [250,128,114], sandybrown: [244,164,96], seagreen: [46,139,87], seashell: [255,245,238], sienna: [160,82,45], silver: [192,192,192], skyblue: [135,206,235],
+      slateblue: [106,90,205], slategray: [112,128,144], slategrey: [112,128,144], snow: [255,250,250], springgreen: [0,255,127], steelblue: [70,130,180], tan: [210,180,140], teal: [0,128,128], thistle: [216,191,216], tomato: [255,99,71], turquoise: [64,224,208], violet: [238,130,238], wheat: [245,222,179], white: [255,255,255], whitesmoke: [245,245,245], yellow: [255,255,0]};
+    const DefaultColors = {black: [NamedColors.black, 1], white: [NamedColors.white, 1], transparent: [NamedColors.black, 0]};
+    const Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249,
+      rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190,
+      iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221,
+      THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252,
+      yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949,
+      zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476,
+      trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744,
+      cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
+    const PathArguments = {A: 7, a: 7, C: 6, c: 6, H: 1, h: 1, L: 2, l: 2, M: 2, m: 2, Q: 4, q: 4, S: 4, s: 4, T: 2, t: 2, V: 1, v: 1, Z: 0, z: 0};
+    const PathFlags = {A3: true, A4: true, a3: true, a4: true};
+    const Properties = {
+      'color':              {inherit: true, initial: undefined},
+      'visibility':         {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
+      'fill':               {inherit: true, initial: DefaultColors.black},
+      'stroke':             {inherit: true, initial: 'none'},
+      'stop-color':         {inherit: false, initial: DefaultColors.black},
+      'fill-opacity':       {inherit: true, initial: 1},
+      'stroke-opacity':     {inherit: true, initial: 1},
+      'stop-opacity':       {inherit: false, initial: 1},
+      'fill-rule':          {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
+      'clip-rule':          {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
+      'stroke-width':       {inherit: true, initial: 1},
+      'stroke-dasharray':   {inherit: true, initial: []},
+      'stroke-dashoffset':  {inherit: true, initial: 0},
+      'stroke-miterlimit':  {inherit: true, initial: 4},
+      'stroke-linejoin':    {inherit: true, initial: 'miter', values: {'miter':'miter', 'round':'round', 'bevel':'bevel'}},
+      'stroke-linecap':     {inherit: true, initial: 'butt', values: {'butt':'butt', 'round':'round', 'square':'square'}},
+      'font-size':          {inherit: true, initial: 16, values: {'xx-small':9, 'x-small':10, 'small':13, 'medium':16, 'large':18, 'x-large':24, 'xx-large':32}},
+      'font-family':        {inherit: true, initial: 'sans-serif'},
+      'font-weight':        {inherit: true, initial: 'normal', values: {'600':'bold', '700':'bold', '800':'bold', '900':'bold', 'bold':'bold', 'bolder':'bold', '500':'normal', '400':'normal', '300':'normal', '200':'normal', '100':'normal', 'normal':'normal', 'lighter':'normal'}},
+      'font-style':         {inherit: true, initial: 'normal', values: {'italic':'italic', 'oblique':'italic', 'normal':'normal'}},
+      'text-anchor':        {inherit: true, initial: 'start', values: {'start':'start', 'middle':'middle', 'end':'end'}},
+      'direction':          {inherit: true, initial: 'ltr', values: {'ltr':'ltr', 'rtl':'rtl'}},
+      'dominant-baseline':  {inherit: true, initial: 'baseline', values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
+      'alignment-baseline': {inherit: false, initial: undefined, values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
+      'baseline-shift':     {inherit: true, initial: 'baseline', values: {'baseline':'baseline', 'sub':'sub', 'super':'super'}},
+      'word-spacing':       {inherit: true, initial: 0, values: {normal:0}},
+      'letter-spacing':     {inherit: true, initial: 0, values: {normal:0}},
+      'text-decoration':    {inherit: false, initial: 'none', values: {'none':'none', 'underline':'underline', 'overline':'overline', 'line-through':'line-through'}},
+      'xml:space':          {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
+      'marker-start':       {inherit: true, initial: 'none'},
+      'marker-mid':         {inherit: true, initial: 'none'},
+      'marker-end':         {inherit: true, initial: 'none'},
+      'opacity':            {inherit: false, initial: 1},
+      'transform':          {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
+      'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
+      'clip-path':          {inherit: false, initial: 'none'},
+      'mask':               {inherit: false, initial: 'none'},
+      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
+    };
+
     function docBeginGroup(bbox) {
       let group = new (function PDFGroup() {})();
       group.name = 'G' + (++groupCount);
@@ -24,7 +86,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         fonts: {}, xobjects: {}, ext_gstates: {}, patterns: {}
       };
       return group;
-    };
+    }
     function docEndGroup(group) {
       if (group !== groupStack.pop()) {throw('Group not matching');}
       if (Object.keys(doc.page.fonts).length) {group.resources.data.Font = doc.page.fonts;}
@@ -35,21 +97,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       group.xobj.end();
       doc._ctm = group.savedMatrix;
       doc.page = group.savedPage;
-    };
+    }
     function docInsertGroup(group) {
       doc.page.xobjects[group.name] = group.xobj;
       doc.addContent('/' + group.name + ' Do');
-    };
+    }
     function docApplyMask(group, clip) {
       let name = 'M'+ (++maskCount);
       let gstate = doc.ref({
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
-        SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0,0,0] : [1,1,1])}
+        SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0, 0, 0] : [1, 1, 1])}
       });
       gstate.end();
       doc.page.ext_gstates[name] = gstate;
       doc.addContent('/' + name + ' gs');
-    };
+    }
     function docCreatePattern(group, dx, dy, matrix) {
       let pattern = new (function PDFPattern() {})();
       pattern.group = group;
@@ -57,7 +119,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       pattern.dy = dy;
       pattern.matrix = matrix || [1, 0, 0, 1, 0, 0];
       return pattern;
-    };
+    }
     function docUsePattern(pattern, stroke) {
       let name = 'P' + (++patternCount);
       let ref = doc.ref({
@@ -79,7 +141,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.addContent('/Pattern cs');
         doc.addContent('/' + name + ' scn');
       }
-    };
+    }
     function docBeginText(font, size) {
       if (!doc.page.fonts[font.id]) {doc.page.fonts[font.id] = font.ref();}
       doc.addContent('BT').addContent('/' + font.id + ' ' + size + ' Tf');
@@ -97,24 +159,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function docEndText() {
       doc.addContent('ET');
     }
-    function docFillColor(color, opacity) {
-      if (color.constructor.name === 'PDFPattern') {
-        doc.fillOpacity(opacity);
-        docUsePattern(color, false);
-      } else if (colorCallback) {
-        doc.fillColor(colorCallback(color), opacity);
+    function docFillColor(color) {
+      if (color[0].constructor.name === 'PDFPattern') {
+        doc.fillOpacity(color[1]);
+        docUsePattern(color[0], false);
       } else {
-        doc.fillColor(color, opacity);
+        doc.fillColor(color[0], color[1]);
       }
     }
-    function docStrokeColor(color, opacity) {
-      if (color.constructor.name === 'PDFPattern') {
-        doc.strokeOpacity(opacity);
-        docUsePattern(color, true);
-      } else if (colorCallback) {
-        doc.strokeColor(colorCallback(color), opacity);
+    function docStrokeColor(color) {
+      if (color[0].constructor.name === 'PDFPattern') {
+        doc.strokeOpacity(color[1]);
+        docUsePattern(color[0], true);
       } else {
-        doc.strokeColor(color, opacity);
+        doc.strokeColor(color[0], color[1]);
       }
     }
     function parseXml(xml) {
@@ -228,14 +286,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return result;
     };
     function decodeEntities(str) {
-      let Entities = {quot: 34, amp: 38, lt: 60, gt: 62, apos: 39, OElig: 338, oelig: 339, Scaron: 352, scaron: 353, Yuml: 376, circ: 710, tilde: 732, ensp: 8194, emsp: 8195, thinsp: 8201, zwnj: 8204, zwj: 8205, lrm: 8206, rlm: 8207, ndash: 8211, mdash: 8212, lsquo: 8216, rsquo: 8217, sbquo: 8218, ldquo: 8220, rdquo: 8221, bdquo: 8222, dagger: 8224, Dagger: 8225, permil: 8240, lsaquo: 8249,
-           rsaquo: 8250, euro: 8364, nbsp: 160, iexcl: 161, cent: 162, pound: 163, curren: 164, yen: 165, brvbar: 166, sect: 167, uml: 168, copy: 169, ordf: 170, laquo: 171, not: 172, shy: 173, reg: 174, macr: 175, deg: 176, plusmn: 177, sup2: 178, sup3: 179, acute: 180, micro: 181, para: 182, middot: 183, cedil: 184, sup1: 185, ordm: 186, raquo: 187, frac14: 188, frac12: 189, frac34: 190,
-           iquest: 191, Agrave: 192, Aacute: 193, Acirc: 194, Atilde: 195, Auml: 196, Aring: 197, AElig: 198, Ccedil: 199, Egrave: 200, Eacute: 201, Ecirc: 202, Euml: 203, Igrave: 204, Iacute: 205, Icirc: 206, Iuml: 207, ETH: 208, Ntilde: 209, Ograve: 210, Oacute: 211, Ocirc: 212, Otilde: 213, Ouml: 214, times: 215, Oslash: 216, Ugrave: 217, Uacute: 218, Ucirc: 219, Uuml: 220, Yacute: 221,
-           THORN: 222, szlig: 223, agrave: 224, aacute: 225, acirc: 226, atilde: 227, auml: 228, aring: 229, aelig: 230, ccedil: 231, egrave: 232, eacute: 233, ecirc: 234, euml: 235, igrave: 236, iacute: 237, icirc: 238, iuml: 239, eth: 240, ntilde: 241, ograve: 242, oacute: 243, ocirc: 244, otilde: 245, ouml: 246, divide: 247, oslash: 248, ugrave: 249, uacute: 250, ucirc: 251, uuml: 252,
-           yacute: 253, thorn: 254, yuml: 255, fnof: 402, Alpha: 913, Beta: 914, Gamma: 915, Delta: 916, Epsilon: 917, Zeta: 918, Eta: 919, Theta: 920, Iota: 921, Kappa: 922, Lambda: 923, Mu: 924, Nu: 925, Xi: 926, Omicron: 927, Pi: 928, Rho: 929, Sigma: 931, Tau: 932, Upsilon: 933, Phi: 934, Chi: 935, Psi: 936, Omega: 937, alpha: 945, beta: 946, gamma: 947, delta: 948, epsilon: 949,
-           zeta: 950, eta: 951, theta: 952, iota: 953, kappa: 954, lambda: 955, mu: 956, nu: 957, xi: 958, omicron: 959, pi: 960, rho: 961, sigmaf: 962, sigma: 963, tau: 964, upsilon: 965, phi: 966, chi: 967, psi: 968, omega: 969, thetasym: 977, upsih: 978, piv: 982, bull: 8226, hellip: 8230, prime: 8242, Prime: 8243, oline: 8254, frasl: 8260, weierp: 8472, image: 8465, real: 8476,
-           trade: 8482, alefsym: 8501, larr: 8592, uarr: 8593, rarr: 8594, darr: 8595, harr: 8596, crarr: 8629, lArr: 8656, uArr: 8657, rArr: 8658, dArr: 8659, hArr: 8660, forall: 8704, part: 8706, exist: 8707, empty: 8709, nabla: 8711, isin: 8712, notin: 8713, ni: 8715, prod: 8719, sum: 8721, minus: 8722, lowast: 8727, radic: 8730, prop: 8733, infin: 8734, ang: 8736, and: 8743, or: 8744,
-           cap: 8745, cup: 8746, int: 8747, there4: 8756, sim: 8764, cong: 8773, asymp: 8776, ne: 8800, equiv: 8801, le: 8804, ge: 8805, sub: 8834, sup: 8835, nsub: 8836, sube: 8838, supe: 8839, oplus: 8853, otimes: 8855, perp: 8869, sdot: 8901, lceil: 8968, rceil: 8969, lfloor: 8970, rfloor: 8971, lang: 9001, rang: 9002, loz: 9674, spades: 9824, clubs: 9827, hearts: 9829, diams: 9830};
       return(str.replace(/&(?:#([0-9]+)|#[xX]([0-9A-Fa-f]+)|([0-9A-Za-z]+));/g, function(mt, m0, m1, m2) {
         if (m0) {return String.fromCharCode(parseInt(m0, 10));}
         else if (m1) {return String.fromCharCode(parseInt(m1, 16));}
@@ -243,41 +293,32 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         else {return mt;}
       }));
     }
-    function parseColor(v) {
-      let NamedColors = {aliceblue: [240,248,255], antiquewhite: [250,235,215], aqua: [0,255,255], aquamarine: [127,255,212], azure: [240,255,255], beige: [245,245,220], bisque: [255,228,196], black: [0,0,0], blanchedalmond: [255,235,205], blue: [0,0,255], blueviolet: [138,43,226], brown: [165,42,42], burlywood: [222,184,135], cadetblue: [95,158,160], chartreuse: [127,255,0],
-           chocolate: [210,105,30], coral: [255,127,80], cornflowerblue: [100,149,237], cornsilk: [255,248,220], crimson: [220,20,60], cyan: [0,255,255], darkblue: [0,0,139], darkcyan: [0,139,139], darkgoldenrod: [184,134,11], darkgray: [169,169,169], darkgrey: [169,169,169], darkgreen: [0,100,0], darkkhaki: [189,183,107], darkmagenta: [139,0,139], darkolivegreen: [85,107,47],
-           darkorange: [255,140,0], darkorchid: [153,50,204], darkred: [139,0,0], darksalmon: [233,150,122], darkseagreen: [143,188,143], darkslateblue: [72,61,139], darkslategray: [47,79,79], darkslategrey: [47,79,79], darkturquoise: [0,206,209], darkviolet: [148,0,211], deeppink: [255,20,147], deepskyblue: [0,191,255], dimgray: [105,105,105], dimgrey: [105,105,105],
-           dodgerblue: [30,144,255], firebrick: [178,34,34], floralwhite: [255,250,240], forestgreen: [34,139,34], fuchsia: [255,0,255], gainsboro: [220,220,220], ghostwhite: [248,248,255], gold: [255,215,0], goldenrod: [218,165,32], gray: [128,128,128], grey: [128,128,128], green: [0,128,0], greenyellow: [173,255,47], honeydew: [240,255,240], hotpink: [255,105,180],
-           indianred: [205,92,92], indigo: [75,0,130], ivory: [255,255,240], khaki: [240,230,140], lavender: [230,230,250], lavenderblush: [255,240,245], lawngreen: [124,252,0], lemonchiffon: [255,250,205], lightblue: [173,216,230], lightcoral: [240,128,128], lightcyan: [224,255,255], lightgoldenrodyellow: [250,250,210], lightgray: [211,211,211], lightgrey: [211,211,211],
-           lightgreen: [144,238,144], lightpink: [255,182,193], lightsalmon: [255,160,122], lightseagreen: [32,178,170], lightskyblue: [135,206,250], lightslategray: [119,136,153], lightslategrey: [119,136,153], lightsteelblue: [176,196,222], lightyellow: [255,255,224], lime: [0,255,0], limegreen: [50,205,50], linen: [250,240,230], magenta: [255,0,255], maroon: [128,0,0],
-           mediumaquamarine: [102,205,170], mediumblue: [0,0,205], mediumorchid: [186,85,211], mediumpurple: [147,112,219], mediumseagreen: [60,179,113], mediumslateblue: [123,104,238], mediumspringgreen: [0,250,154], mediumturquoise: [72,209,204], mediumvioletred: [199,21,133], midnightblue: [25,25,112], mintcream: [245,255,250], mistyrose: [255,228,225], moccasin: [255,228,181],
-           navajowhite: [255,222,173], navy: [0,0,128], oldlace: [253,245,230], olive: [128,128,0], olivedrab: [107,142,35], orange: [255,165,0], orangered: [255,69,0], orchid: [218,112,214], palegoldenrod: [238,232,170], palegreen: [152,251,152], paleturquoise: [175,238,238], palevioletred: [219,112,147], papayawhip: [255,239,213], peachpuff: [255,218,185], peru: [205,133,63],
-           pink: [255,192,203], plum: [221,160,221], powderblue: [176,224,230], purple: [128,0,128], rebeccapurple: [102,51,153], red: [255,0,0], rosybrown: [188,143,143], royalblue: [65,105,225], saddlebrown: [139,69,19], salmon: [250,128,114], sandybrown: [244,164,96], seagreen: [46,139,87], seashell: [255,245,238], sienna: [160,82,45], silver: [192,192,192], skyblue: [135,206,235],
-           slateblue: [106,90,205], slategray: [112,128,144], slategrey: [112,128,144], snow: [255,250,250], springgreen: [0,255,127], steelblue: [70,130,180], tan: [210,180,140], teal: [0,128,128], thistle: [216,191,216], tomato: [255,99,71], turquoise: [64,224,208], violet: [238,130,238], wheat: [245,222,179], white: [255,255,255], whitesmoke: [245,245,245], yellow: [255,255,0]};
-      let temp;
-      v = (v || '').toLowerCase().trim();
-      if (temp = NamedColors[v]) {
-        return temp.concat(1);
-      } else if (temp = v.match(/^rgba\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)$/)) {
+    function parseColor(raw) {
+      let temp, result;
+      raw = (raw || '').trim();
+      if (temp = NamedColors[raw]) {
+        result = [temp.slice(), 1];
+      } else if (temp = raw.match(/^rgba\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)$/i)) {
         temp[1] = parseInt(temp[1]); temp[2] = parseInt(temp[2]); temp[3] = parseInt(temp[3]); temp[4] = parseFloat(temp[4]);
         if (temp[1] < 256 && temp[2] < 256 && temp[3] < 256 && temp[4] <= 1) {
-          return temp.slice(1, 5);
+          result = [temp.slice(1, 4), temp[4]];
         }
-      } else if (temp = v.match(/^rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)$/)) {
+      } else if (temp = raw.match(/^rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)$/i)) {
         temp[1] = parseInt(temp[1]); temp[2] = parseInt(temp[2]); temp[3] = parseInt(temp[3]);
         if (temp[1] < 256 && temp[2] < 256 && temp[3] < 256) {
-          return temp.slice(1, 4).concat(1);
+          result = [temp.slice(1, 4), 1];
         }
-      } else if (temp = v.match(/^rgb\(\s*([0-9.]+)%\s*,\s*([0-9.]+)%\s*,\s*([0-9.]+)%\s*\)$/)) {
+      } else if (temp = raw.match(/^rgb\(\s*([0-9.]+)%\s*,\s*([0-9.]+)%\s*,\s*([0-9.]+)%\s*\)$/i)) {
         temp[1] = 2.55 * parseFloat(temp[1]); temp[2] = 2.55 * parseFloat(temp[2]); temp[3] = 2.55 * parseFloat(temp[3]);
         if (temp[1] < 256 && temp[2] < 256 && temp[3] < 256) {
-          return temp.slice(1, 4).concat(1);
+          result = [temp.slice(1, 4), 1];
         }
-      } else if (temp = v.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/)) {
-        return temp.slice(1,4).map(function(x) {return parseInt(x, 16);}).concat(1);
-      } else if (temp = v.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/)) {
-        return temp.slice(1,4).map(function(x) {return 0x11 * parseInt(x, 16);}).concat(1);
+      } else if (temp = raw.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)) {
+        result = [[parseInt(temp[1], 16), parseInt(temp[2], 16), parseInt(temp[3], 16)], 1];
+      } else if (temp = raw.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i)) {
+        result = [[0x11 * parseInt(temp[1], 16), 0x11 * parseInt(temp[2], 16), 0x11 * parseInt(temp[3], 16)], 1];
       }
+      return colorCallback ? colorCallback(result, raw) : result;
     }
     function multiplyMatrix() {
       function multiply(a, b) {
@@ -314,6 +355,26 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       if (isNotEqual(m0 * m3 - m1 * m2, 0)) {
         return [m0, m1, m2, m3, m4, m5];
       }
+    }
+    function solveEquation(curve) {
+      let a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
+      if (isEqual(a, 0) && isEqual(b, 0)) {
+        return [];
+      } else if (isEqual(a, 0)) {
+        return [(-c) / b];
+      } else {
+        let d = b * b - 4 * a * c;
+        if (isNotEqual(d, 0) && d > 0) {
+          return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
+        } else if (isEqual(d, 0)) {
+          return [(-b) / (2 * a)];
+        } else {
+          return [];
+        }
+      }
+    }
+    function getCurveValue(t, curve) {
+      return (curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t;
     }
     function isEqual(number, ref) {
       return Math.abs(number - ref) < 1e-10;
@@ -482,98 +543,74 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
 
     var StringParser = function(str) {
-      let parser = this;
-      parser.match = function(exp, all) {
+      this.match = function(exp, all) {
         let temp = str.match(exp);
         if (!temp || temp.index !== 0) {return;}
         str = str.substring(temp[0].length);
         return (all ? temp : temp[0]);
       };
-      parser.matchSeparator = function() {
-        return parser.match(/^(?:\s*,\s*|\s*|)/);
+      this.matchSeparator = function() {
+        return this.match(/^(?:\s*,\s*|\s*|)/);
       };
-      parser.matchSpace = function() {
-        return parser.match(/^(?:\s*)/);
+      this.matchSpace = function() {
+        return this.match(/^(?:\s*)/);
       };
-      parser.matchLengthUnit = function() {
-        return parser.match(/^(?:px|pt|cm|mm|in|pc|em|ex|%|)/);
+      this.matchLengthUnit = function() {
+        return this.match(/^(?:px|pt|cm|mm|in|pc|em|ex|%|)/);
       };
-      parser.matchNumber = function() {
-        return parser.match(/^(?:[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)/);
+      this.matchNumber = function() {
+        return this.match(/^(?:[-+]?(?:[0-9]+[.][0-9]+|[0-9]+[.]|[.][0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?)/);
       };
-      parser.matchAll = function() {
-        return parser.match(/^[\s\S]+/);
+      this.matchAll = function() {
+        return this.match(/^[\s\S]+/);
       };
     };
 
     var BezierSegment = function(p1x, p1y, c1x, c1y, c2x, c2y, p2x, p2y) {
-      let solveEquation = function(curve) {
-        let a = curve[2] || 0, b = curve[1] || 0, c = curve[0] || 0;
-        if (isEqual(a, 0) && isEqual(b, 0)) {
-          return [];
-        } else if (isEqual(a, 0)) {
-          return [(-c) / b];
-        } else {
-          let d = b * b - 4 * a * c;
-          if (isNotEqual(d, 0) && d > 0) {
-            return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
-          } else if (isEqual(d, 0)) {
-            return [(-b) / (2 * a)];
-          } else {
-            return [];
-          }
-        }
-      };
-      let getCurveValue = function(t, curve) {
-        return (curve[0] || 0) + (curve[1] || 0) * t + (curve[2] || 0) * t * t + (curve[3] || 0) * t * t * t;
-      };
       let divisions = 6 * precision;
-      let equationX = [p1x, -3*p1x+3*c1x, 3*p1x-6*c1x+3*c2x, -p1x+3*c1x-3*c2x+p2x];
-      let equationY = [p1y, -3*p1y+3*c1y, 3*p1y-6*c1y+3*c2y, -p1y+3*c1y-3*c2y+p2y];
-      let derivativeX = [-3*p1x+3*c1x, 6*p1x-12*c1x+6*c2x, -3*p1x+9*c1x-9*c2x+3*p2x];
-      let derivativeY = [-3*p1y+3*c1y, 6*p1y-12*c1y+6*c2y, -3*p1y+9*c1y-9*c2y+3*p2y];
-      let lengthMap = (function() {
-        let lengthMap = [0];
-        for (let i = 1; i <= divisions; i++) {
-          let t = (i - 0.5) / divisions;
-          let dx = getCurveValue(t, derivativeX) / divisions,
-              dy = getCurveValue(t, derivativeY) / divisions,
-              l = Math.sqrt(dx * dx + dy * dy);
-          lengthMap[i] = lengthMap[i - 1] + l;
-        }
-        return lengthMap;
-      })();
-      let totalLength = this.totalLength = lengthMap[divisions];
-      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ?
-                               Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
-      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ?
-                               Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
-      this.boundingBox = (function() {
+      let equationX = [p1x, -3 * p1x + 3 * c1x, 3 * p1x - 6 * c1x + 3 * c2x, -p1x + 3 * c1x - 3 * c2x + p2x];
+      let equationY = [p1y, -3 * p1y + 3 * c1y, 3 * p1y - 6 * c1y + 3 * c2y, -p1y + 3 * c1y - 3 * c2y + p2y];
+      let derivativeX = [-3 * p1x + 3 * c1x, 6 * p1x - 12 * c1x + 6 * c2x, -3 * p1x + 9 * c1x - 9 * c2x + 3 * p2x];
+      let derivativeY = [-3 * p1y + 3 * c1y, 6 * p1y - 12 * c1y + 6 * c2y, -3 * p1y + 9 * c1y - 9 * c2y + 3 * p2y];
+      let lengthMap = [0];
+      for (let i = 1; i <= divisions; i++) {
+        let t = (i - 0.5) / divisions;
+        let dx = getCurveValue(t, derivativeX) / divisions,
+            dy = getCurveValue(t, derivativeY) / divisions,
+            l = Math.sqrt(dx * dx + dy * dy);
+        lengthMap[i] = lengthMap[i - 1] + l;
+      }
+      this.totalLength = lengthMap[divisions];
+      this.startPoint = [p1x, p1y, isEqual(p1x, c1x) && isEqual(p1y, c1y) ? Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(c1y - p1y, c1x - p1x)];
+      this.endPoint = [p2x, p2y, isEqual(c2x, p2x) && isEqual(c2y, p2y) ? Math.atan2(c2y - c1y, c2x - c1x) : Math.atan2(p2y - c2y, p2x - c2x)];
+      this.getBoundingBox = function() {
         let temp;
         let minX = getCurveValue(0, equationX), minY = getCurveValue(0, equationY),
             maxX = getCurveValue(1, equationX), maxY = getCurveValue(1, equationY);
         if (minX > maxX) {temp = maxX; maxX = minX; minX = temp;}
         if (minY > maxY) {temp = maxY; maxY = minY; minY = temp;}
-        solveEquation(derivativeX).forEach(function(t) {
-          if (t >= 0 && t <= 1) {
-            let x = getCurveValue(t, equationX);
+        let rootsX = solveEquation(derivativeX);
+        for (let i = 0; i < rootsX.length; i++) {
+          if (rootsX[i] >= 0 && rootsX[i] <= 1) {
+            let x = getCurveValue(rootsX[i], equationX);
             if (x < minX) {minX = x;}
             if (x > maxX) {maxX = x;}
           }
-        });
-        solveEquation(derivativeY).forEach(function(t) {
-          if (t >= 0 && t <= 1) {
-            let y = getCurveValue(t, equationY);
+        }
+        let rootsY = solveEquation(derivativeY);
+        for (let i = 0; i < rootsY.length; i++) {
+          if (rootsY[i] >= 0 && rootsY[i] <= 1) {
+            let y = getCurveValue(rootsY[i], equationY);
             if (y < minY) {minY = y;}
             if (y > maxY) {maxY = y;}
           }
-        });
+        }
         return [minX, minY, maxX, maxY];
-      })();
+      };
       this.getPointAtLength = function(l) {
         if (isEqual(l, 0)) {return this.startPoint;}
-        if (isEqual(l, totalLength)) {return this.endPoint;}
-        if (l < 0 || l > totalLength) {return;}
+        if (isEqual(l, this.totalLength)) {return this.endPoint;}
+        if (l < 0 || l > this.totalLength) {return;}
         for (let i = 1; i <= divisions; i++) {
           let l1 = lengthMap[i-1], l2 = lengthMap[i];
           if (l1 <= l && l <= l2) {
@@ -587,13 +624,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var LineSegment = function(p1x, p1y, p2x, p2y) {
-      let totalLength = this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
-      this.boundingBox = [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
+      this.totalLength = Math.sqrt((p2x - p1x) * (p2x - p1x) + (p2y - p1y) * (p2y - p1y));
       this.startPoint = [p1x, p1y, Math.atan2(p2y - p1y, p2x - p1x)];
       this.endPoint = [p2x, p2y, Math.atan2(p2y - p1y, p2x - p1x)];
+      this.getBoundingBox = function() {
+        return [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
+      };
       this.getPointAtLength = function(l) {
-        if (l >= 0 && l <= totalLength) {
-          let r = l / totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
+        if (l >= 0 && l <= this.totalLength) {
+          let r = l / this.totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
           return [x, y, Math.atan2(p2y - p1y, p2x - p1x)];
         }
       };
@@ -601,14 +640,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgPath = function(d) {
       SvgShape.call(this);
-      let ArgumentsNumber = {A:7,a:7, C:6,c:6, H:1,h:1, L:2,l:2, M:2,m:2, Q:4,q:4, S:4,s:4, T:2,t:2, V:1,v:1, Z:0,z:0};
-      let Flags = {A3:true, A4:true, a3:true, a4:true};
-      let command, value, values, argsNumber, temp, parser = new StringParser((d || '').trim());
+      let command, value, values, argsNumber, temp,
+          parser = new StringParser((d || '').trim());
       while (command = parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
         parser.matchSeparator();
-        argsNumber = ArgumentsNumber[command];
+        argsNumber = PathArguments[command];
         values = [];
-        while (value = (Flags[command + values.length] ? parser.match(/^[01]/) : parser.matchNumber())) {
+        while (value = (PathFlags[command + values.length] ? parser.match(/^[01]/) : parser.matchNumber())) {
           parser.matchSeparator();
           if (values.length === argsNumber) {
             this[command].apply(this, values);
@@ -629,68 +667,104 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
     };
 
-    var SvgShape = function(commands) {
-      let pathCommands = this.pathCommands = [], startX = 0, startY = 0, currX = 0, currY = 0, lastCom, lastCtrlX, lastCtrlY;
-      if (commands && commands.length) {
-        for (let i = 0; i < commands.length; i++) {
-          pathCommands.push(commands[i].slice());
+    var SvgShape = function() {
+      this.pathCommands = [];
+      this.pathSegments = [];
+      let startX = 0, startY = 0, currX = 0, currY = 0, lastCom, lastCtrlX, lastCtrlY;
+      this.move = function(x, y) {
+        startX = currX = x; startY = currY = y;
+        return null;
+      };
+      this.line = function(x, y) {
+        let segment = new LineSegment(currX, currY, x, y);
+        currX = x; currY = y;
+        return segment;
+      };
+      this.curve = function(c1x, c1y, c2x, c2y, x, y) {
+        let segment = new BezierSegment(currX, currY, c1x, c1y, c2x, c2y, x, y);
+        currX = x; currY = y;
+        return segment;
+      };
+      this.close = function() {
+        let segment = new LineSegment(currX, currY, startX, startY);
+        currX = startX; currY = startY;
+        return segment;
+      };
+      this.addCommand = function(data) {
+        this.pathCommands.push(data);
+        let segment = this[data[0]].apply(this, data.slice(3));
+        if (segment) {
+          segment.hasStart = data[1];
+          segment.hasEnd = data[2];
+          this.pathSegments.push(segment);
         }
-      }
-      this.resetProperties = function() {
-        pathSegments = startPoint = endPoint = totalLength = boundingBox = null;
-        return this;
-      }
-      this.resetCommands = function() {
-        startX = startY = currX = currY = lastCtrlX = lastCtrlY = 0; lastCom = null;
-        return this;
-      }
-      // Shape creation
-      this.addCommand = function(command) {
-        pathCommands.push(command);
-        return this.resetProperties();
       };
       this.M = function(x, y) {
-        pathCommands.push(['M', true, true, x, y]);
-        startX = currX = x; startY = currY = y; lastCom = 'M';
-        return this.resetProperties();
+        this.addCommand(['move', true, true, x, y]);
+        lastCom = 'M';
+        return this;
       };
-      this.m = function(x, y) {return this.M(currX + x, currY + y);};
+      this.m = function(x, y) {
+        return this.M(currX + x, currY + y);
+      };
       this.Z = this.z = function() {
-        pathCommands.push(['Z', true, true]);
-        currX = startX; currY = startY; lastCom = 'Z';
-        return this.resetProperties();
+        this.addCommand(['close', true, true]);
+        lastCom = 'Z';
+        return this;
       };
       this.L = function(x, y) {
-        pathCommands.push(['L', true, true, x, y]);
-        currX = x; currY = y; lastCom = 'L';
-        return this.resetProperties();
+        this.addCommand(['line', true, true, x, y]);
+        lastCom = 'L';
+        return this;
       };
-      this.l = function(x, y) {return this.L(currX + x, currY + y);};
-      this.H = function(x) {return this.L(x, currY);};
-      this.h = function(x) {return this.L(currX + x, currY);};
-      this.V = function(y) {return this.L(currX, y);};
-      this.v = function(y) {return this.L(currX, currY + y);};
+      this.l = function(x, y) {
+        return this.L(currX + x, currY + y);
+      };
+      this.H = function(x) {
+        return this.L(x, currY);
+      };
+      this.h = function(x) {
+        return this.L(currX + x, currY);
+      };
+      this.V = function(y) {
+        return this.L(currX, y);
+      };
+      this.v = function(y) {
+        return this.L(currX, currY + y);
+      };
       this.C = function(c1x, c1y, c2x, c2y, x, y) {
-        pathCommands.push(['C', true, true, c1x, c1y, c2x, c2y, x, y]);
-        currX = x; currY = y; lastCom = 'C'; lastCtrlX = c2x; lastCtrlY = c2y;
-        return this.resetProperties();
+        this.addCommand(['curve', true, true, c1x, c1y, c2x, c2y, x, y]);
+        lastCom = 'C'; lastCtrlX = c2x; lastCtrlY = c2y;
+        return this;
       };
-      this.c = function(c1x, c1y, c2x, c2y, x, y) {return this.C(currX + c1x, currY + c1y, currX + c2x, currY + c2y, currX + x, currY + y);};
-      this.S = function(c1x, c1y, x, y) {return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), c1x, c1y, x, y);};
-      this.s = function(c1x, c1y, x, y) {return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), currX + c1x, currY + c1y, currX + x, currY + y);};
+      this.c = function(c1x, c1y, c2x, c2y, x, y) {
+        return this.C(currX + c1x, currY + c1y, currX + c2x, currY + c2y, currX + x, currY + y);
+      };
+      this.S = function(c1x, c1y, x, y) {
+        return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), c1x, c1y, x, y);
+      };
+      this.s = function(c1x, c1y, x, y) {
+        return this.C(currX + (lastCom === 'C' ? currX - lastCtrlX : 0), currY + (lastCom === 'C' ? currY - lastCtrlY : 0), currX + c1x, currY + c1y, currX + x, currY + y);
+      };
       this.Q = function(cx, cy, x, y) {
         let c1x = currX + 2 / 3 * (cx - currX), c1y = currY + 2 / 3 * (cy - currY),
             c2x = x + 2 / 3 * (cx - x), c2y = y + 2 / 3 * (cy - y);
-        pathCommands.push(['C', true, true, c1x, c1y, c2x, c2y, x, y]);
-        currX = x; currY = y; lastCom = 'Q'; lastCtrlX = cx; lastCtrlY = cy;
-        return this.resetProperties();
+        this.addCommand(['curve', true, true, c1x, c1y, c2x, c2y, x, y]);
+        lastCom = 'Q'; lastCtrlX = cx; lastCtrlY = cy;
+        return this;
       };
-      this.q = function(c1x, c1y, x, y) {return this.Q(currX + c1x, currY + c1y, currX + x, currY + y);};
-      this.T = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), x, y);};
-      this.t = function(x, y) {return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), currX + x, currY + y);};
+      this.q = function(c1x, c1y, x, y) {
+        return this.Q(currX + c1x, currY + c1y, currX + x, currY + y);
+      };
+      this.T = function(x, y) {
+        return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), x, y);
+      };
+      this.t = function(x, y) {
+        return this.Q(currX + (lastCom === 'Q' ? currX - lastCtrlX : 0), currY + (lastCom === 'Q' ? currY - lastCtrlY : 0), currX + x, currY + y);
+      };
       this.A = function(rx, ry, fi, fa, fs, x, y) {
         if (isEqual(rx, 0) || isEqual(ry, 0)) {
-          pathCommands.push(['L', true, true, x, y]);
+          this.addCommand(['line', true, true, x, y]);
         } else {
           fi = fi * (Math.PI / 180);
           rx = Math.abs(rx);
@@ -727,59 +801,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 c2y = cy + Math.sin(fi) * rx * (Math.cos(th4) + t * Math.sin(th4)) + Math.cos(fi) * ry * (Math.sin(th4) - t * Math.cos(th4)),
                 endX = cx + Math.cos(fi) * rx * Math.cos(th4) - Math.sin(fi) * ry * Math.sin(th4),
                 endY = cy + Math.sin(fi) * rx * Math.cos(th4) + Math.cos(fi) * ry * Math.sin(th4);
-            pathCommands.push(['C', (i === 0), (i === segms - 1), c1x, c1y, c2x, c2y, endX, endY]);
+            this.addCommand(['curve', (i === 0), (i === segms - 1), c1x, c1y, c2x, c2y, endX, endY]);
           }
         }
-        currX = x; currY = y; lastCom = 'A';
-        return this.resetProperties();
+        lastCom = 'A';
+        return this;
       };
-      this.a = function(rx, ry, fi, fa, fs, x, y) {return this.A(rx, ry, fi, fa, fs, currX + x, currY + y);};
-      // Shape properties
-      let pathSegments = null; Object.defineProperty(this, 'pathSegments', {get: function() {
-        if (pathSegments !== null) {return pathSegments;}
-        let currX = 0, currY = 0, startX = 0, startY = 0, segments = [];
-        for (let i = 0; i < pathCommands.length; i++) {
-          let command = pathCommands[i][0], values = pathCommands[i].slice(3), segment;
-          switch(command) {
-            case 'M':
-              segment = null;
-              startX = currX = values[0]; startY = currY = values[1];  break;
-            case 'L':
-              segment = new LineSegment(currX, currY, values[0], values[1]);
-              currX = values[0]; currY = values[1];  break;
-            case 'C':
-              segment = new BezierSegment(currX, currY, values[0], values[1], values[2], values[3], values[4], values[5]);
-              currX = values[4]; currY = values[5];  break;
-            case 'Z':
-              segment = new LineSegment(currX, currY, startX, startY);
-              currX = startX; currY = startY;  break;
-          }
-          if (segment) {
-            segment.hasStart = pathCommands[i][1];
-            segment.hasEnd = pathCommands[i][2];
-            segments.push(segment);
-          }
-        }
-        return (pathSegments = segments);
+      this.a = function(rx, ry, fi, fa, fs, x, y) {
+        return this.A(rx, ry, fi, fa, fs, currX + x, currY + y);
+      };
+      Object.defineProperty(this, 'startPoint', {get: function() {
+        return this.pathSegments.length && this.pathSegments[0].startPoint;
       }});
-      let startPoint = null; Object.defineProperty(this, 'startPoint', {get: function() {
-        if (startPoint !== null) {return startPoint;}
-        return (startPoint = this.pathSegments.length && this.pathSegments[0].startPoint);
+      Object.defineProperty(this, 'endPoint', {get: function() {
+        return this.pathSegments.length && this.pathSegments[this.pathSegments.length - 1].endPoint;
       }});
-      let endPoint = null; Object.defineProperty(this, 'endPoint', {get: function() {
-        if (endPoint !== null) {return endPoint;}
-        return (endPoint = this.pathSegments.length && this.pathSegments[this.pathSegments.length - 1].endPoint);
-      }});
-      let totalLength = null; Object.defineProperty(this, 'totalLength', {get: function() {
-        if (totalLength !== null) {return totalLength;}
+      Object.defineProperty(this, 'totalLength', {get: function() {
         let length = 0;
         for (let i = 0; i < this.pathSegments.length; i++) {
           length += this.pathSegments[i].totalLength;
         }
-        return (totalLength = length);
+        return length;
       }});
-      let boundingBox = null; Object.defineProperty(this, 'boundingBox', {get: function() {
-        if (boundingBox !== null) {return boundingBox;}
+      Object.defineProperty(this, 'boundingBox', {get: function() {
         let bbox = [Infinity, Infinity, -Infinity, -Infinity];
         function addBounds(bbox1) {
           if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
@@ -788,13 +832,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (bbox1[3] > bbox[3]) {bbox[3] = bbox1[3];}
         }
         for (let i = 0; i < this.pathSegments.length; i++) {
-          addBounds(this.pathSegments[i].boundingBox);
+          addBounds(this.pathSegments[i].getBoundingBox());
         }
         if (bbox[0] === Infinity) {bbox[0] = 0;}
         if (bbox[1] === Infinity) {bbox[1] = 0;}
         if (bbox[2] === -Infinity) {bbox[2] = 0;}
         if (bbox[3] === -Infinity) {bbox[3] = 0;}
-        return (boundingBox = bbox);
+        return bbox;
       }});
       this.getPointAtLength = function(l) {
         if (l >= 0 && l <= this.totalLength) {
@@ -808,43 +852,44 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return this.endPoint;
         }
       };
-      // Shape functions
       this.transform = function(m) {
-        for (let i = 0; i < pathCommands.length; i++) {
-          let data = pathCommands[i];
+        this.pathSegments = [];
+        for (let i = 0; i < this.pathCommands.length; i++) {
+          let data = this.pathCommands.shift();
           for (let j = 3; j < data.length; j+=2) {
             let p = transformPoint([data[j], data[j + 1]], m)
             data[j] = p[0];
             data[j + 1] = p[1];
           }
+          this.addCommand(data);
         }
-        return this.resetCommands().resetProperties();
-      };
-      this.clone = function() {
-        return new SvgShape(pathCommands);
+        return this;        
       };
       this.mergeShape = function(shape) {
         for (let i = 0; i < shape.pathCommands.length; i++) {
-          pathCommands.push(shape.pathCommands[i]);
+          this.addCommand(shape.pathCommands[i].slice());
         }
-        return this.resetCommands().resetProperties();
+        return this;
+      };
+      this.clone = function() {
+        return new SvgShape().mergeShape(this);
       };
       this.insertInDocument = function() {
-        for (let i = 0; i < pathCommands.length; i++) {
-          let command = pathCommands[i][0], values = pathCommands[i].slice(3);
+        for (let i = 0; i < this.pathCommands.length; i++) {
+          let command = this.pathCommands[i][0], values = this.pathCommands[i].slice(3);
           switch(command) {
-            case 'M':  doc.moveTo(values[0], values[1]);  break;
-            case 'L':  doc.lineTo(values[0], values[1]);  break;
-            case 'C':  doc.bezierCurveTo(values[0], values[1], values[2], values[3], values[4], values[5]);  break;
-            case 'Z':  doc.closePath();  break;
+            case 'move':  doc.moveTo(values[0], values[1]);  break;
+            case 'line':  doc.lineTo(values[0], values[1]);  break;
+            case 'curve':  doc.bezierCurveTo(values[0], values[1], values[2], values[3], values[4], values[5]);  break;
+            case 'close':  doc.closePath();  break;
           }
         }
       };
       this.getSubPaths = function() {
         let subPaths = [], shape = new SvgShape();
-        for (let i = 0; i < pathCommands.length; i++) {
-          let data = pathCommands[i], command = pathCommands[i][0];
-          if (command === 'M' && i !== 0) {
+        for (let i = 0; i < this.pathCommands.length; i++) {
+          let data = this.pathCommands[i], command = this.pathCommands[i][0];
+          if (command === 'move' && i !== 0) {
             subPaths.push(shape);
             shape = new SvgShape();
           }
@@ -875,47 +920,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return markers;
       };
-    };
-
-    var Properties = {
-      'color':              {inherit: true, initial: undefined},
-      'visibility':         {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
-      'fill':               {inherit: true, initial: [0, 0, 0, 1]},
-      'stroke':             {inherit: true, initial: 'none'},
-      'stop-color':         {inherit: false, initial: [0, 0, 0, 1]},
-      'fill-opacity':       {inherit: true, initial: 1},
-      'stroke-opacity':     {inherit: true, initial: 1},
-      'stop-opacity':       {inherit: false, initial: 1},
-      'fill-rule':          {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
-      'clip-rule':          {inherit: true, initial: 'nonzero', values: {'nonzero':'nonzero', 'evenodd':'evenodd'}},
-      'stroke-width':       {inherit: true, initial: 1},
-      'stroke-dasharray':   {inherit: true, initial: []},
-      'stroke-dashoffset':  {inherit: true, initial: 0},
-      'stroke-miterlimit':  {inherit: true, initial: 4},
-      'stroke-linejoin':    {inherit: true, initial: 'miter', values: {'miter':'miter', 'round':'round', 'bevel':'bevel'}},
-      'stroke-linecap':     {inherit: true, initial: 'butt', values: {'butt':'butt', 'round':'round', 'square':'square'}},
-      'font-size':          {inherit: true, initial: 16, values: {'xx-small':9,'x-small':10,'small':13,'medium':16,'large':18,'x-large':24,'xx-large':32}},
-      'font-family':        {inherit: true, initial: 'sans-serif'},
-      'font-weight':        {inherit: true, initial: 'normal', values: {'600':'bold', '700':'bold', '800':'bold', '900':'bold', 'bold':'bold', 'bolder':'bold', '500':'normal', '400':'normal', '300':'normal', '200':'normal', '100':'normal', 'normal':'normal', 'lighter':'normal'}},
-      'font-style':         {inherit: true, initial: 'normal', values: {'italic':'italic', 'oblique':'italic', 'normal':'normal'}},
-      'text-anchor':        {inherit: true, initial: 'start', values: {'start':'start', 'middle':'middle', 'end':'end'}},
-      'direction':          {inherit: true, initial: 'ltr', values: {'ltr':'ltr', 'rtl':'rtl'}},
-      'dominant-baseline':  {inherit: true, initial: 'baseline', values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
-      'alignment-baseline': {inherit: false, initial: undefined, values: {'auto':'baseline', 'baseline':'baseline', 'before-edge':'before-edge', 'text-before-edge':'before-edge', 'middle':'middle', 'central':'central', 'after-edge':'after-edge', 'text-after-edge':'after-edge', 'ideographic':'ideographic', 'alphabetic':'alphabetic', 'hanging':'hanging', 'mathematical':'mathematical'}},
-      'baseline-shift':     {inherit: true, initial: 'baseline', values: {'baseline':'baseline', 'sub':'sub', 'super':'super'}},
-      'word-spacing':       {inherit: true, initial: 0, values: {normal:0}},
-      'letter-spacing':     {inherit: true, initial: 0, values: {normal:0}},
-      'text-decoration':    {inherit: false, initial: 'none', values: {'none':'none', 'underline':'underline', 'overline':'overline', 'line-through':'line-through'}},
-      'xml:space':          {inherit: true, initial: 'default', css: 'white-space', values: {'preserve':'preserve', 'default':'default', 'pre':'preserve', 'pre-line':'preserve', 'pre-wrap':'preserve', 'nowrap': 'default'}},
-      'marker-start':       {inherit: true, initial: 'none'},
-      'marker-mid':         {inherit: true, initial: 'none'},
-      'marker-end':         {inherit: true, initial: 'none'},
-      'opacity':            {inherit: false, initial: 1},
-      'transform':          {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-      'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
-      'clip-path':          {inherit: false, initial: 'none'},
-      'mask':               {inherit: false, initial: 'none'},
-      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
     };
 
     var SvgElem = function(obj, inherits) {
@@ -1008,13 +1012,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         return initial;
       };
-      this.computeLengthList = function(value, percent) {
+      this.computeLengthList = function(value, percent, strict) {
         let parser = new StringParser((value || '').trim()), result = [], temp1, temp2;
         while (typeof (temp1 = parser.matchNumber()) === 'string' && typeof (temp2 = parser.matchLengthUnit()) === 'string') {
           result.push(this.computeUnits(temp1, temp2, percent));
           parser.matchSeparator();
         }
-        result.error = parser.matchAll();
+        if (strict && parser.matchAll()) {return;}
         return result;
       };
       this.getLength = function(key, percent, initial) {
@@ -1073,6 +1077,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (result != null) {return styleCache[key] = result;}
         }
         if (value !== null && value !== undefined) {
+          let parsed;
           switch (key) {
             case 'font-size':
               result = this.computeLength(value, this.inherits ? this.inherits.get(key) : keyInfo.initial, undefined, true);
@@ -1084,96 +1089,98 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               result = value || undefined;
               break;
             case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
-              result = (function() {
-                let parsed = parseFloat(value);
-                if (!isNaN(parsed)) {
-                  return Math.max(0, Math.min(1, parsed));
-                }
-              }).call(this);
+              parsed = parseFloat(value);
+              if (!isNaN(parsed)) {
+                result = Math.max(0, Math.min(1, parsed));
+              }
               break;
             case 'transform':
               result = parseTranform(value);
               break;
             case 'stroke-dasharray':
-              result = (function() {
-                if (value === 'none') {return [];}
-                let dasharray = this.computeLengthList(value, this.getViewport());
-                if (dasharray.error) {return;}
-                let sum = 0;
-                for (let j = 0; j < dasharray.length; j++) {
-                  if (dasharray[j] < 0) {return;}
-                  sum += dasharray[j];
+              if (value === 'none') {
+                result = [];
+              } else if (parsed = this.computeLengthList(value, this.getViewport(), true)) {
+                let sum = 0, error = false;
+                for (let j = 0; j < parsed.length; j++) {
+                  if (parsed[j] < 0) {error = true;}
+                  sum += parsed[j];
                 }
-                if (dasharray.length % 2 === 1) {
-                  dasharray = dasharray.concat(dasharray);
+                if (!error) {
+                  if (parsed.length % 2 === 1) {
+                    parsed = parsed.concat(parsed);
+                  }
+                  result = (sum === 0 ? [] : parsed);
                 }
-                return (sum === 0 ? [] : dasharray);
-              }).call(this);
+              }
               break;
             case 'color':
-              result = (function() {
-                if (value === 'none' || value === 'transparent') {return 'none';}
-                return parseColor(value);
-              }).call(this);
+              if (value === 'none' || value === 'transparent') {
+                result = 'none';
+              } else {
+                result = parseColor(value);
+              }
               break;
             case 'fill': case 'stroke':
-              result = (function() {
-                if (value === 'none' || value === 'transparent') {return 'none';}
-                if (value === 'currentColor') {return this.get('color');}
-                let color = parseColor(value);
-                if (color) {return color;}
-                value = (value || '').split(' ');
-                let object = this.resolveUrl(value[0]),
-                    fallbackColor = parseColor(value[1]);
-                if (object === undefined) {return fallbackColor;}
-                if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
-                  return new SvgElemGradient(object, null, fallbackColor);
+              if (value === 'none' || value === 'transparent') {
+                result = 'none';
+              } else if (value === 'currentColor') {
+                result = this.get('color');
+              } else if (parsed = parseColor(value)) {
+                return parsed;
+              } else if (parsed = (value || '').split(' ')) {
+                let object = this.resolveUrl(parsed[0]),
+                    fallbackColor = parseColor(parsed[1]);
+                if (object == null) {
+                  result = fallbackColor;
+                } else if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
+                  result = new SvgElemGradient(object, null, fallbackColor);
+                } else if (object.nodeName === 'pattern') {
+                  result = new SvgElemPattern(object, null, fallbackColor);
+                } else {
+                  result = fallbackColor;
                 }
-                if (object.nodeName === 'pattern') {
-                  return new SvgElemPattern(object, null, fallbackColor);
-                }
-                return fallbackColor;
-              }).call(this);
+              }
               break;
             case 'stop-color':
-              result = (function() {
-                if (value === 'none' || value === 'transparent') {return 'none';}
-                if (value === 'currentColor') {return this.get('color');}
-                return parseColor(value);
-              }).call(this);
+              if (value === 'none' || value === 'transparent') {
+                result = 'none';
+              } else if (value === 'currentColor') {
+                result = this.get('color');
+              } else {
+                result = parseColor(value);
+              }
               break;
             case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
-              result = (function() {
-                if (value === 'none') {return 'none';}
-                return this.resolveUrl(value);
-              }).call(this);
+              if (value === 'none') {
+                result = 'none';
+              } else {
+                result = this.resolveUrl(value);
+              }
               break;
             case 'stroke-width':
-              result = (function() {
-                let parsed = this.computeLength(value, this.getViewport());
-                if (parsed != null && parsed >= 0) {return parsed;}
-              }).call(this);
+              parsed = this.computeLength(value, this.getViewport());
+              if (parsed != null && parsed >= 0) {
+                result = parsed;
+              }
               break;
             case 'stroke-miterlimit':
-              result = (function() {
-                let parsed = parseFloat(value);
-                if (parsed != null && parsed >= 1) {return parsed;}
-              }).call(this);
+              parsed = parseFloat(value);
+              if (parsed != null && parsed >= 1) {
+                result = parsed;
+              }
               break;
             case 'word-spacing': case 'letter-spacing':
               result = this.computeLength(value, this.getViewport());
               break;
             case 'stroke-dashoffset':
-              result = (function() {
-                let result = this.computeLength(value, this.getViewport());
-                if (result != null) {
-                  if (result < 0) { // fix for crbug.com/660850
-                    let dasharray = this.get('stroke-dasharray');
-                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
-                  }
-                  return result;
+              result = this.computeLength(value, this.getViewport());
+              if (result != null) {
+                if (result < 0) { // fix for crbug.com/660850
+                  let dasharray = this.get('stroke-dasharray');
+                  for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
                 }
-              }).call(this);
+              }
               break;
           }
         }
@@ -1237,12 +1244,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let opacity = this.get('opacity'),
             fill = this.get('fill'),
             fillOpacity = this.get('fill-opacity');
-        if (isClip) {return ['white', 1];}
+        if (isClip) {return DefaultColors.white;}
         if (fill !== 'none' && opacity && fillOpacity) {
           if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
             return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
           }
-          return [fill.slice(0, 3), fillOpacity * fill[3] * opacity];
+          return [fill[0], fill[1] * fillOpacity * opacity];
         }
       };
       this.getStroke = function(isClip, isMask) {
@@ -1254,7 +1261,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
           }
-          return [stroke.slice(0, 3), strokeOpacity * stroke[3] * opacity];
+          return [stroke[0], stroke[1] * strokeOpacity * opacity];
         }
       };
     };
@@ -1267,7 +1274,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < children.length; i++) {
           if (children[i].get('display') !== 'none') {
             if (typeof children[i].getBoundingShape === 'function') {
-              let childShape = children[i].getBoundingShape()
+              let childShape = children[i].getBoundingShape().clone();
               if (typeof children[i].getTransformation === 'function') {
                 childShape.transform(children[i].getTransformation());
               }
@@ -1466,7 +1473,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.fillOpacity(this.get('opacity'));
           doc.image(image, 0, 0);
         } else {
-          doc.rect(0, 0, image.width, image.height).fill('white');
+          doc.rect(0, 0, image.width, image.height);
+          docFillColor(DefaultColors.white).fill();
         }
         doc.restore();
       };
@@ -1529,7 +1537,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           docEndGroup(group);
           return [docCreatePattern(group, width, height, matrix), gOpacity];
         } else {
-          return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
+          return fallback ? [fallback[0], fallback[1] * gOpacity] : undefined;
         }
       };
       this.getVWidth = function() {
@@ -1572,7 +1580,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let child = children[0],
               uniqueColor = child.get('stop-color');
           if (uniqueColor === 'none') {return;}
-          return [uniqueColor.slice(0, 3), child.get('stop-opacity') * uniqueColor[3] * gOpacity];
+          return [uniqueColor[0], uniqueColor[1] * child.get('stop-opacity') * gOpacity];
         }
         let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
@@ -1638,30 +1646,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             for (let i = 0; i < children.length; i++) {
               let child = children[inOrder ? i : children.length - 1 - i],
                   stopColor = child.get('stop-color');
-              if (stopColor === 'none') {stopColor = [255, 255, 255, 0];}
-              let stopOpacity = stopColor[3] * child.get('stop-opacity') * gOpacity;
-              if (stopOpacity < 1) {
-                if (isMask) {
-                  stopColor[0] *= stopOpacity;
-                  stopColor[1] *= stopOpacity;
-                  stopColor[2] *= stopOpacity;
-                  stopOpacity = 1;
-                }
-              }
+              if (stopColor === 'none') {stopColor = DefaultColors.transparent;}
               offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
               if (i === 0 && offset > 0) {
-                grad.stop((n + 0) / nTotal, stopColor.slice(0, 3), stopOpacity);
+                grad.stop((n + 0) / nTotal, stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
               }
-              grad.stop((n + offset) / (nAfter + nBefore + 1), stopColor.slice(0, 3), stopOpacity);
+              grad.stop((n + offset) / (nAfter + nBefore + 1), stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
               if (i === children.length - 1 && offset < 1) {
-                grad.stop((n + 1) / nTotal, stopColor.slice(0, 3), stopOpacity);
+                grad.stop((n + 1) / nTotal, stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
               }
             }
           }
           grad.setTransform.apply(grad, matrix);
           return [grad, 1];
         } else {
-          return fallback ? [fallback.slice(0, 3), fallback[3] * gOpacity] : undefined;
+          return fallback ? [fallback[0], fallback[1] * gOpacity] : undefined;
         }
       }
     };
@@ -1671,7 +1670,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemStylable.call(this, obj);
       this.dashScale = 1;
       this.getBoundingShape = function() {
-        return this.shape.clone();
+        return this.shape;
       };
       this.getTransformation = function() {
         return this.get('transform');
@@ -1696,7 +1695,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
                 let x = subPaths[j].boundingBox[0],
                     y = subPaths[j].boundingBox[1];
-                docFillColor.apply(doc, stroke);
+                docFillColor(stroke);
                 if (LineCap === 'square') {
                   doc.rect(x - 0.5 * LineWidth, y - 0.5 * LineWidth, LineWidth, LineWidth);
                 } else if (LineCap === 'round') {
@@ -1708,7 +1707,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           if (fill || stroke) {
             if (fill) {
-              docFillColor.apply(doc, fill);
+              docFillColor(fill);
             }
             if (stroke) {
               let dashArray = this.get('stroke-dasharray'),
@@ -1719,7 +1718,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 }
                 dashOffset *= this.dashScale;
               }
-              docStrokeColor.apply(doc, stroke);
+              docStrokeColor(stroke);
               doc.lineWidth(this.get('stroke-width'))
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
@@ -1765,7 +1764,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
         } else {
           this.shape.insertInDocument();
-          doc.fillColor('white');
+          docFillColor(DefaultColors.white);
           doc.fill(this.get('clip-rule'));
         }
         doc.restore();
@@ -1998,10 +1997,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (this.get('visibility') === 'hidden') {continue;}
               if (fill || stroke || isClip) {
                 if (fill) {
-                  docFillColor.apply(doc, fill);
+                  docFillColor(fill);
                 }
                 if (stroke && strokeWidth) {
-                  docStrokeColor.apply(doc, stroke);
+                  docStrokeColor(stroke);
                   doc.lineWidth(strokeWidth)
                      .miterLimit(this.get('stroke-miterlimit'))
                      .lineJoin(this.get('stroke-linejoin'))
@@ -2030,10 +2029,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let fill = this.getFill(isClip, isMask),
             stroke = this.getStroke(isClip, isMask);
         if (fill) {
-          docFillColor.apply(doc, fill);
+          docFillColor(fill);
         }
         if (stroke) {
-          docStrokeColor.apply(doc, stroke);
+          docStrokeColor(stroke);
           doc.lineWidth(this.get('stroke-width'))
              .miterLimit(this.get('stroke-miterlimit'))
              .lineJoin(this.get('stroke-linejoin'))
@@ -2086,7 +2085,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         this.pathScale = this.pathObject.totalLength / this.pathLength;
       } else if ((temp = this.getUrl('href') || this.getUrl('xlink:href')) && temp.nodeName === 'path') {
         let pathElem = new SvgElemPath(temp, this);
-        this.pathObject = pathElem.shape.transform(pathElem.get('transform'));
+        this.pathObject = pathElem.shape.clone().transform(pathElem.get('transform'));
         this.pathLength = this.chooseValue(pathElem.pathLength, this.pathObject.totalLength);
         this.pathScale = this.pathObject.totalLength / this.pathLength;
       }
@@ -2240,9 +2239,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           if (currentElem.name === 'textPath') {
             textPaths.push(currentElem);
-            let pathElem = currentElem.path;
-            if (pathElem) {
-              let pathObject = pathElem.shape.clone().transform(pathElem.get('transform'));
+            let pathObject = currentElem.pathObject;
+            if (pathObject) {
               currentX = pathObject.endPoint[0]; currentY = pathObject.endPoint[1];
             }
           }
@@ -2369,6 +2367,12 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     if (typeof colorCallback !== 'function') {
       colorCallback = null;
+    } else {
+      for (let color in DefaultColors) {
+        let newColor = colorCallback(DefaultColors[color]);
+        DefaultColors[color][0] = newColor[0];
+        DefaultColors[color][1] = newColor[1];
+      }
     }
     if (typeof documentCallback !== 'function') {
       documentCallback = null;
