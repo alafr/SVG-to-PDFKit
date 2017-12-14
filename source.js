@@ -320,6 +320,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return colorCallback ? colorCallback(result, raw) : result;
     }
+    function applyOpacityToColor(color, opacity, isMask) {
+      if (isMask) {
+        let rgb = color[0];
+        for (let i = 0; i < rgb.length; i++) {
+          rgb[i] *= color[1] * opacity;
+        }
+        color[1] = 1;
+      } else {
+        color[1] *= opacity;
+      }
+      return color;
+    }
     function multiplyMatrix() {
       function multiply(a, b) {
         return [ a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1], a[0]*b[2]+a[2]*b[3],
@@ -1249,7 +1261,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
             return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
           }
-          return [fill[0], fill[1] * fillOpacity * opacity];
+          return applyOpacityToColor(fill, fillOpacity * opacity, isMask);
         }
       };
       this.getStroke = function(isClip, isMask) {
@@ -1261,7 +1273,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
           }
-          return [stroke[0], stroke[1] * strokeOpacity * opacity];
+          return applyOpacityToColor(stroke, strokeOpacity * opacity, isMask);
         }
       };
     };
@@ -1578,9 +1590,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (children.length === 0) {return;}
         if (children.length === 1) {
           let child = children[0],
-              uniqueColor = child.get('stop-color');
-          if (uniqueColor === 'none') {return;}
-          return [uniqueColor[0], uniqueColor[1] * child.get('stop-opacity') * gOpacity];
+              stopColor = child.get('stop-color');
+          if (stopColor === 'none') {return;}
+          return applyOpacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
         }
         let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
@@ -1647,13 +1659,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let child = children[inOrder ? i : children.length - 1 - i],
                   stopColor = child.get('stop-color');
               if (stopColor === 'none') {stopColor = DefaultColors.transparent;}
+              applyOpacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
               offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
               if (i === 0 && offset > 0) {
-                grad.stop((n + 0) / nTotal, stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
+                grad.stop((n + 0) / nTotal, stopColor[0], stopColor[1]);
               }
-              grad.stop((n + offset) / (nAfter + nBefore + 1), stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
+              grad.stop((n + offset) / (nAfter + nBefore + 1), stopColor[0], stopColor[1]);
               if (i === children.length - 1 && offset < 1) {
-                grad.stop((n + 1) / nTotal, stopColor[0], stopColor[1] * child.get('stop-opacity') * gOpacity);
+                grad.stop((n + 1) / nTotal, stopColor[0], stopColor[1]);
               }
             }
           }
