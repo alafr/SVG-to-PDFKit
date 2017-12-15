@@ -1406,7 +1406,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       this.link = this.attr('href') || this.attr('xlink:href');
       this.addLink = function() {
-        if (this.getChildren().length) {
+        if (this.link.match(/^(?:[a-z][a-z0-9+.-]*:)?\/\//i) && this.getChildren().length) {
           let bbox = this.getBoundingShape().transform(getGlobalMatrix()).getBoundingBox();
           docInsertLink(bbox[0], bbox[1], bbox[2], bbox[3], this.link);
           warningCallback('SVGElemLink: links are not supported');
