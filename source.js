@@ -320,17 +320,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return colorCallback ? colorCallback(result, raw) : result;
     }
-    function applyOpacityToColor(color, opacity, isMask) {
+    function opacityToColor(color, opacity, isMask) {
+      let newColor = color[0].slice(),
+          newOpacity = color[1] * opacity;
       if (isMask) {
-        let rgb = color[0];
-        for (let i = 0; i < rgb.length; i++) {
-          rgb[i] *= color[1] * opacity;
+        for (let i = 0; i < color.length; i++) {
+          newColor[i] *= newOpacity;
         }
-        color[1] = 1;
+        return [newColor, 1];
       } else {
-        color[1] *= opacity;
+        return [newColor, newOpacity];
       }
-      return color;
     }
     function multiplyMatrix() {
       function multiply(a, b) {
@@ -1257,7 +1257,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
             return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
           }
-          return applyOpacityToColor(fill, fillOpacity * opacity, isMask);
+          return opacityToColor(fill, fillOpacity * opacity, isMask);
         }
       };
       this.getStroke = function(isClip, isMask) {
@@ -1269,7 +1269,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
           }
-          return applyOpacityToColor(stroke, strokeOpacity * opacity, isMask);
+          return opacityToColor(stroke, strokeOpacity * opacity, isMask);
         }
       };
     };
@@ -1586,7 +1586,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           let child = children[0],
               stopColor = child.get('stop-color');
           if (stopColor === 'none') {return;}
-          return applyOpacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
+          return opacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
         }
         let bBoxUnits = (this.attr('gradientUnits') !== 'userSpaceOnUse'),
             matrix = parseTranform(this.attr('gradientTransform')),
@@ -1653,7 +1653,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               let child = children[inOrder ? i : children.length - 1 - i],
                   stopColor = child.get('stop-color');
               if (stopColor === 'none') {stopColor = DefaultColors.transparent;}
-              applyOpacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
+              stopColor = opacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
               offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
               if (i === 0 && offset > 0) {
                 grad.stop((n + 0) / nTotal, stopColor[0], stopColor[1]);
