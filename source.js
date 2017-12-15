@@ -175,6 +175,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.strokeColor(color[0], color[1]);
       }
     }
+    function docInsertLink(x, y, w, h, url) {
+      let ref = doc.ref({
+        Type: 'Annot',
+        Subtype: 'Link',
+        Rect: [x, y, w, h],
+        Border: [0, 0, 0],
+        A: {
+          S: 'URI',
+          URI: new String(url)
+        }
+      });
+      ref.end();
+      links.push(ref);
+    }
     function parseXml(xml) {
       let SvgNode = function(tag) {
         this.nodeName = tag;
@@ -1386,12 +1400,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemLink = function(obj, inherits) {
       if (inherits && inherits.isText) {
         SvgElemTspan.call(this, obj, inherits);
+        this.allowedChildren = ['textPath', 'tspan', '#text', 'a'];
       } else {
         SvgElemGroup.call(this, obj, inherits);
       }
       this.link = this.attr('href') || this.attr('xlink:href');
       this.addLink = function() {
-        if (this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
+        if (this.getChildren().length) {
+          let bbox = this.getBoundingShape().transform(getGlobalMatrix()).getBoundingBox();
+          docInsertLink(bbox[0], bbox[1], bbox[2], bbox[3], this.link);
+          warningCallback('SVGElemLink: links are not supported');
+        }
       }
     };
 
@@ -2336,7 +2355,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         groupCount = 0,
         maskCount = 0,
         patternCount = 0,
-        documentCache = {};
+        documentCache = {},
+        links = [];
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
@@ -2390,6 +2410,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
         elem.drawInDocument();
+        for (let i = 0; i < links.length; i++) {
+          doc.page.annotations.push(links[i]);
+        }
         doc.restore();
       } else {
         warningCallback('SVGtoPDF: this element can\'t be rendered directly: ' + svg.nodeName);
