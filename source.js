@@ -355,7 +355,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     function getPageBBox() {
       return new SvgShape().M(0, 0).L(doc.page.width, 0).L(doc.page.width, doc.page.height).L(0, doc.page.height)
-                           .transform(inverseMatrix(getGlobalMatrix())).boundingBox;
+                           .transform(inverseMatrix(getGlobalMatrix())).getBoundingBox();
     }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
@@ -682,6 +682,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgShape = function() {
       this.pathCommands = [];
       this.pathSegments = [];
+      this.startPoint = null;
+      this.endPoint = null;
+      this.totalLength = 0;
       let startX = 0, startY = 0, currX = 0, currY = 0, lastCom, lastCtrlX, lastCtrlY;
       this.move = function(x, y) {
         startX = currX = x; startY = currY = y;
@@ -708,7 +711,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (segment) {
           segment.hasStart = data[1];
           segment.hasEnd = data[2];
+          this.startPoint = this.startPoint || segment.startPoint;
+          this.endPoint = segment.endPoint;
           this.pathSegments.push(segment);
+          this.totalLength += segment.totalLength;
         }
       };
       this.M = function(x, y) {
@@ -822,20 +828,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.a = function(rx, ry, fi, fa, fs, x, y) {
         return this.A(rx, ry, fi, fa, fs, currX + x, currY + y);
       };
-      Object.defineProperty(this, 'startPoint', {get: function() {
-        return this.pathSegments.length && this.pathSegments[0].startPoint;
-      }});
-      Object.defineProperty(this, 'endPoint', {get: function() {
-        return this.pathSegments.length && this.pathSegments[this.pathSegments.length - 1].endPoint;
-      }});
-      Object.defineProperty(this, 'totalLength', {get: function() {
-        let length = 0;
-        for (let i = 0; i < this.pathSegments.length; i++) {
-          length += this.pathSegments[i].totalLength;
-        }
-        return length;
-      }});
-      Object.defineProperty(this, 'boundingBox', {get: function() {
+      this.getBoundingBox = function() {
         let bbox = [Infinity, Infinity, -Infinity, -Infinity];
         function addBounds(bbox1) {
           if (bbox1[0] < bbox[0]) {bbox[0] = bbox1[0];}
@@ -851,7 +844,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (bbox[2] === -Infinity) {bbox[2] = 0;}
         if (bbox[3] === -Infinity) {bbox[3] = 0;}
         return bbox;
-      }});
+      };
       this.getPointAtLength = function(l) {
         if (l >= 0 && l <= this.totalLength) {
           let temp;
@@ -866,6 +859,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.transform = function(m) {
         this.pathSegments = [];
+        this.startPoint = null;
+        this.endPoint = null;
+        this.totalLength = 0;
         for (let i = 0; i < this.pathCommands.length; i++) {
           let data = this.pathCommands.shift();
           for (let j = 3; j < data.length; j+=2) {
@@ -1230,7 +1226,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.getBoundingBox = function() {
         let shape = this.getBoundingShape();
-        return shape.boundingBox;
+        return shape.getBoundingBox();
       };
     };
 
@@ -1378,6 +1374,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemContainer.call(this, obj, inherits);
       this.drawInDocument = function(isClip, isMask) {
         doc.save();
+        if (this.link && !isClip && !isMask) {this.addLink();}
         this.drawContent(isClip, isMask);
         doc.restore();
       };
@@ -1387,18 +1384,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemLink = function(obj, inherits) {
-      SvgElemContainer.call(this, obj, inherits);
-      let link = this.attr('href') || this.attr('xlink:href');
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
-        if (link && this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
-        doc.transform.apply(doc, this.getTransformation());
-        this.drawContent(isClip, isMask);
-        doc.restore();
-      };
-      this.getTransformation = function() {
-        return this.get('transform');
-      };
+      if (inherits && inherits.isText) {
+        SvgElemTspan.call(this, obj, inherits);
+      } else {
+        SvgElemGroup.call(this, obj, inherits);
+      }
+      this.link = this.attr('href') || this.attr('xlink:href');
+      this.addLink = function() {
+        if (this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
+      }
     };
 
     var SvgElemSvg = function(obj, inherits) {
@@ -1704,15 +1698,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               stroke = this.getStroke(isClip, isMask);
           for (let j = 0; j < subPaths.length; j++) {
             if (stroke && isEqual(subPaths[j].totalLength, 0)) {
-              let LineWidth = this.get('stroke-width'), LineCap = this.get('stroke-linecap');
-              if ((LineCap === 'square' || LineCap === 'round') && LineWidth > 0) {
-                let x = subPaths[j].boundingBox[0],
-                    y = subPaths[j].boundingBox[1];
+              let lineWidth = this.get('stroke-width'), lineCap = this.get('stroke-linecap');
+              if ((lineCap === 'square' || lineCap === 'round') && lineWidth > 0) {
+                let x = subPaths[j].startPoint[0],
+                    y = subPaths[j].startPoint[1];
                 docFillColor(stroke);
-                if (LineCap === 'square') {
-                  doc.rect(x - 0.5 * LineWidth, y - 0.5 * LineWidth, LineWidth, LineWidth);
-                } else if (LineCap === 'round') {
-                  doc.circle(x, y, 0.5 * LineWidth);
+                if (lineCap === 'square') {
+                  doc.rect(x - 0.5 * lineWidth, y - 0.5 * lineWidth, lineWidth, lineWidth);
+                } else if (lineCap === 'round') {
+                  doc.circle(x, y, 0.5 * lineWidth);
                 }
                 doc.fill();
               }
@@ -1976,10 +1970,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
+      this.allowedChildren = ['tspan', '#text', 'a'];
+      this.isText = true;
       this.getBoundingShape = function() {
         return this.inherits.getBoundingShape();
       };
       this.drawTextInDocument = function(isClip, isMask) {
+        if (this.link && !isClip && !isMask) {this.addLink();}
         if (this.get('text-decoration') === 'underline') {
           this.decorate(0.05 * this._font.size, -0.075 * this._font.size, isClip, isMask);
         }
@@ -2001,7 +1998,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < children.length; i++) {
           let childElem = children[i];
           switch(childElem.name) {
-            case 'tspan': case 'textPath':
+            case 'tspan': case 'textPath': case 'a':
               if (childElem.get('display') !== 'none') {
                 childElem.drawTextInDocument(isClip, isMask);
               }
@@ -2078,18 +2075,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemTextNode = function(obj, inherits) {
-      SvgElemTextContainer.call(this, obj, inherits);
+      SvgElem.call(this, obj, inherits);
       this.textContent = obj.nodeValue;
     };
 
     var SvgElemTspan = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['tspan', '#text'];
     };
 
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['tspan', '#text'];
       let pathObject, pathLength, temp;
       if ((temp = this.attr('path')) && temp.trim() !== '') {
         let pathLength = this.getLength('pathLength', this.getViewport());
@@ -2106,7 +2101,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemText = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['textPath', 'tspan', '#text'];
+      this.allowedChildren = ['textPath', 'tspan', '#text', 'a'];
       (function (textParentElem) {
         let processedText = '', remainingText = obj.textContent, textPaths = [], currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
         function doAnchoring() {
@@ -2176,7 +2171,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           for (let i = 0; i < children.length; i++) {
             let childElem = children[i];
             switch(childElem.name) {
-              case 'tspan': case 'textPath':
+              case 'tspan': case 'textPath': case 'a':
                 recursive(childElem, currentElem);
                 break;
               case '#text':
@@ -2314,7 +2309,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.drawInDocument = function(isClip, isMask) {
         doc.save();
-        doc.transform.apply(doc, this.getTransformation());
+        this.transform();
         this.clip();
         let masked = this.mask(), group;
         if (masked) {
@@ -2330,8 +2325,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     options = options || {};
-    var assumePt = options.assumePt || false, // setting this to true disables the px to pt translation
-        pxToPt = assumePt ? 1 : (72/96), // 1px = 72/96pt, but only if assumePt is false
+    var pxToPt = options.assumePt ? 1 : (72/96), // 1px = 72/96pt, but only if assumePt is false
         viewportWidth = (options.width || doc.page.width) / pxToPt,
         viewportHeight = (options.height || doc.page.height) / pxToPt,
         preserveAspectRatio = options.preserveAspectRatio || null, // default to null so that the attr can override if not passed
