@@ -1309,7 +1309,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemHasChildren.call(this, obj);
       SvgElemStylable.call(this, obj);
       this.drawContent = function(isClip, isMask) {
-        doc.transform.apply(doc, this.getTransformation());
+        this.transform();
         let clipped = this.clip(),
             masked = this.mask(),
             group;
@@ -1455,25 +1455,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         warningCallback('SVGElemImage: failed to open image "' + link + '" in PDFKit');
       }
       this.getTransformation = function() {
-        return multiplyMatrix(
-          this.get('transform'),
-          [1, 0, 0, 1, x, y],
-          parseAspectRatio(this.attr('preserveAspectRatio'), width, height, image ? image.width : width, image ? image.height : height)
-        );
+        return this.get('transform');
       };
       this.getBoundingShape = function() {
-        return new SvgShape().M(x, y).L(x + width, y).L(x + width, y + height).L(x, y + height).Z();
+        return new SvgShape().M(x, y).L(x + width, y).M(x + width, y + height).L(x, y + height);
       };
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !image) {return;}
         doc.save();
-        doc.transform.apply(doc, this.get('transform'));
+        this.transform();
+        if (this.get('overflow') === 'hidden') {
+          doc.rect(x, y, width, height).clip();
+        }
         this.clip();
         this.mask();
-        doc.transform.apply(doc, [1, 0, 0, 1, x, y]);
-        if (this.get('overflow') === 'hidden') {
-          doc.rect(0, 0, width, height).clip();
-        }
+        doc.translate(x, y);
         doc.transform.apply(doc, parseAspectRatio(this.attr('preserveAspectRatio'), width, height, image ? image.width : width, image ? image.height : height));
         if (!isClip) {
           doc.fillOpacity(this.get('opacity'));
