@@ -1359,6 +1359,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       SvgElemContainer.call(this, obj, inherits);
       this.drawInDocument = function(isClip, isMask) {
         doc.save();
+        if (this.link && !isClip && !isMask) {this.addLink();}
         this.drawContent(isClip, isMask);
         doc.restore();
       };
@@ -1368,18 +1369,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemLink = function(obj, inherits) {
-      SvgElemContainer.call(this, obj, inherits);
-      let link = this.attr('href') || this.attr('xlink:href');
-      this.drawInDocument = function(isClip, isMask) {
-        doc.save();
-        if (link && this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
-        doc.transform.apply(doc, this.getTransformation());
-        this.drawContent(isClip, isMask);
-        doc.restore();
-      };
-      this.getTransformation = function() {
-        return this.get('transform');
-      };
+      if (inherits && inherits.isText) {
+        SvgElemTspan.call(this, obj, inherits);
+      } else {
+        SvgElemGroup.call(this, obj, inherits);
+      }
+      this.link = this.attr('href') || this.attr('xlink:href');
+      this.addLink = function() {
+        if (this.getChildren().length) {warningCallback('SVGElemLink: links are not supported');}
+      }
     };
 
     var SvgElemSvg = function(obj, inherits) {
@@ -1964,10 +1962,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
+      this.allowedChildren = ['tspan', '#text', 'a'];
+      this.isText = true;
       this.getBoundingShape = function() {
         return this.inherits.getBoundingShape();
       };
       this.drawTextInDocument = function(isClip, isMask) {
+        if (this.link && !isClip && !isMask) {this.addLink();}
         if (this.get('text-decoration') === 'underline') {
           this.decorate(0.05 * this._font.size, -0.075 * this._font.size, isClip, isMask);
         }
@@ -1989,7 +1990,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < children.length; i++) {
           let childElem = children[i];
           switch(childElem.name) {
-            case 'tspan': case 'textPath':
+            case 'tspan': case 'textPath': case 'a':
               if (childElem.get('display') !== 'none') {
                 childElem.drawTextInDocument(isClip, isMask);
               }
@@ -2072,12 +2073,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemTspan = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['tspan', '#text'];
     };
 
     var SvgElemTextPath = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['tspan', '#text'];
       let pathObject, pathLength, temp;
       if ((temp = this.attr('path')) && temp.trim() !== '') {
         let pathLength = this.getLength('pathLength', this.getViewport());
@@ -2094,7 +2093,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemText = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['textPath', 'tspan', '#text'];
+      this.allowedChildren = ['textPath', 'tspan', '#text', 'a'];
       (function (textParentElem) {
         let processedText = '', remainingText = obj.textContent, textPaths = [], currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
         function doAnchoring() {
@@ -2164,7 +2163,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           for (let i = 0; i < children.length; i++) {
             let childElem = children[i];
             switch(childElem.name) {
-              case 'tspan': case 'textPath':
+              case 'tspan': case 'textPath': case 'a':
                 recursive(childElem, currentElem);
                 break;
               case '#text':
