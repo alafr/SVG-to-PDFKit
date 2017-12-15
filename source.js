@@ -965,7 +965,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         }
       };
       this.resolveUrl = function(value) {
-        let temp = (value || '').match(/^\s*(?:url\((.*)#(.*)\)|url\("(.*)#(.*)"\)|url\('(.*)#(.*)'\)|(.*)#(.*))\s*$/) || [];
+        let temp = (value || '').match(/^\s*(?:url\("(.*)#(.*)"\)|url\('(.*)#(.*)'\)|url\((.*)#(.*)\)|(.*)#(.*))\s*$/) || [];
         let file = temp[1] || temp[3] || temp[5] || temp[7],
             id = temp[2] || temp[4] || temp[6] || temp[8];
         if (id) {
