@@ -1409,7 +1409,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (this.link.match(/^(?:[a-z][a-z0-9+.-]*:)?\/\//i) && this.getChildren().length) {
           let bbox = this.getBoundingShape().transform(getGlobalMatrix()).getBoundingBox();
           docInsertLink(bbox[0], bbox[1], bbox[2], bbox[3], this.link);
-          warningCallback('SVGElemLink: links are not supported');
         }
       }
     };
@@ -1988,7 +1987,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.allowedChildren = ['tspan', '#text', 'a'];
       this.isText = true;
       this.getBoundingShape = function() {
-        return this.inherits.getBoundingShape();
+        let shape = new SvgShape();
+        for (let i = 0; i < this._pos.length; i++) {
+          let pos = this._pos[i];
+          if (!pos.hidden) {
+            let dx0 = pos.ascent * Math.sin(pos.rotate), dy0 = -pos.ascent * Math.cos(pos.rotate),
+                dx1 = pos.descent * Math.sin(pos.rotate), dy1 = -pos.descent * Math.cos(pos.rotate),
+                dx2 = pos.width * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
+            shape.M(pos.x + dx0, pos.y + dy0).L(pos.x + dx0 + dx2, pos.y + dy0 + dy2)
+                 .M(pos.x + dx1 + dx2, pos.y + dy1 + dy2).L(pos.x + dx1, pos.y + dy1);
+          }
+        }
+        return shape;
       };
       this.drawTextInDocument = function(isClip, isMask) {
         if (this.link && !isClip && !isMask) {this.addLink();}
@@ -2305,20 +2315,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           textOnPath(textPaths[i]);
         }
       })(this);
-      this.getBoundingShape = function() {
-        let shape = new SvgShape();
-        for (let i = 0; i < this._pos.length; i++) {
-          let pos = this._pos[i];
-          if (!pos.hidden) {
-            let dx0 = pos.ascent * Math.sin(pos.rotate), dy0 = -pos.ascent * Math.cos(pos.rotate),
-                dx1 = pos.descent * Math.sin(pos.rotate), dy1 = -pos.descent * Math.cos(pos.rotate),
-                dx2 = pos.width * Math.cos(pos.rotate), dy2 = pos.width * Math.sin(pos.rotate);
-            shape.M(pos.x + dx0, pos.y + dy0).L(pos.x + dx0 + dx2, pos.y + dy0 + dy2)
-                 .M(pos.x + dx1 + dx2, pos.y + dy1 + dy2).L(pos.x + dx1, pos.y + dy1);
-          }
-        }
-        return shape;
-      };
       this.getTransformation = function() {
         return this.get('transform');
       };
