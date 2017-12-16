@@ -23,9 +23,9 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
-|	Failed tests	| 21 | 9.3% |
-| Passed tests | 206 | 90.7% |
-| **Total tests** | **227** |  |
+|	Failed tests	| 20 | 8.6% |
+| Passed tests | 212 | 91.4% |
+| **Total tests** | **232** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
@@ -51,7 +51,6 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	text-intro-10-f.svg	|	Unicode	|
 |	text-intro-11-t.svg	|	Unicode	|
 |	text-intro-12-t.svg	|	Unicode	|
-|	text-text-03-b.svg	|	Text decoration	|
 
 #### Passed tests that look like fails because of bugs in other packages
 
