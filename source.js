@@ -190,77 +190,44 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       links.push(ref);
     }
     function parseXml(xml) {
-      let SvgNode = function(tag) {
+      let SvgNode = function(tag, type, value) {
         this.nodeName = tag;
-        this.attributes = {};
+        this.nodeValue = value;
+        this.nodeType = type;
+        this.attributes = Object.create(null);
         this.childNodes = [];
         this.parentNode = null;
-        this.nodeValue = null;
-        if (tag === '#text') {this.nodeType = 3;} else {this.nodeType = 1;}
+        this.id = '';
+        this.textContent = '';
+        this.classList = [];
       };
-      Object.defineProperty(SvgNode.prototype, 'children', { get: function() {
-        if (this.nodeType === 1) {
-          let temp = [];
-          for (let i = 0; i < this.childNodes.length; i++) {
-            if (this.childNodes[i].nodeType === 1) {temp.push(this.childNodes[i]);}
-          }
-          return temp;
-        }
-      }});
-      Object.defineProperty(SvgNode.prototype, 'parentElement', { get: function() {
-        return this.parentNode;
-      }});
-      Object.defineProperty(SvgNode.prototype, 'tagName', { get: function() {
-        if (this.nodeType === 1) {
-          return this.nodeName;
-        }
-      }});
-      Object.defineProperty(SvgNode.prototype, 'id', { get: function() {
-        if (this.nodeType === 1) {
-          return this.getAttribute('id') || '';
-        }
-      }});
-      Object.defineProperty(SvgNode.prototype, 'name', { get: function() {
-        if (this.nodeType === 1) {
-          return this.getAttribute('name') || '';
-        }
-      }});
-      Object.defineProperty(SvgNode.prototype, 'textContent', { get: function() {
-        return (function recursive(node) {
-          if (node.nodeType === 3) {return node.nodeValue;}
-          let temp = '';
-          for (let i = 0; i < node.childNodes.length; i++) {
-            temp += recursive(node.childNodes[i]);
-          }
-          return temp;
-        })(this);
-      }});
       SvgNode.prototype.getAttribute = function(attr) {
-        return (this.hasAttribute(attr) || null) && this.attributes[attr];
-      };
-      SvgNode.prototype.hasAttribute = function(attr) {
-        return this.attributes.hasOwnProperty(attr);
+        return this.attributes[attr] != null ? this.attributes[attr] : null;
       };
       SvgNode.prototype.getElementById = function(id) {
-        return (function recursive(node, id) {
-          let temp;
+        let result = null;
+        (function recursive(node) {
+          if (result) {return;}
           if (node.nodeType === 1) {
-            if (node.attributes.id === id) {return node;}
+            if (node.id === id) {result = node;}
             for (let i = 0; i < node.childNodes.length; i++) {
-              if (temp = recursive(node.childNodes[i], id)) {return temp;}
+              recursive(node.childNodes[i]);
             }
           }
-        })(this, '' + id) || null;
+        })(this);
+        return result;
       };
-      let parser = new StringParser(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<![\s\S]*?>/g, '').replace(/<\?[\s\S]*?\?>/g, '').trim());
-      let result = (function recursive() {
-        let temp, child, node, attr, value;
+      let parser = new StringParser(xml.trim()), result, child; 
+      let recursive = function() {
+        let temp, child;
         if (temp = parser.match(/^<([\w:.-]+)\s*/, true)) { // Opening tag
-          node = new SvgNode(temp[1]);
+          let node = new SvgNode(temp[1], 1, null);
           while (temp = parser.match(/^([\w:.-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?\s*/, true)) { // Attribute
-            attr = temp[1]; value = decodeEntities(temp[2] || temp[3] || '');
-            if (!node.attributes.hasOwnProperty(attr)) {
+            let attr = temp[1], value = decodeEntities(temp[2] || temp[3] || '');
+            if (!node.attributes[attr]) {
               node.attributes[attr] = value;
+              if (attr === 'id') {node.id = value;}
+              if (attr === 'class') {node.classList = value.split(' ');}
             } else {
               warningCallback('parseXml: duplicate attribute "' + attr + '"');
             }
@@ -269,6 +236,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             while (child = recursive()) {
               node.childNodes.push(child);
               child.parentNode = node;
+              node.textContent += (child.nodeType === 3 || child.nodeType === 4 ? child.nodeValue : child.textContent);
             }
             if (temp = parser.match(/^<\/([\w:.-]+)\s*>/, true)) { // Closing tag
               if (temp[1] === node.nodeName) {
@@ -288,14 +256,27 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           } else {
             warningCallback('parseXml: tag could not be parsed "' + node.nodeName + '"');
           }
+        } else if (temp = parser.match(/^<!--[\s\S]*?-->/)) { // Comment
+          return new SvgNode(null, 8, temp);
+        } else if (temp = parser.match(/^<\?[\s\S]*?\?>/)) { // Processing instructions
+          return new SvgNode(null, 7, temp);
+        } else if (temp = parser.match(/^<!DOCTYPE\s*([\s\S]*?)>/)) { // Doctype
+          return new SvgNode(null, 10, temp);
+        } else if (temp = parser.match(/^<!\[CDATA\[([\s\S]*?)\]\]>/, true)) { // Cdata node
+          return new SvgNode('#cdata-section', 4, temp[1]);
         } else if (temp = parser.match(/^([^<]+)/, true)) { // Text node
-          node = new SvgNode('#text');
-          node.nodeValue = decodeEntities(temp[1]);
-          return node;
+          return new SvgNode('#text', 3, decodeEntities(temp[1]));
         }
-      })();
+      };
+      while (child = recursive()) {
+        if (child.nodeType === 1 && !result) {
+          result = child;
+        } else if (child.nodeType === 1 || (child.nodeType === 3 && child.nodeValue.trim() !== '')) {
+          warningCallback('parseXml: data after document end has been discarded');
+        }
+      }
       if (parser.matchAll()) {
-        warningCallback('parseXml: data after document end has been discarded');
+        warningCallback('parseXml: parsing error');
       }
       return result;
     };
@@ -962,7 +943,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case 'text': if (this instanceof SvgElemText) {break;} else {return new SvgElemText(obj, inherits);}
         case 'tspan': if (this instanceof SvgElemTspan) {break;} else {return new SvgElemTspan(obj, inherits);}
         case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
-        case '#text': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
+        case '#text': case '#cdata-section': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
       }
       let styleCache = Object.create(null);
       let childrenCache = null;
@@ -972,6 +953,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.inherits = inherits || (!this.isOuterElement ? new SvgElem(obj.parentNode, null) : null);
       this.stack = (this.inherits ? this.inherits.stack.concat(obj) : [obj]);
       this.style = parseStyleAttr(typeof obj.getAttribute === 'function' && obj.getAttribute('style'));
+      if (useCSS) {this.css = getComputedStyle(obj);}
       this.allowedChildren = [];
       this.attr = function(key) {
         if (typeof obj.getAttribute === 'function') {
@@ -1077,140 +1059,148 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.chooseValue = function(args) {
         for (let i = 0; i < arguments.length; i++) {
-          if ((arguments[i] !== undefined) && (arguments[i] !== null) && (arguments[i] === arguments[i])) {return arguments[i];}
+          if (arguments[i] != null && arguments[i] === arguments[i]) {return arguments[i];}
         }
         return arguments[arguments.length - 1];
       };
       this.get = function(key) {
         if (styleCache[key] !== undefined) {return styleCache[key];}
         let keyInfo = Properties[key] || {}, value, result;
-        if (useCSS && key !== 'transform') { // the CSS transform behaves strangely
-          if (!this.css) {this.css = getComputedStyle(obj);}
-          value = this.css[keyInfo.css || key] || this.attr(key);
-        } else {
-          value = this.style[key] || this.attr(key);
-        }
-        if (value === 'inherit') {
-          result = (this.inherits ? this.inherits.get(key) : keyInfo.initial);
-          if (result != null) {return styleCache[key] = result;}
-        }
-        if (keyInfo.values != null) {
-          result = keyInfo.values[value];
-          if (result != null) {return styleCache[key] = result;}
-        }
-        if (value !== null && value !== undefined) {
-          let parsed;
-          switch (key) {
-            case 'font-size':
-              result = this.computeLength(value, this.inherits ? this.inherits.get(key) : keyInfo.initial, undefined, true);
-              break;
-            case 'baseline-shift':
-              result = this.computeLength(value, this.get('font-size'));
-              break;
-            case 'font-family':
-              result = value || undefined;
-              break;
-            case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
-              parsed = parseFloat(value);
-              if (!isNaN(parsed)) {
-                result = Math.max(0, Math.min(1, parsed));
+        for (let i = 0; i < 2; i++) {
+          switch (i) {
+            case 0:
+              if (useCSS && key !== 'transform') { // the CSS transform behaves strangely
+                value = this.css[keyInfo.css || key];
+              } else {
+                value = this.style[key];
               }
               break;
-            case 'transform':
-              result = parseTranform(value);
+            case 1:
+              value = this.attr(key);
               break;
-            case 'stroke-dasharray':
-              if (value === 'none') {
-                result = [];
-              } else if (parsed = this.computeLengthList(value, this.getViewport(), true)) {
-                let sum = 0, error = false;
-                for (let j = 0; j < parsed.length; j++) {
-                  if (parsed[j] < 0) {error = true;}
-                  sum += parsed[j];
+          }
+          if (value === 'inherit') {
+            result = (this.inherits ? this.inherits.get(key) : keyInfo.initial);
+            if (result != null) {return styleCache[key] = result;}
+          }
+          if (keyInfo.values != null) {
+            result = keyInfo.values[value];
+            if (result != null) {return styleCache[key] = result;}
+          }
+          if (value != null) {
+            let parsed;
+            switch (key) {
+              case 'font-size':
+                result = this.computeLength(value, this.inherits ? this.inherits.get(key) : keyInfo.initial, undefined, true);
+                break;
+              case 'baseline-shift':
+                result = this.computeLength(value, this.get('font-size'));
+                break;
+              case 'font-family':
+                result = value || undefined;
+                break;
+              case 'opacity': case 'stroke-opacity': case 'fill-opacity': case 'stop-opacity':
+                parsed = parseFloat(value);
+                if (!isNaN(parsed)) {
+                  result = Math.max(0, Math.min(1, parsed));
                 }
-                if (!error) {
-                  if (parsed.length % 2 === 1) {
-                    parsed = parsed.concat(parsed);
+                break;
+              case 'transform':
+                result = parseTranform(value);
+                break;
+              case 'stroke-dasharray':
+                if (value === 'none') {
+                  result = [];
+                } else if (parsed = this.computeLengthList(value, this.getViewport(), true)) {
+                  let sum = 0, error = false;
+                  for (let j = 0; j < parsed.length; j++) {
+                    if (parsed[j] < 0) {error = true;}
+                    sum += parsed[j];
                   }
-                  result = (sum === 0 ? [] : parsed);
+                  if (!error) {
+                    if (parsed.length % 2 === 1) {
+                      parsed = parsed.concat(parsed);
+                    }
+                    result = (sum === 0 ? [] : parsed);
+                  }
                 }
-              }
-              break;
-            case 'color':
-              if (value === 'none' || value === 'transparent') {
-                result = 'none';
-              } else {
-                result = parseColor(value);
-              }
-              break;
-            case 'fill': case 'stroke':
-              if (value === 'none' || value === 'transparent') {
-                result = 'none';
-              } else if (value === 'currentColor') {
-                result = this.get('color');
-              } else if (parsed = parseColor(value)) {
-                return parsed;
-              } else if (parsed = (value || '').split(' ')) {
-                let object = this.resolveUrl(parsed[0]),
-                    fallbackColor = parseColor(parsed[1]);
-                if (object == null) {
-                  result = fallbackColor;
-                } else if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
-                  result = new SvgElemGradient(object, null, fallbackColor);
-                } else if (object.nodeName === 'pattern') {
-                  result = new SvgElemPattern(object, null, fallbackColor);
+                break;
+              case 'color':
+                if (value === 'none' || value === 'transparent') {
+                  result = 'none';
                 } else {
-                  result = fallbackColor;
+                  result = parseColor(value);
                 }
-              }
-              break;
-            case 'stop-color':
-              if (value === 'none' || value === 'transparent') {
-                result = 'none';
-              } else if (value === 'currentColor') {
-                result = this.get('color');
-              } else {
-                result = parseColor(value);
-              }
-              break;
-            case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
-              if (value === 'none') {
-                result = 'none';
-              } else {
-                result = this.resolveUrl(value);
-              }
-              break;
-            case 'stroke-width':
-              parsed = this.computeLength(value, this.getViewport());
-              if (parsed != null && parsed >= 0) {
-                result = parsed;
-              }
-              break;
-            case 'stroke-miterlimit':
-              parsed = parseFloat(value);
-              if (parsed != null && parsed >= 1) {
-                result = parsed;
-              }
-              break;
-            case 'word-spacing': case 'letter-spacing':
-              result = this.computeLength(value, this.getViewport());
-              break;
-            case 'stroke-dashoffset':
-              result = this.computeLength(value, this.getViewport());
-              if (result != null) {
-                if (result < 0) { // fix for crbug.com/660850
-                  let dasharray = this.get('stroke-dasharray');
-                  for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
+                break;
+              case 'fill': case 'stroke':
+                if (value === 'none' || value === 'transparent') {
+                  result = 'none';
+                } else if (value === 'currentColor') {
+                  result = this.get('color');
+                } else if (parsed = parseColor(value)) {
+                  return parsed;
+                } else if (parsed = (value || '').split(' ')) {
+                  let object = this.resolveUrl(parsed[0]),
+                      fallbackColor = parseColor(parsed[1]);
+                  if (object == null) {
+                    result = fallbackColor;
+                  } else if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
+                    result = new SvgElemGradient(object, null, fallbackColor);
+                  } else if (object.nodeName === 'pattern') {
+                    result = new SvgElemPattern(object, null, fallbackColor);
+                  } else {
+                    result = fallbackColor;
+                  }
                 }
-              }
-              break;
+                break;
+              case 'stop-color':
+                if (value === 'none' || value === 'transparent') {
+                  result = 'none';
+                } else if (value === 'currentColor') {
+                  result = this.get('color');
+                } else {
+                  result = parseColor(value);
+                }
+                break;
+              case 'marker-start': case 'marker-mid': case 'marker-end': case 'clip-path': case 'mask':
+                if (value === 'none') {
+                  result = 'none';
+                } else {
+                  result = this.resolveUrl(value);
+                }
+                break;
+              case 'stroke-width':
+                parsed = this.computeLength(value, this.getViewport());
+                if (parsed != null && parsed >= 0) {
+                  result = parsed;
+                }
+                break;
+              case 'stroke-miterlimit':
+                parsed = parseFloat(value);
+                if (parsed != null && parsed >= 1) {
+                  result = parsed;
+                }
+                break;
+              case 'word-spacing': case 'letter-spacing':
+                result = this.computeLength(value, this.getViewport());
+                break;
+              case 'stroke-dashoffset':
+                result = this.computeLength(value, this.getViewport());
+                if (result != null) {
+                  if (result < 0) { // fix for crbug.com/660850
+                    let dasharray = this.get('stroke-dasharray');
+                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
+                  }
+                }
+                break;
+            }
           }
         }
         if (result != null) {return styleCache[key] = result;}
         return styleCache[key] = (keyInfo.inherit && this.inherits ? this.inherits.get(key) : keyInfo.initial);
       };
       this.getChildren = function() {
-        if (childrenCache !== null) {return childrenCache;}
+        if (childrenCache != null) {return childrenCache;}
         let children = [];
         for (let i = 0; i < obj.childNodes.length; i++) {
           let child = obj.childNodes[i];
@@ -1400,7 +1390,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemLink = function(obj, inherits) {
       if (inherits && inherits.isText) {
         SvgElemTspan.call(this, obj, inherits);
-        this.allowedChildren = ['textPath', 'tspan', '#text', 'a'];
+        this.allowedChildren = ['textPath', 'tspan', '#text', '#cdata-section', 'a'];
       } else {
         SvgElemGroup.call(this, obj, inherits);
       }
@@ -1512,7 +1502,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let _attr = this.attr;
       this.attr = function(key) {
         let attr = _attr.call(this, key);
-        if (attr !== null || key === 'href' || key === 'xlink:href') {return attr;}
+        if (attr != null || key === 'href' || key === 'xlink:href') {return attr;}
         return this.ref ? this.ref.attr(key) : null;
       };
       let _getChildren = this.getChildren;
@@ -1584,7 +1574,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let _attr = this.attr;
       this.attr = function(key) {
         let attr = _attr.call(this, key);
-        if (attr !== null || key === 'href' || key === 'xlink:href') {return attr;}
+        if (attr != null || key === 'href' || key === 'xlink:href') {return attr;}
         return this.ref ? this.ref.attr(key) : null;
       };
       let _getChildren = this.getChildren;
@@ -1984,7 +1974,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SvgElemTextContainer = function(obj, inherits) {
       SvgElem.call(this, obj, inherits);
       SvgElemStylable.call(this, obj);
-      this.allowedChildren = ['tspan', '#text', 'a'];
+      this.allowedChildren = ['tspan', '#text', '#cdata-section', 'a'];
       this.isText = true;
       this.getBoundingShape = function() {
         let shape = new SvgShape();
@@ -2028,7 +2018,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 childElem.drawTextInDocument(isClip, isMask);
               }
               break;
-            case '#text':
+            case '#text': case '#cdata-section':
               if (this.get('visibility') === 'hidden') {continue;}
               if (fill || stroke || isClip) {
                 if (fill) {
@@ -2126,7 +2116,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemText = function(obj, inherits) {
       SvgElemTextContainer.call(this, obj, inherits);
-      this.allowedChildren = ['textPath', 'tspan', '#text', 'a'];
+      this.allowedChildren = ['textPath', 'tspan', '#text', '#cdata-section', 'a'];
       (function (textParentElem) {
         let processedText = '', remainingText = obj.textContent, textPaths = [], currentChunk = [], currentAnchor, currentDirection, currentX = 0, currentY = 0;
         function doAnchoring() {
@@ -2199,7 +2189,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               case 'tspan': case 'textPath': case 'a':
                 recursive(childElem, currentElem);
                 break;
-              case '#text':
+              case '#text': case '#cdata-section':
                 let rawText = childElem.textContent, renderedText = rawText, words;
                 childElem._font = currentElem._font;
                 childElem._pos = [];
