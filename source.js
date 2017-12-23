@@ -217,6 +217,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         })(this);
         return result;
       };
+      SvgNode.prototype.getElementsByTagName = function(tag) {
+        let result = [];
+        (function recursive(node) {
+          if (node.nodeType === 1) {
+            if (node.nodeName === tag) {result.push(node);}
+            for (let i = 0; i < node.childNodes.length; i++) {
+              recursive(node.childNodes[i]);
+            }
+          }
+        })(this);
+        return result;
+      };
       let parser = new StringParser(xml.trim()), result, child; 
       let recursive = function() {
         let temp, child;
@@ -500,6 +512,67 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return result;
     }
+    function parseSelector(v) {
+      let parts = v.split(/(?=[.#])/g), ids = [], classes = [], tags = [], temp;
+      for (let i = 0; i < parts.length; i++) {
+        if (temp = parts[i].match(/^[#]([_A-Za-z0-9-]+)$/)) {
+          ids.push(temp[1]);
+        } else if (temp = parts[i].match(/^[.]([_A-Za-z0-9-]+)$/)) {
+          classes.push(temp[1]);
+        } else if (temp = parts[i].match(/^([_A-Za-z0-9-]+)$/)) {
+          tags.push(temp[1]);
+        } else if (parts[i] !== '*') {
+          return;
+        }
+      }
+      return {
+        tags: tags, ids: ids, classes: classes,
+        specificity: ids.length * 10000 + classes.length * 100 + tags.length
+      };
+    }
+    function parseStyleSheet(v) {
+      let parser = new StringParser(v.trim()), rules = [], rule;
+      while (rule = parser.match(/^\s*([^\{\}]*?)\s*\{([^\{\}]*?)\}/, true)) {
+        let selectors = rule[1].split(/\s*,\s*/g),
+            css = parseStyleAttr(rule[2]);
+        for (let i = 0; i < selectors.length; i++) {
+          let selector = parseSelector(selectors[i]);
+          if (selector) {
+            rules.push({selector: selector, css:css});
+          }
+        }
+      }
+      return rules;
+    }
+    function matchesSelector(elem, selector) {
+      if (elem.nodeType !== 1) {return false;}
+      for (let i = 0; i < selector.tags.length; i++) {
+        if (selector.tags[i] !== elem.nodeName) {return false;}
+      }
+      for (let i = 0; i < selector.ids.length; i++) {
+        if (selector.ids[i] !== elem.id) {return false;}
+      }
+      for (let i = 0; i < selector.classes.length; i++) {
+        if (elem.classList.indexOf(selector.classes[i]) === -1) {return false;}
+      }
+      return true;
+    }
+    function getStyle(elem) {
+      let result = Object.create(null);
+      let specificities = Object.create(null);
+      for (let i = 0; i < styleRules.length; i++) {
+        let rule = styleRules[i];
+        if (matchesSelector(elem, rule.selector)) {
+          for (let key in rule.css) {
+            if (!(specificities[key] > rule.selector.specificity)) {
+              result[key] = rule.css[key];
+              specificities[key] = rule.selector.specificity;
+            }
+          }
+        }
+      }
+      return result;
+    }
     function combineArrays(array1, array2) {
       return array1.concat(array2.slice(array1.length));
     }
@@ -643,35 +716,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return [x, y, Math.atan2(p2y - p1y, p2x - p1x)];
         }
       };
-    };
-
-    var SvgPath = function(d) {
-      SvgShape.call(this);
-      let command, value, values, argsNumber, temp,
-          parser = new StringParser((d || '').trim());
-      while (command = parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
-        parser.matchSeparator();
-        argsNumber = PathArguments[command];
-        values = [];
-        while (value = (PathFlags[command + values.length] ? parser.match(/^[01]/) : parser.matchNumber())) {
-          parser.matchSeparator();
-          if (values.length === argsNumber) {
-            this[command].apply(this, values);
-            values = [];
-            if (command === 'M') {command = 'L';}
-            else if (command === 'm') {command = 'l';}
-          }
-          values.push(Number(value));
-        }
-        if (values.length === argsNumber) {
-          this[command].apply(this, values);
-        } else {
-          warningCallback('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); return;
-        }
-      }
-      if (temp = parser.matchAll()) {
-        warningCallback('SvgPath: unexpected string ' + temp);
-      }
     };
 
     var SvgShape = function() {
@@ -823,6 +867,33 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.a = function(rx, ry, fi, fa, fs, x, y) {
         return this.A(rx, ry, fi, fa, fs, currX + x, currY + y);
       };
+      this.path = function(d) {
+        let command, value, temp,
+            parser = new StringParser((d || '').trim());
+        while (command = parser.match(/^[astvzqmhlcASTVZQMHLC]/)) {
+          parser.matchSeparator();
+          let values = [];
+          while (value = (PathFlags[command + values.length] ? parser.match(/^[01]/) : parser.matchNumber())) {
+            parser.matchSeparator();
+            if (values.length === PathArguments[command]) {
+              this[command].apply(this, values);
+              values = [];
+              if (command === 'M') {command = 'L';}
+              else if (command === 'm') {command = 'l';}
+            }
+            values.push(Number(value));
+          }
+          if (values.length === PathArguments[command]) {
+            this[command].apply(this, values);
+          } else {
+            warningCallback('SvgPath: command ' + command + ' with ' + values.length + ' numbers'); return;
+          }
+        }
+        if (temp = parser.matchAll()) {
+          warningCallback('SvgPath: unexpected string ' + temp);
+        }
+        return this;
+      };
       this.getBoundingBox = function() {
         let bbox = [Infinity, Infinity, -Infinity, -Infinity];
         function addBounds(bbox1) {
@@ -953,7 +1024,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.inherits = inherits || (!this.isOuterElement ? new SvgElem(obj.parentNode, null) : null);
       this.stack = (this.inherits ? this.inherits.stack.concat(obj) : [obj]);
       this.style = parseStyleAttr(typeof obj.getAttribute === 'function' && obj.getAttribute('style'));
-      if (useCSS) {this.css = getComputedStyle(obj);}
+      this.css = useCSS ? getComputedStyle(obj) : getStyle(obj);
       this.allowedChildren = [];
       this.attr = function(key) {
         if (typeof obj.getAttribute === 'function') {
@@ -1066,16 +1137,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.get = function(key) {
         if (styleCache[key] !== undefined) {return styleCache[key];}
         let keyInfo = Properties[key] || {}, value, result;
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
           switch (i) {
             case 0:
-              if (useCSS && key !== 'transform') { // the CSS transform behaves strangely
+              if (key !== 'transform') { // the CSS transform behaves strangely
                 value = this.css[keyInfo.css || key];
-              } else {
-                value = this.style[key];
               }
               break;
             case 1:
+              value = this.style[key];
+              break;
+            case 2:
               value = this.attr(key);
               break;
           }
@@ -1194,9 +1266,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 }
                 break;
             }
+            if (result != null) {return styleCache[key] = result;}
           }
         }
-        if (result != null) {return styleCache[key] = result;}
         return styleCache[key] = (keyInfo.inherit && this.inherits ? this.inherits.get(key) : keyInfo.initial);
       };
       this.getChildren = function() {
@@ -1875,7 +1947,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemPath = function(obj, inherits) {
       SvgElemBasicShape.call(this, obj, inherits);
-      this.shape = new SvgPath(this.attr('d'));
+      this.shape = new SvgShape().path(this.attr('d'));
       let pathLength = this.getLength('pathLength', this.getViewport());
       this.pathLength = pathLength > 0 ? pathLength : undefined;
       this.dashScale = (this.pathLength !== undefined ? this.shape.totalLength / this.pathLength : 1);
@@ -2103,7 +2175,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let pathObject, pathLength, temp;
       if ((temp = this.attr('path')) && temp.trim() !== '') {
         let pathLength = this.getLength('pathLength', this.getViewport());
-        this.pathObject = new SvgPath(temp);
+        this.pathObject = new SvgShape().path(temp);
         this.pathLength = pathLength > 0 ? pathLength : this.pathObject.totalLength;
         this.pathScale = this.pathObject.totalLength / this.pathLength;
       } else if ((temp = this.getUrl('href') || this.getUrl('xlink:href')) && temp.nodeName === 'path') {
@@ -2342,7 +2414,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         maskCount = 0,
         patternCount = 0,
         documentCache = {},
-        links = [];
+        links = [],
+        styleRules = [];
 
     if (typeof warningCallback !== 'function') {
       warningCallback = function(str) {
@@ -2391,8 +2464,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     if (svg) {
       let elem = new SvgElem(svg, null);
       if (typeof elem.drawInDocument === 'function') {
-        if (options.useCSS && !useCSS) {
-          warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
+        if (!useCSS) {
+          if (options.useCSS) {
+            warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
+          }
+          let styles = svg.getElementsByTagName('style');
+          for (let i = 0; i < styles.length; i++) {
+            styleRules = styleRules.concat(parseStyleSheet(styles[i].textContent));
+          }
         }
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
         elem.drawInDocument();
