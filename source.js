@@ -190,7 +190,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       links.push(ref);
     }
     function parseXml(xml) {
-      let SvgNode = function(tag, type, value) {
+      let SvgNode = function(tag, type, value, error) {
+        this.error = error;
         this.nodeName = tag;
         this.nodeValue = value;
         this.nodeType = type;
@@ -229,11 +230,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         })(this);
         return result;
       };
-      let parser = new StringParser(xml.trim()), result, child; 
+      let parser = new StringParser(xml.trim()), result, child, error = false; 
       let recursive = function() {
         let temp, child;
         if (temp = parser.match(/^<([\w:.-]+)\s*/, true)) { // Opening tag
-          let node = new SvgNode(temp[1], 1, null);
+          let node = new SvgNode(temp[1], 1, null, error);
           while (temp = parser.match(/^([\w:.-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?\s*/, true)) { // Attribute
             let attr = temp[1], value = decodeEntities(temp[2] || temp[3] || '');
             if (!node.attributes[attr]) {
@@ -242,6 +243,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (attr === 'class') {node.classList = value.split(' ');}
             } else {
               warningCallback('parseXml: duplicate attribute "' + attr + '"');
+              error = true;
             }
           }
           if (parser.match(/^>/)) { // End of opening tag
@@ -255,29 +257,30 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 return node;
               } else {
                 warningCallback('parseXml: tag not matching, opening "' + node.nodeName + '" & closing "' + temp[1] + '"');
-                node.error = true;
+                error = true;
                 return node;
               }
             } else {
               warningCallback('parseXml: tag not matching, opening "' + node.nodeName + '" & not closing');
-              node.error = true;
+              error = true;
               return node;
             }
           } else if (parser.match(/^\/>/)) { // Self-closing tag
             return node;
           } else {
             warningCallback('parseXml: tag could not be parsed "' + node.nodeName + '"');
+            error = true;
           }
         } else if (temp = parser.match(/^<!--[\s\S]*?-->/)) { // Comment
-          return new SvgNode(null, 8, temp);
+          return new SvgNode(null, 8, temp, error);
         } else if (temp = parser.match(/^<\?[\s\S]*?\?>/)) { // Processing instructions
-          return new SvgNode(null, 7, temp);
+          return new SvgNode(null, 7, temp, error);
         } else if (temp = parser.match(/^<!DOCTYPE\s*([\s\S]*?)>/)) { // Doctype
-          return new SvgNode(null, 10, temp);
+          return new SvgNode(null, 10, temp, error);
         } else if (temp = parser.match(/^<!\[CDATA\[([\s\S]*?)\]\]>/, true)) { // Cdata node
-          return new SvgNode('#cdata-section', 4, temp[1]);
+          return new SvgNode('#cdata-section', 4, temp[1], error);
         } else if (temp = parser.match(/^([^<]+)/, true)) { // Text node
-          return new SvgNode('#text', 3, decodeEntities(temp[1]));
+          return new SvgNode('#text', 3, decodeEntities(temp[1]), error);
         }
       };
       while (child = recursive()) {
@@ -621,6 +624,28 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       return data;
     }
+    function createSVGElement(obj, inherits) {
+      switch (obj.nodeName) {
+        case 'use': return new SvgElemUse(obj, inherits);
+        case 'symbol': return new SvgElemSymbol(obj, inherits);
+        case 'g': return new SvgElemGroup(obj, inherits);
+        case 'a': return new SvgElemLink(obj, inherits);
+        case 'svg': return new SvgElemSvg(obj, inherits);
+        case 'image': return new SVGElemImage(obj, inherits);
+        case 'rect': return new SvgElemRect(obj, inherits);
+        case 'circle': return new SvgElemCircle(obj, inherits);
+        case 'ellipse': return new SvgElemEllipse(obj, inherits);
+        case 'line': return new SvgElemLine(obj, inherits);
+        case 'polyline': return new SvgElemPolyline(obj, inherits);
+        case 'polygon': return new SvgElemPolygon(obj, inherits);
+        case 'path': return new SvgElemPath(obj, inherits);
+        case 'text': return new SvgElemText(obj, inherits);
+        case 'tspan': return new SvgElemTspan(obj, inherits);
+        case 'textPath': return new SvgElemTextPath(obj, inherits);
+        case '#text': case '#cdata-section': return new SvgElemTextNode(obj, inherits);
+        default: return new SvgElem(obj, inherits);
+      }
+    }
 
     var StringParser = function(str) {
       this.match = function(exp, all) {
@@ -708,12 +733,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.startPoint = [p1x, p1y, Math.atan2(p2y - p1y, p2x - p1x)];
       this.endPoint = [p2x, p2y, Math.atan2(p2y - p1y, p2x - p1x)];
       this.getBoundingBox = function() {
-        return [Math.min(p1x, p2x), Math.min(p1y, p2y), Math.max(p1x, p2x), Math.max(p1y, p2y)];
+        return [Math.min(this.startPoint[0], this.endPoint[0]), Math.min(this.startPoint[1], this.endPoint[1]),
+                Math.max(this.startPoint[0], this.endPoint[0]), Math.max(this.startPoint[1], this.endPoint[1])];
       };
       this.getPointAtLength = function(l) {
         if (l >= 0 && l <= this.totalLength) {
-          let r = l / this.totalLength || 0, x = p1x + r * (p2x - p1x), y = p1y + r * (p2y - p1y);
-          return [x, y, Math.atan2(p2y - p1y, p2x - p1x)];
+          let r = l / this.totalLength || 0,
+              x = this.startPoint[0] + r * (this.endPoint[0] - this.startPoint[0]),
+              y = this.startPoint[1] + r * (this.endPoint[1] - this.startPoint[1]);
+          return [x, y, this.startPoint[2]];
         }
       };
     };
@@ -997,31 +1025,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElem = function(obj, inherits) {
-      switch (obj.nodeName) {
-        case 'use': if (this instanceof SvgElemUse) {break;} else {return new SvgElemUse(obj, inherits);}
-        case 'symbol': if (this instanceof SvgElemSymbol) {break;} else {return new SvgElemSymbol(obj, inherits);}
-        case 'g': if (this instanceof SvgElemGroup) {break;} else {return new SvgElemGroup(obj, inherits);}
-        case 'a': if (this instanceof SvgElemLink) {break;} else {return new SvgElemLink(obj, inherits);}
-        case 'svg': if (this instanceof SvgElemSvg) {break;} else {return new SvgElemSvg(obj, inherits);}
-        case 'image': if (this instanceof SVGElemImage) {break;} else {return new SVGElemImage(obj, inherits);}
-        case 'rect': if (this instanceof SvgElemRect) {break;} else {return new SvgElemRect(obj, inherits);}
-        case 'circle': if (this instanceof SvgElemCircle) {break;} else {return new SvgElemCircle(obj, inherits);}
-        case 'ellipse': if (this instanceof SvgElemEllipse) {break;} else {return new SvgElemEllipse(obj, inherits);}
-        case 'line': if (this instanceof SvgElemLine) {break;} else {return new SvgElemLine(obj, inherits);}
-        case 'polyline': if (this instanceof SvgElemPolyline) {break;} else {return new SvgElemPolyline(obj, inherits);}
-        case 'polygon': if (this instanceof SvgElemPolygon) {break;} else {return new SvgElemPolygon(obj, inherits);}
-        case 'path': if (this instanceof SvgElemPath) {break;} else {return new SvgElemPath(obj, inherits);}
-        case 'text': if (this instanceof SvgElemText) {break;} else {return new SvgElemText(obj, inherits);}
-        case 'tspan': if (this instanceof SvgElemTspan) {break;} else {return new SvgElemTspan(obj, inherits);}
-        case 'textPath': if (this instanceof SvgElemTextPath) {break;} else {return new SvgElemTextPath(obj, inherits);}
-        case '#text': case '#cdata-section': if (this instanceof SvgElemTextNode) {break;} else {return new SvgElemTextNode(obj, inherits);}
-      }
       let styleCache = Object.create(null);
       let childrenCache = null;
       this.name = obj.nodeName;
-      this.node = obj;
       this.isOuterElement = obj === svg || !obj.parentNode;
-      this.inherits = inherits || (!this.isOuterElement ? new SvgElem(obj.parentNode, null) : null);
+      this.inherits = inherits || (!this.isOuterElement ? createSVGElement(obj.parentNode, null) : null);
       this.stack = (this.inherits ? this.inherits.stack.concat(obj) : [obj]);
       this.style = parseStyleAttr(typeof obj.getAttribute === 'function' && obj.getAttribute('style'));
       this.css = useCSS ? getComputedStyle(obj) : getStyle(obj);
@@ -1276,8 +1284,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let children = [];
         for (let i = 0; i < obj.childNodes.length; i++) {
           let child = obj.childNodes[i];
-          if (this.allowedChildren.indexOf(child.nodeName) !== -1) {
-            children.push(new SvgElem(child, this));
+          if (!child.error && this.allowedChildren.indexOf(child.nodeName) !== -1) {
+            children.push(createSVGElement(child, this));
           }
         }
         return childrenCache = children;
@@ -1306,7 +1314,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemStylable = function(obj) {
+    var SvgElemStylable = function(obj, inherits) {
+      SvgElem.call(this, obj, inherits);
       this.transform = function() {
         doc.transform.apply(doc, this.getTransformation());
       };
@@ -1350,7 +1359,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
     };
 
-    var SvgElemHasChildren = function(obj) {
+    var SvgElemHasChildren = function(obj, inherits) {
+      SvgElemStylable.call(this, obj, inherits);
       this.allowedChildren = ['use', 'g', 'a', 'svg', 'image', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text'];
       this.getBoundingShape = function() {
         let shape = new SvgShape(),
@@ -1381,9 +1391,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemContainer = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemHasChildren.call(this, obj, inherits);
       this.drawContent = function(isClip, isMask) {
         this.transform();
         let clipped = this.clip(),
@@ -1406,7 +1414,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let x = this.getLength('x', this.getVWidth(), 0),
           y = this.getLength('y', this.getVHeight(), 0),
           child = this.getUrl('href') || this.getUrl('xlink:href');
-      if (child) {child = new SvgElem(child, this);}
+      if (child) {child = createSVGElement(child, this);}
       this.getChildren  = function() {
         return child ? [child] : [];
       };
@@ -1521,8 +1529,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SVGElemImage = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemStylable.call(this, obj);
+      SvgElemStylable.call(this, obj, inherits);
       let link = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
           width = this.getLength('width', this.getVWidth(), 0),
           height = this.getLength('height', this.getVHeight(), 0),
@@ -1563,8 +1570,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemPattern = function(obj, inherits, fallback) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
+      SvgElemHasChildren.call(this, obj, inherits);
       this.ref = (function() {
         let ref = this.getUrl('href') || this.getUrl('xlink:href');
         if (ref && ref.nodeName === obj.nodeName) {
@@ -1749,8 +1755,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemBasicShape = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemStylable.call(this, obj);
+      SvgElemStylable.call(this, obj, inherits);
       this.dashScale = 1;
       this.getBoundingShape = function() {
         return this.shape;
@@ -1954,8 +1959,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemMarker = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
+      SvgElemHasChildren.call(this, obj, inherits);
       let width = this.getLength('markerWidth', this.getParentVWidth(), 3),
           height = this.getLength('markerHeight', this.getParentVHeight(), 3),
           viewBox = this.getViewbox('viewBox', [0, 0, width, height]);
@@ -1995,9 +1999,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemClipPath = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemHasChildren.call(this, obj, inherits);
       this.useMask = function(bBox) {
         let group = docBeginGroup(getPageBBox());
         doc.save();
@@ -2013,9 +2015,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemMask = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemHasChildren.call(this, obj);
-      SvgElemStylable.call(this, obj);
+      SvgElemHasChildren.call(this, obj, inherits);
       this.useMask = function(bBox) {
         let group = docBeginGroup(getPageBBox());
         doc.save();
@@ -2044,8 +2044,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemTextContainer = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
-      SvgElemStylable.call(this, obj);
+      SvgElemStylable.call(this, obj, inherits);
       this.allowedChildren = ['tspan', '#text', '#cdata-section', 'a'];
       this.isText = true;
       this.getBoundingShape = function() {
@@ -2162,7 +2161,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemTextNode = function(obj, inherits) {
-      SvgElem.call(this, obj, inherits);
+      this.name = obj.nodeName;
       this.textContent = obj.nodeValue;
     };
 
@@ -2462,16 +2461,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     if (typeof svg === 'string') {svg = parseXml(svg);}
     if (svg) {
-      let elem = new SvgElem(svg, null);
+      let styles = svg.getElementsByTagName('style');
+      for (let i = 0; i < styles.length; i++) {
+        styleRules = styleRules.concat(parseStyleSheet(styles[i].textContent));
+      }
+      let elem = createSVGElement(svg, null);
       if (typeof elem.drawInDocument === 'function') {
-        if (!useCSS) {
-          if (options.useCSS) {
-            warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
-          }
-          let styles = svg.getElementsByTagName('style');
-          for (let i = 0; i < styles.length; i++) {
-            styleRules = styleRules.concat(parseStyleSheet(styles[i].textContent));
-          }
+        if (options.useCSS && !useCSS) {
+          warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
         }
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
         elem.drawInDocument();
