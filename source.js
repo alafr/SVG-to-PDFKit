@@ -1737,6 +1737,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               if (stopColor === 'none') {stopColor = DefaultColors.transparent;}
               stopColor = opacityToColor(stopColor, child.get('stop-opacity') * gOpacity, isMask);
               offset = Math.max(offset, inOrder ? child.getPercent('offset', 0) : 1 - child.getPercent('offset', 0));
+              if (i === 0 && stopColor[0].length === 4) {grad._colorSpace = 'DeviceCMYK';} // Fix until PR #763 is merged into PDFKit
               if (i === 0 && offset > 0) {
                 grad.stop((n + 0) / nTotal, stopColor[0], stopColor[1]);
               }
