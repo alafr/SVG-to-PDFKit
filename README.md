@@ -30,7 +30,8 @@ Insert SVG into a PDF document created with PDFKit.
       - useCSS [boolean] = use the CSS styles computed by the browser (for SVGElement only)
       - fontCallback [function] = function called to get the fonts, see source code
       - imageCallback [function] = same as above for the images (for Node.js)
-      - colorCallback [function] = function called to get color, making mapping RGB to HEX colors possible
+      - documentCallback [function] = same as above for the external SVG documents
+      - colorCallback [function] = function called to get color, making mapping to CMYK possible
       - warningCallback [function] = function called when there is a warning
       - assumePt [boolean] = assume that units are PDF points instead of SVG pixels
       - precision [number] = precision factor for approximative calculations (default = 3)
@@ -57,9 +58,9 @@ Insert SVG into a PDF document created with PDFKit.
  - fonts
  - gradients
  - patterns
+ - links
 
 ## Unsupported
- - links (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/18">#18</a>)
  - filters
  - text attributes: font-variant, writing-mode, unicode-bidi
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
