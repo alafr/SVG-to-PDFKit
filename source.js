@@ -1349,7 +1349,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         let opacity = this.get('opacity'),
             stroke = this.get('stroke'),
             strokeOpacity = this.get('stroke-opacity');
-        if (isClip) {return;}
+        if (isClip || isEqual(this.get('stroke-width'), 0)) {return;}
         if (stroke !== 'none' && opacity && strokeOpacity) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
@@ -1476,7 +1476,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       }
       this.link = this.attr('href') || this.attr('xlink:href');
       this.addLink = function() {
-        if (this.link.match(/^(?:[a-z][a-z0-9+.-]*:)?\/\//i) && this.getChildren().length) {
+        if (this.link.match(/^(?:[a-z][a-z0-9+.-]*:|\/\/)?/i) && this.getChildren().length) {
           let bbox = this.getBoundingShape().transform(getGlobalMatrix()).getBoundingBox();
           docInsertLink(bbox[0], bbox[1], bbox[2], bbox[3], this.link);
         }
@@ -1777,28 +1777,29 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           let subPaths = this.shape.getSubPaths(),
               fill = this.getFill(isClip, isMask),
-              stroke = this.getStroke(isClip, isMask);
-          for (let j = 0; j < subPaths.length; j++) {
-            if (stroke && isEqual(subPaths[j].totalLength, 0)) {
-              let lineWidth = this.get('stroke-width'), lineCap = this.get('stroke-linecap');
-              if ((lineCap === 'square' || lineCap === 'round') && lineWidth > 0) {
-                let x = subPaths[j].startPoint[0],
-                    y = subPaths[j].startPoint[1];
-                docFillColor(stroke);
-                if (lineCap === 'square') {
-                  doc.rect(x - 0.5 * lineWidth, y - 0.5 * lineWidth, lineWidth, lineWidth);
-                } else if (lineCap === 'round') {
-                  doc.circle(x, y, 0.5 * lineWidth);
-                }
-                doc.fill();
-              }
-            }
-          }
+              stroke = this.getStroke(isClip, isMask),
+              lineWidth = this.get('stroke-width'),
+              lineCap = this.get('stroke-linecap');
           if (fill || stroke) {
             if (fill) {
               docFillColor(fill);
             }
             if (stroke) {
+              for (let j = 0; j < subPaths.length; j++) {
+                if (isEqual(subPaths[j].totalLength, 0)) {
+                  if ((lineCap === 'square' || lineCap === 'round') && lineWidth > 0) {
+                    let x = subPaths[j].startPoint[0],
+                        y = subPaths[j].startPoint[1];
+                    docFillColor(stroke);
+                    if (lineCap === 'square') {
+                      doc.rect(x - 0.5 * lineWidth, y - 0.5 * lineWidth, lineWidth, lineWidth);
+                    } else if (lineCap === 'round') {
+                      doc.circle(x, y, 0.5 * lineWidth);
+                    }
+                    doc.fill();
+                  }
+                }
+              }
               let dashArray = this.get('stroke-dasharray'),
                   dashOffset = this.get('stroke-dashoffset');
               if (isNotEqual(this.dashScale, 1)) {
@@ -1808,10 +1809,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 dashOffset *= this.dashScale;
               }
               docStrokeColor(stroke);
-              doc.lineWidth(this.get('stroke-width'))
+              doc.lineWidth(lineWidth)
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
-                 .lineCap(this.get('stroke-linecap'))
+                 .lineCap(lineCap)
                  .dash(dashArray, {phase: dashOffset});
             }
             for (let j = 0; j < subPaths.length; j++) {
@@ -1834,17 +1835,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             let markersPos = this.shape.getMarkers();
             if (markerStart !== 'none') {
               let marker = new SvgElemMarker(markerStart, null);
-              marker.drawMarker(false, isMask, markersPos[0], this.get('stroke-width'));
+              marker.drawMarker(false, isMask, markersPos[0], lineWidth);
             }
             if (markerMid !== 'none') {
               for (let i = 1; i < markersPos.length - 1; i++) {
                 let marker = new SvgElemMarker(markerMid, null);
-                marker.drawMarker(false, isMask, markersPos[i], this.get('stroke-width'));
+                marker.drawMarker(false, isMask, markersPos[i], lineWidth);
               }
             }
             if (markerEnd !== 'none') {
               let marker = new SvgElemMarker(markerEnd, null);
-              marker.drawMarker(false, isMask, markersPos[markersPos.length - 1], this.get('stroke-width'));
+              marker.drawMarker(false, isMask, markersPos[markersPos.length - 1], lineWidth);
             }
           }
           if (group) {
