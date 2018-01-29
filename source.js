@@ -412,8 +412,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
-      while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
-        let func = temp[1], nums = [], parser2 = new StringParser(temp[2].trim()), temp2;
+      while (temp = parser.match(/^([A-Za-z3]+)[(]([^(]+)[)]/, true)) {
+        let func = temp[1], nums = [], parser2 = new StringParser(temp[2].trim().replace('px', '')), temp2;
         while (temp2 = parser2.matchNumber()) {
           nums.push(Number(temp2));
           parser2.matchSeparator();
@@ -421,6 +421,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (func === 'matrix' && nums.length === 6) {
           result = multiplyMatrix(result, [nums[0], nums[1], nums[2], nums[3], nums[4], nums[5]]);
         } else if (func === 'translate' && nums.length === 2) {
+          result = multiplyMatrix(result, [1, 0, 0, 1, nums[0], nums[1]]);
+        } else if (func === 'translate3d' && nums.length === 2) {
           result = multiplyMatrix(result, [1, 0, 0, 1, nums[0], nums[1]]);
         } else if (func === 'translate' && nums.length === 1) {
           result = multiplyMatrix(result, [1, 0, 0, 1, nums[0], 0]);
