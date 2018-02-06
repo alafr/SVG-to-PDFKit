@@ -93,6 +93,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       if (Object.keys(doc.page.xobjects).length) {group.resources.data.XObject = doc.page.xobjects;}
       if (Object.keys(doc.page.ext_gstates).length) {group.resources.data.ExtGState = doc.page.ext_gstates;}
       if (Object.keys(doc.page.patterns).length) {group.resources.data.Pattern = doc.page.patterns;}
+      group.resources.data.ColorSpace = (function() {
+          var output = {};
+          var i = 1;
+          for (var item in doc.spotColors) {
+              item = doc.spotColors[item];
+              output[`CS${i++}`] = `${item.id} 0 R`;
+          };
+          return output;
+      })();
       group.resources.end();
       group.xobj.end();
       doc._ctm = group.savedMatrix;
@@ -1222,7 +1231,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 } else if (parsed = (value || '').split(' ')) {
                   let object = this.resolveUrl(parsed[0]),
                       fallbackColor = parseColor(parsed[1]);
-                  if (object == null) {
+                  if (object === undefined) {
+                    result = doc.spotColors[value[0]] ? value[0] : undefined;
+                  } else if (object == null) {
                     result = fallbackColor;
                   } else if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
                     result = new SvgElemGradient(object, null, fallbackColor);
