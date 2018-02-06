@@ -65,7 +65,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     function docBeginGroup(bbox) {
       let group = new (function PDFGroup() {})();
-      group.name = 'G' + (++groupCount);
+      group.name = 'G' + (doc._groupCount = (doc._groupCount || 0) + 1);
       group.resources = doc.ref();
       group.xobj = doc.ref({
         Type: 'XObject',
@@ -103,7 +103,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       doc.addContent('/' + group.name + ' Do');
     }
     function docApplyMask(group, clip) {
-      let name = 'M'+ (++maskCount);
+      let name = 'M' + (doc._maskCount = (doc._maskCount || 0) + 1);
       let gstate = doc.ref({
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
         SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0, 0, 0] : [1, 1, 1])}
@@ -121,7 +121,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return pattern;
     }
     function docUsePattern(pattern, stroke) {
-      let name = 'P' + (++patternCount);
+      let name = 'P' + (doc._patternCount = (doc._patternCount || 0) + 1);
       let ref = doc.ref({
         Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 2,
         BBox: [0, 0, pattern.dx, pattern.dy], XStep: pattern.dx, YStep: pattern.dy,
@@ -2411,9 +2411,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         documentCallback = options.documentCallback,
         precision = Math.ceil(Math.max(1, options.precision)) || 3,
         groupStack = [],
-        groupCount = 0,
-        maskCount = 0,
-        patternCount = 0,
         documentCache = {},
         links = [],
         styleRules = [];
