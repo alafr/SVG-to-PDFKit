@@ -1232,7 +1232,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   let object = this.resolveUrl(parsed[0]),
                       fallbackColor = parseColor(parsed[1]);
                   if (object === undefined) {
-                    result = doc.spotColors[value[0]] ? value[0] : undefined;
+                    result = doc.spotColors[value] ? value : undefined;
                   } else if (object == null) {
                     result = fallbackColor;
                   } else if (object.nodeName === 'linearGradient' || object.nodeName === 'radialGradient') {
@@ -1352,6 +1352,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (fill !== 'none' && opacity && fillOpacity) {
           if (fill instanceof SvgElemGradient || fill instanceof SvgElemPattern) {
             return fill.getPaint(this.getBoundingBox(), fillOpacity * opacity, isClip, isMask);
+          } else if (typeof fill === 'string') {
+            return fill;
           }
           return opacityToColor(fill, fillOpacity * opacity, isMask);
         }
@@ -1793,7 +1795,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               lineCap = this.get('stroke-linecap');
           if (fill || stroke) {
             if (fill) {
-              docFillColor(fill);
+              docFillColor(typeof fill === 'string' ? [fill] : fill);
             }
             if (stroke) {
               for (let j = 0; j < subPaths.length; j++) {
