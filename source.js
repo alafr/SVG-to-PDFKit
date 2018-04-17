@@ -2432,7 +2432,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (bold && !italic) {return 'Courier-Bold';}
           if (!bold && italic) {return 'Courier-Oblique';}
           if (!bold && !italic) {return 'Courier';}
-        } else if (family.match(/(?:^|,)\s*sans-serif\s*$/) || true) {
+        } else if (family.match(/(?:^|,)\s*sans-serif\s*$/)) {
           if (bold && italic) {return 'Helvetica-BoldOblique';}
           if (bold && !italic) {return 'Helvetica-Bold';}
           if (!bold && italic) {return 'Helvetica-Oblique';}
