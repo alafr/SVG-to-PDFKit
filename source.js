@@ -2437,6 +2437,35 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           if (bold && !italic) {return 'Helvetica-Bold';}
           if (!bold && italic) {return 'Helvetica-Oblique';}
           if (!bold && !italic) {return 'Helvetica';}
+        } else {
+          if (bold && italic) {
+            if (doc._registeredFonts.hasOwnProperty(family+'-BoldItalic')) {
+              return family+'-BoldItalic';
+            } else {
+              fontOptions.fauxBold = true;
+              fontOptions.fauxItalic = true;
+              return family;
+            }
+          }
+          if (bold && !italic) {
+            if (doc._registeredFonts.hasOwnProperty(family+'-Bold')) {
+              return family+'-Bold';
+            } else {
+              fontOptions.fauxBold = true;
+              return family;
+            }
+          }
+          if (!bold && italic) {
+            if (doc._registeredFonts.hasOwnProperty(family+'-Italic')) {
+              return family+'-Italic';
+            } else {
+              fontOptions.fauxItalic = true;
+              return family;
+            }
+          }
+          if (!bold && !italic) {
+              return family;
+          }
         }
       };
     }
