@@ -169,6 +169,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       doc.addContent('ET');
     }
     function docFillColor(color) {
+      color = typeof color === 'string' ? [color] : color;
       if (color[0].constructor.name === 'PDFPattern') {
         doc.fillOpacity(color[1]);
         docUsePattern(color[0], false);
@@ -1795,7 +1796,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               lineCap = this.get('stroke-linecap');
           if (fill || stroke) {
             if (fill) {
-              docFillColor(typeof fill === 'string' ? [fill] : fill);
+              docFillColor(fill);
             }
             if (stroke) {
               for (let j = 0; j < subPaths.length; j++) {
