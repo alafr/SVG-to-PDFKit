@@ -1531,16 +1531,28 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     var SVGElemImage = function(obj, inherits) {
       SvgElemStylable.call(this, obj, inherits);
       let link = imageCallback(this.attr('href') || this.attr('xlink:href') || ''),
-          width = this.getLength('width', this.getVWidth(), 0),
-          height = this.getLength('height', this.getVHeight(), 0),
           x = this.getLength('x', this.getVWidth(), 0),
           y = this.getLength('y', this.getVHeight(), 0),
+          width = this.getLength('width', this.getVWidth(), 'auto'),
+          height = this.getLength('height', this.getVHeight(), 'auto'),
           image;
       try {
         image = doc.openImage(link);
       } catch(e) {
         warningCallback('SVGElemImage: failed to open image "' + link + '" in PDFKit');
       }
+      if (image) {
+        if (width === 'auto' && height !== 'auto') {
+          width = height * image.width / image.height;
+        } else if (height === 'auto' && width !== 'auto') {
+          height = width * image.height / image.width;
+        } else if (width === 'auto' && height === 'auto') {
+          width = image.width;
+          height = image.height;
+        }
+      }
+      if (width === 'auto' || width < 0) {width = 0;}
+      if (height === 'auto' || height < 0) {height = 0;}
       this.getTransformation = function() {
         return this.get('transform');
       };
@@ -1693,8 +1705,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             r2 = this.getLength('r', (bBoxUnits ? 1 : this.getViewport()), (bBoxUnits ? 0.5 : 0.5 * this.getViewport()));
             x1 = this.getLength('fx', (bBoxUnits ? 1 : this.getVWidth()), x2);
             y1 = this.getLength('fy', (bBoxUnits ? 1 : this.getVHeight()), y2);
-            x1 = Math.min(Math.max(x1, x2 - r2 + 1e-6), x2 + r2 - 1e-6);
-            y1 = Math.min(Math.max(y1, y2 - r2 + 1e-6), y2 + r2 - 1e-6);
+            if (r2 < 0) {
+              warningCallback('SvgElemGradient: negative r value');
+            }
+            let d = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)),
+                multiplier = 1;
+            if (d > r2) { // according to specification
+              multiplier = r2 / d;
+              x1 = x2 + (x1 - x2) * multiplier;
+              y1 = y2 + (y1 - y2) * multiplier;
+            }
+            r2 = Math.max(r2, d * multiplier * (1 + 1e-6)); // fix for edge-case gradients see issue #84
           }
           if (spread === 'reflect' || spread === 'repeat') {
             let inv = inverseMatrix(matrix),
