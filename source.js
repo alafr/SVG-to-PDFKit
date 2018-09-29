@@ -412,7 +412,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
-      while (temp = parser.match(/^([A-Za-z]+)[(]([^(]+)[)]/, true)) {
+      while (temp = parser.match(/^([A-Za-z]+)\s*[(]([^(]+)[)]/, true)) {
         let func = temp[1], nums = [], parser2 = new StringParser(temp[2].trim()), temp2;
         while (temp2 = parser2.matchNumber()) {
           nums.push(Number(temp2));
