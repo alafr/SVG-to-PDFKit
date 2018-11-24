@@ -1834,7 +1834,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
                  .lineCap(lineCap)
-                 .dash(dashArray, {phase: dashOffset});
+                 .dash(dashArray[0] || '', {phase: dashOffset, space: dashArray[1] || null});
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
