@@ -1367,11 +1367,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (stroke !== 'none' && opacity && strokeOpacity) {
           if (stroke instanceof SvgElemGradient || stroke instanceof SvgElemPattern) {
             return stroke.getPaint(this.getBoundingBox(), strokeOpacity * opacity, isClip, isMask);
+          } else if (typeof stroke === 'string') {
+            return stroke;
           }
           return opacityToColor(stroke, strokeOpacity * opacity, isMask);
         }
       };
-    };
+    };  
 
     var SvgElemHasChildren = function(obj, inherits) {
       SvgElemStylable.call(this, obj, inherits);
