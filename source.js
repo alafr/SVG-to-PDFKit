@@ -2443,6 +2443,44 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     if (typeof fontCallback !== 'function') {
       fontCallback = function(family, bold, italic, fontOptions) {
+        // Check if the font is already registered in the document
+        if (bold && italic) {
+          if (doc._registeredFonts.hasOwnProperty(family + '-BoldItalic')) {
+            return family + '-BoldItalic';
+          } else if (doc._registeredFonts.hasOwnProperty(family + '-Italic')) {
+            fontOptions.fauxBold = true;
+            return family + '-Italic';
+          } else if (doc._registeredFonts.hasOwnProperty(family + '-Bold')) {
+            fontOptions.fauxItalic = true;
+            return family + '-Bold';
+          } else if (doc._registeredFonts.hasOwnProperty(family)) {
+            fontOptions.fauxBold = true;
+            fontOptions.fauxItalic = true;
+            return family;
+          }
+        }
+        if (bold && !italic) {
+          if (doc._registeredFonts.hasOwnProperty(family + '-Bold')) {
+            return family + '-Bold';
+          } else if (doc._registeredFonts.hasOwnProperty(family)) {
+            fontOptions.fauxBold = true;
+            return family;
+          }
+        }
+        if (!bold && italic) {
+          if (doc._registeredFonts.hasOwnProperty(family + '-Italic')) {
+            return family + '-Italic';
+          } else if (doc._registeredFonts.hasOwnProperty(family)) {
+            fontOptions.fauxItalic = true;
+            return family;
+          }
+        }
+        if (!bold && !italic) {
+          if (doc._registeredFonts.hasOwnProperty(family)) {
+            return family;
+          }
+        }
+        // Use standard fonts as fallback
         if (family.match(/(?:^|,)\s*serif\s*$/)) {
           if (bold && italic) {return 'Times-BoldItalic';}
           if (bold && !italic) {return 'Times-Bold';}
