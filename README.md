@@ -39,7 +39,7 @@ Insert SVG into a PDF document created with PDFKit.
 ## Fonts
 In the browser, it's easier to register fonts (<a href="https://github.com/foliojs/pdfkit/issues/623#issuecomment-284625259">see here how</a>) before calling SVGtoPDF. SVGtoPDF doesn't wait for font loading with asynchronous XMLHttpRequest.
 
-Make sure to name the fonts with the exact pattern 'MyFont', 'MyFont-Bold', 'MyFont-Italic', 'MyFont-BoldItalic' (case sensitive), if the font is named font-family="MyFont" in the svg.
+Make sure to name the fonts with the exact pattern 'MyFont', 'MyFont-Bold', 'MyFont-Italic', 'MyFont-BoldItalic' (case sensitive), if the font is named font-family="MyFont" in the svg. Missing Bold, Italic, BoldItalic fonts are simulated with stroke and skew angle.
 
 If your fonts don't follow this pattern, or you want to register fonts at the moment they are encountered in the svg, you can use a custom fontCallback function.
 
