@@ -1809,15 +1809,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               for (let j = 0; j < subPaths.length; j++) {
                 if (isEqual(subPaths[j].totalLength, 0)) {
                   if ((lineCap === 'square' || lineCap === 'round') && lineWidth > 0) {
-                    let x = subPaths[j].startPoint[0],
-                        y = subPaths[j].startPoint[1];
-                    docFillColor(stroke);
-                    if (lineCap === 'square') {
-                      doc.rect(x - 0.5 * lineWidth, y - 0.5 * lineWidth, lineWidth, lineWidth);
-                    } else if (lineCap === 'round') {
-                      doc.circle(x, y, 0.5 * lineWidth);
+                    if (subPaths[j].startPoint && subPaths[j].startPoint.length > 1) {
+                      let x = subPaths[j].startPoint[0],
+                          y = subPaths[j].startPoint[1];
+                      docFillColor(stroke);
+                      if (lineCap === 'square') {
+                        doc.rect(x - 0.5 * lineWidth, y - 0.5 * lineWidth, lineWidth, lineWidth);
+                      } else if (lineCap === 'round') {
+                        doc.circle(x, y, 0.5 * lineWidth);
+                      }
+                      doc.fill();
                     }
-                    doc.fill();
                   }
                 }
               }
