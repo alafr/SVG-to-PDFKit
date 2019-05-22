@@ -23,7 +23,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     const PathArguments = {A: 7, a: 7, C: 6, c: 6, H: 1, h: 1, L: 2, l: 2, M: 2, m: 2, Q: 4, q: 4, S: 4, s: 4, T: 2, t: 2, V: 1, v: 1, Z: 0, z: 0};
     const PathFlags = {A3: true, A4: true, a3: true, a4: true};
     const Properties = {
-      'color':              {inherit: true, initial: undefined},
+      'color':              {inherit: true, initial: DefaultColors.black},
       'visibility':         {inherit: true, initial: 'visible', values: {'hidden': 'hidden', 'collapse': 'hidden', 'visible':'visible'}},
       'fill':               {inherit: true, initial: DefaultColors.black},
       'stroke':             {inherit: true, initial: 'none'},
@@ -1208,6 +1208,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               case 'color':
                 if (value === 'none' || value === 'transparent') {
                   result = 'none';
+                } else if (value === 'currentColor') {
+                  result = (this.inherits ? this.inherits.get(key) : keyInfo.initial);
                 } else {
                   result = parseColor(value);
                 }
