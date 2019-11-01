@@ -116,15 +116,15 @@ function runTest(svg, name, callback) {
       blob = stream.toBlob('application/pdf');
       var abreader = new FileReader();
       abreader.onload = function(e) {
-        PDFJS.disableWorker = true;
-        PDFJS.disableFontFace = true;
-        PDFJS.getDocument({data:abreader.result}).then(function(pdf) {
+        pdfjsLib.disableWorker = true;
+        pdfjsLib.disableFontFace = true;
+        pdfjsLib.getDocument({data:abreader.result}).promise.then(function(pdf) {
           pdf.getPage(1).then(function(page) {
-            var viewport = page.getViewport(96/72);
+            var viewport = page.getViewport({scale: 96/72});
             var context = canvas1.getContext('2d');
             canvas1.width = docWidth;
             canvas1.height = docHeight;
-            page.render({canvasContext: context, viewport: viewport}).then(function() {
+            page.render({canvasContext: context, viewport: viewport}).promise.then(function() {
               if (++successes === 2) {compare();}
             });
           });
@@ -150,7 +150,7 @@ function runTest(svg, name, callback) {
     image.onerror = function() {
       if (++errors === 1) {callback({error: new Error('Rendering of svg inside the canvas with the native function failed')});}
     }
-    image.src = 'data:image/svg+xml,' + encodeURI('<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><style>' + styleText + '</style>' + svg + '</svg>');
+    image.src = 'data:image/svg+xml,' + encodeURI('<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><style>' + styleText + '</style>' + svg + '</svg>').replace(/#/g, '%23');
   }
   runSvgToPdfKit();
   runNative();
