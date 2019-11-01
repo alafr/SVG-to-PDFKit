@@ -2530,12 +2530,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (options.useCSS && !useCSS) {
           warningCallback('SVGtoPDF: useCSS option can only be used for SVG *elements* in compatible browsers');
         }
+        let savedFillColor = doc._fillColor;
         doc.save().translate(x || 0, y || 0).scale(pxToPt);
         elem.drawInDocument();
         for (let i = 0; i < links.length; i++) {
           doc.page.annotations.push(links[i]);
         }
         doc.restore();
+        doc._fillColor = savedFillColor;
       } else {
         warningCallback('SVGtoPDF: this element can\'t be rendered directly: ' + svg.nodeName);
       }
