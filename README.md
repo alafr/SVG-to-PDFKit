@@ -70,6 +70,7 @@ If your fonts don't follow this pattern, or you want to register fonts at the mo
 ## Unsupported
  - filters
  - text attributes: font-variant, writing-mode, unicode-bidi
+ - vector-effect (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/113">#113</a>)
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
 
