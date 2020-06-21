@@ -2234,6 +2234,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             let textScale = length / (endX - startX);
             if (textScale > 0 && textScale < Infinity) {
               for (let j = 0; j < pos.length; j++) {
+                pos[j].continuous = false;
                 pos[j].x = startX + textScale * (pos[j].x - startX);
                 pos[j].scale *= textScale;
                 pos[j].width *= textScale;
@@ -2243,6 +2244,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             if (pos.length >= 2) {
               let spaceDiff = (length - (endX - startX)) / (pos.length - 1);
               for (let j = 0; j < pos.length; j++) {
+                pos[j].continuous = false;
                 pos[j].x += j * spaceDiff;
               }
             }
@@ -2313,6 +2315,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                         dyAttr = currentElem._dy[index],
                         rotAttr = currentElem._rot[index],
                         continuous = !(w === 0 && j === 0);
+                    if (letterSpacing !== 0) {continuous = false}
+                    if (wordSpacing !== 0) {continuous = false}
                     if (xAttr !== undefined) {continuous = false; doAnchoring(); currentX = xAttr;}
                     if (yAttr !== undefined) {continuous = false; doAnchoring(); currentY = yAttr;}
                     if (dxAttr !== undefined) {continuous = false; currentX += dxAttr;}
