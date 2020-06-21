@@ -153,8 +153,56 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let mode = fill && stroke ? 2 : stroke ? 1 : fill ? 0 : 3;
       doc.addContent(mode + ' Tr');
     }
-    function docWriteGlyph(glyph) {
-      doc.addContent('<' + glyph + '> Tj');
+    function docWriteGlyphs(positions, font) {
+      let commands = [];
+      let commandStr = '';
+      const skew = font.fauxItalic ? -0.25 : 0;
+
+      // Add the given character to the 'TJ' command string.
+      function addChar(char) {
+        commandStr += char.glyph;
+        if (char.kern === 0) return;
+        commands.push(`<${commandStr}> ${validateNumber(char.kern)}`);
+        commandStr = '';
+      };
+
+      // Flush the current TJ command string to the output stream.
+      function flush() {
+        if (commandStr.length) {
+          commands.push(`<${commandStr}> 0`);
+          commandStr = '';
+        }
+        if (commands.length) {
+          doc.addContent(`[${commands.join(' ')}] TJ`);
+          commands = [];
+        }
+      };
+
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i];
+
+        if (pos.hidden || isEqual(pos.width, 0)) {
+          flush();
+          continue;
+        }
+
+        if (pos.continuous) {
+          addChar(pos);
+          continue;
+        }
+
+        // If this character is non-continuous, flush the command buffer.
+        flush();
+
+        // Start a new TJ command after writing a Text Matrix (Tm)
+        const cos = Math.cos(pos.rotate);
+        const sin = Math.sin(pos.rotate);
+        docSetTextMatrix(cos * pos.scale, sin * pos.scale, cos * skew - sin, sin * skew + cos, pos.x, pos.y);
+        addChar(pos);
+      };
+
+      // Flush any remaining characters in the buffer.
+      flush();
     }
     function docEndText() {
       doc.addContent('ET');
@@ -615,6 +663,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         data.push({
           glyph: hex[i],
           unicode: unicode,
+          kern: pos[i].advanceWidth - pos[i].xAdvance,
           width: pos[i].advanceWidth * size / 1000,
           xOffset: pos[i].xOffset * size / 1000,
           yOffset: pos[i].yOffset * size / 1000,
@@ -2130,13 +2179,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 }
                 docBeginText(this._font.font, this._font.size);
                 docSetTextMode(!!fill, !!stroke);
-                for (let j = 0, pos = childElem._pos; j < pos.length; j++) {
-                  if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
-                    let cos = Math.cos(pos[j].rotate), sin = Math.sin(pos[j].rotate), skew = (this._font.fauxItalic ? -0.25 : 0);
-                    docSetTextMatrix(cos * pos[j].scale, sin * pos[j].scale, cos * skew - sin, sin * skew + cos, pos[j].x, pos[j].y);
-                    docWriteGlyph(pos[j].glyph);
-                  }
-                }
+                docWriteGlyphs(childElem._pos, this._font);
                 docEndText();
               }
               break;
@@ -2326,6 +2369,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                       glyph: pos[j].glyph,
                       rotate: (Math.PI / 180) * currentElem.chooseValue(rotAttr, currentElem._defRot),
                       x: currentX + pos[j].xOffset,
+                      kern: pos[j].kern,
                       y: currentY + baseline + pos[j].yOffset,
                       width: pos[j].width,
                       ascent: getAscent(currentElem._font.font, currentElem._font.size),
