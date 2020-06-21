@@ -2028,6 +2028,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.useMask = function(bBox) {
         let group = docBeginGroup(getPageBBox());
         doc.save();
+        doc.transform.apply(doc, this.get('transform'));
         if (this.attr('clipPathUnits') === 'objectBoundingBox') {
           doc.transform(bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]);
         }
