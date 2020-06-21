@@ -8,8 +8,6 @@ In this folder you will find demo and test pages that use SVG-to-PDFKit:
 - Run automatic tests to check for regressions (Chrome only) : 
 <a href="https://alafr.github.io/SVG-to-PDFKit/examples/tests.htm" target="_blank">tests.htm</a>
 
-You will also find an updated PDFKit version, prebuilt and ready for use in `<script>` tags.
-
 &nbsp; &nbsp;
 
 ### Tests
@@ -24,8 +22,8 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	Test result	|	Count	| % |
 |	---	|	---	|	---	|
 |	Failed tests	| 20 | 8.6% |
-| Passed tests | 212 | 91.4% |
-| **Total tests** | **232** |  |
+| Passed tests | 214 | 91.4% |
+| **Total tests** | **234** |  |
 
 #### Failed tests because of bugs or missing features in SVG-to-PDFKit
 
@@ -56,7 +54,6 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 
 |	Passed tests	|	Comment	|
 |	---	|	---	|
-| additional-test-01.svg	| Chrome bug https://crbug.com/450368	|
 | additional-test-02.svg	| Chrome bug https://crbug.com/603995	|
 |	color-prop-05-t.svg	|	Specifications conflict https://crbug.com/571723	|
 |	pservers-grad-02-b.svg	|	PDFjs bug https://git.io/vQqgG	|
@@ -76,5 +73,4 @@ The percentage of difference computed by Resemble.js is not enough to determine 
 |	pservers-grad-20-b.svg	|	PDFjs bug	|
 |	pservers-grad-21-b.svg	|	Chrome bug https://crbug.com/322487 + PDFjs bug https://git.io/vFQP6	|
 |	pservers-grad-22-b.svg	|	PDFjs bug https://git.io/vQqgG	|
-|	pservers-pattern-01-b.svg	|	PDFjs bug https://git.io/vF95D	|
 |	styling-inherit-01-b.svg	|	PDFjs bug https://git.io/vQqgG	|
