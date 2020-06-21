@@ -2056,7 +2056,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           w = this.getLength('width', this.getVWidth(), 1.2) * (bBox[2] - bBox[0]);
           h = this.getLength('height', this.getVHeight(), 1.2) * (bBox[3] - bBox[1]);
         }
-        doc.rect(x, y, w, h).clip();
         if (this.attr('maskContentUnits') === 'objectBoundingBox') {
           doc.transform(bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]);
         }
