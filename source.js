@@ -1905,7 +1905,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               markerEnd = this.get('marker-end');
           if (markerStart !== 'none' || markerMid !== 'none' || markerEnd !== 'none') {
             let markersPos = this.shape.getMarkers();
-            if (markerStart !== 'none') {
+            if (markerStart !== 'none' && markersPos.length > 0) {
               let marker = new SvgElemMarker(markerStart, null);
               marker.drawMarker(false, isMask, markersPos[0], lineWidth);
             }
@@ -1915,7 +1915,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 marker.drawMarker(false, isMask, markersPos[i], lineWidth);
               }
             }
-            if (markerEnd !== 'none') {
+            if (markerEnd !== 'none' && markersPos.length > 0) {
               let marker = new SvgElemMarker(markerEnd, null);
               marker.drawMarker(false, isMask, markersPos[markersPos.length - 1], lineWidth);
             }
