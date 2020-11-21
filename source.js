@@ -356,6 +356,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       raw = (raw || '').trim();
       if (temp = NamedColors[raw]) {
         result = [temp.slice(), 1];
+      } else if (temp = raw.match(/^cmyk\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)$/i)) {
+        temp[1] = parseInt(temp[1]); temp[2] = parseInt(temp[2]); temp[3] = parseInt(temp[3]); temp[4] = parseFloat(temp[4]);
+        if (temp[1] <= 100 && temp[2] <= 100 && temp[3] <= 100 && temp[4] <= 100) {
+          result = [temp.slice(1, 5), 1];
+        }
       } else if (temp = raw.match(/^rgba\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)$/i)) {
         temp[1] = parseInt(temp[1]); temp[2] = parseInt(temp[2]); temp[3] = parseInt(temp[3]); temp[4] = parseFloat(temp[4]);
         if (temp[1] < 256 && temp[2] < 256 && temp[3] < 256 && temp[4] <= 1) {
