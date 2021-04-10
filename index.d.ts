@@ -21,7 +21,7 @@ declare namespace SVGtoPDF {
         // initial viewport width, by default it's the page width
         width?: number
 
-        // initial viewport width, by default it's the page width
+        // initial viewport width, by default it's the page height
         height?: number
 
         // override alignment of the SVG content inside its viewport
