@@ -2307,8 +2307,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           currentElem._rot = combineArrays(currentElem.getNumberList('rotate'), (parentElem ? parentElem._rot.slice(parentElem._pos.length) : []));
           currentElem._defRot = currentElem.chooseValue(currentElem._rot[currentElem._rot.length - 1], parentElem && parentElem._defRot, 0);
           if (currentElem.name === 'textPath') {currentElem._y = [];}
-          let fontOptions = {fauxItalic: false, fauxBold: false},
-              fontNameorLink = fontCallback(currentElem.get('font-family'), currentElem.get('font-weight') === 'bold', currentElem.get('font-style') === 'italic', fontOptions);
+          let fontOptions = {fauxItalic: false, fauxBold: false};
+          let currentElemFontFamily = currentElem.get('font-family');
+          let currentElemBold = currentElem.get('font-weight') === 'bold';
+          let currentElemItalic = currentElem.get('font-style') === 'italic';
+          let fontInfo = fontCallback(currentElemFontFamily, currentElemBold, currentElemItalic, fontOptions);
+          let fontNameorLink = fontInfo.fontNameorLink;
+          fontOptions.fauxBold = fontInfo.fauxBold;
+          fontOptions.fauxItalic = fontInfo.fauxItalic;
           try {
             doc.font(fontNameorLink);
           } catch(e) {
@@ -2421,6 +2427,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             parentElem._index += currentElem._index;
           }
         }
+
         function textOnPath(currentElem) {
           let pathObject = currentElem.pathObject,
               pathLength = currentElem.pathLength,
