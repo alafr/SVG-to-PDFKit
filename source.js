@@ -718,7 +718,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return styles.reduce((acc, style) => {
         const [key, value] = style.split(':');
         if (!key) {return acc;}
-        acc[key] = value;
+        acc[key.trim()] = value.trim();
         return acc;
       }, {});
     }
