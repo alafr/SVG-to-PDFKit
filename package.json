@@ -1,6 +1,6 @@
 {
   "name": "@heritage-type/svg-to-pdfkit",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Insert SVG into a PDF document created with PDFKit",
   "author": "HeritageType",
   "license": "MIT",
