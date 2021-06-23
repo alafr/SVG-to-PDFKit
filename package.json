@@ -7,6 +7,9 @@
   "repository": "https://github.com/HeritageType/SVG-to-PDFKit",
   "bugs": "https://github.com/HeritageType/SVG-to-PDFKit/issues",
   "main": "source.js",
+  "scripts": {
+    "test": "echo 'no tests';exit 0"
+  },
   "dependencies": {
     "pdfkit": ">=0.8.1"
   }
