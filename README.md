@@ -4,7 +4,7 @@ Insert SVG into a PDF document created with PDFKit.
 
 ## Install
 
-    npm @heritage-type/install svg-to-pdfkit --save
+    npm install @heritage-type/svg-to-pdfkit --save
 
 ## Use
 
