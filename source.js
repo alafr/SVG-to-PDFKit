@@ -60,7 +60,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
-      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
+      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}},
+      'vector-effect':      {inherit: true, initial: 'none', values: {'none':'none', 'non-scaling-stroke':'non-scaling-stroke'}}
     };
 
     function docBeginGroup(bbox) {
@@ -1842,7 +1843,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
         doc.save();
-        this.transform();
+        if (this.get('vector-effect') === 'non-scaling-stroke') {
+          this.shape.transform(this.getTransformation());
+        } else {
+          this.transform();
+        }
         this.clip();
         if (!isClip) {
           let masked = this.mask(),
