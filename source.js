@@ -60,7 +60,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
-      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
+      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}},
+      'vector-effect':      {inherit: true, initial: 'none', values: {'none':'none', 'non-scaling-stroke':'non-scaling-stroke'}}
     };
 
     function docBeginGroup(bbox) {
@@ -419,6 +420,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function getPageBBox() {
       return new SvgShape().M(0, 0).L(doc.page.width, 0).L(doc.page.width, doc.page.height).L(0, doc.page.height)
                            .transform(inverseMatrix(getGlobalMatrix())).getBoundingBox();
+    }
+    function getPageScale() {
+      const bbox = getPageBBox();
+      const width = doc.page.width;
+      return width / bbox[2];
     }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
@@ -1842,7 +1848,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
         doc.save();
-        this.transform();
+        if (this.get('vector-effect') === 'non-scaling-stroke') {
+          this.shape.transform(this.getTransformation());
+        } else {
+          this.transform();
+        }
         this.clip();
         if (!isClip) {
           let masked = this.mask(),
@@ -1855,6 +1865,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               stroke = this.getStroke(isClip, isMask),
               lineWidth = this.get('stroke-width'),
               lineCap = this.get('stroke-linecap');
+
+          if (this.get('vector-effect') === 'non-scaling-stroke') {
+            lineWidth = lineWidth / getPageScale();
+          }
+          
           if (fill || stroke) {
             if (fill) {
               docFillColor(fill);
