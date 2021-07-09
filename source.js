@@ -421,6 +421,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return new SvgShape().M(0, 0).L(doc.page.width, 0).L(doc.page.width, doc.page.height).L(0, doc.page.height)
                            .transform(inverseMatrix(getGlobalMatrix())).getBoundingBox();
     }
+    function getPageScale() {
+      const bbox = getPageBBox();
+      const width = doc.page.width;
+      return width / bbox[2];
+    }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
@@ -1860,6 +1865,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               stroke = this.getStroke(isClip, isMask),
               lineWidth = this.get('stroke-width'),
               lineCap = this.get('stroke-linecap');
+
+          if (this.get('vector-effect') === 'non-scaling-stroke') {
+            lineWidth = lineWidth / getPageScale();
+          }
+          
           if (fill || stroke) {
             if (fill) {
               docFillColor(fill);
