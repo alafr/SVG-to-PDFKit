@@ -60,7 +60,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
-      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}}
+      'overflow':           {inherit: false, initial: 'hidden', values: {'hidden':'hidden', 'scroll':'hidden', 'visible':'visible'}},
+      'vector-effect':      {inherit: true, initial: 'none', values: {'none':'none', 'non-scaling-stroke':'non-scaling-stroke'}}
     };
 
     function docBeginGroup(bbox) {
@@ -107,6 +108,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       let gstate = doc.ref({
         Type: 'ExtGState', CA: 1, ca: 1, BM: 'Normal',
         SMask: {S: 'Luminosity', G: group.xobj, BC: (clip ? [0, 0, 0] : [1, 1, 1])}
+      });
+      gstate.end();
+      doc.page.ext_gstates[name] = gstate;
+      doc.addContent('/' + name + ' gs');
+    }
+    function applyBlendMode(group, blendMode) {
+      let name = 'M' + blendMode;
+      let gstate = doc.ref({
+        Type: 'ExtGState', CA: 1, ca: 1, BM: blendMode, G: group.xobj
       });
       gstate.end();
       doc.page.ext_gstates[name] = gstate;
@@ -420,6 +430,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return new SvgShape().M(0, 0).L(doc.page.width, 0).L(doc.page.width, doc.page.height).L(0, doc.page.height)
                            .transform(inverseMatrix(getGlobalMatrix())).getBoundingBox();
     }
+    function getPageScale() {
+      const bbox = getPageBBox();
+      const width = doc.page.width;
+      return width / bbox[2];
+    }
     function inverseMatrix(m) {
       let dt = m[0] * m[3] - m[1] * m[2];
       return [m[3] / dt, -m[1] / dt, -m[2] / dt, m[0] / dt, (m[2]*m[5] - m[3]*m[4]) / dt, (m[1]*m[4] - m[0]*m[5]) / dt];
@@ -699,6 +714,24 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         case '#text': case '#cdata-section': return new SvgElemTextNode(obj, inherits);
         default: return new SvgElem(obj, inherits);
       }
+    }
+
+    /* Utilities for blend modes */
+    function getObjectStyles(obj) {
+      if (!obj.attributes.style) return {};
+
+      const styles = obj.attributes.style.split(';');
+      return styles.reduce((acc, style) => {
+        const [key, value] = style.split(':');
+        if (!key) {return acc;}
+        acc[key.trim()] = value.trim();
+        return acc;
+      }, {});
+    }
+
+    // pdf BlendModes https://www.adobe.com/content/dam/acom/en/devnet/pdf/pdf_reference_archive/blend_modes.pdf
+    function parseCSSBlendMode(blendMode) {
+      return blendMode.split('-').map(string => string.charAt(0).toUpperCase() + string.slice(1)).join('');
     }
 
     var StringParser = function(str) {
@@ -1446,17 +1479,20 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 
     var SvgElemContainer = function(obj, inherits) {
       SvgElemHasChildren.call(this, obj, inherits);
-      this.drawContent = function(isClip, isMask) {
+      this.drawContent = function(isClip, isMask, blendMode) {
         this.transform();
         let clipped = this.clip(),
             masked = this.mask(),
             group;
-        if ((this.get('opacity') < 1 || clipped || masked) && !isClip) {
+        if ((this.get('opacity') < 1 || clipped || masked || blendMode) && !isClip) {
           group = docBeginGroup(getPageBBox());
         }
         this.drawChildren(isClip, isMask);
         if (group) {
           docEndGroup(group);
+          if (blendMode) {
+            applyBlendMode(group, blendMode);
+          }
           doc.fillOpacity(this.get('opacity'));
           docInsertGroup(group);
         }
@@ -1513,7 +1549,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.drawInDocument = function(isClip, isMask) {
         doc.save();
         if (this.link && !isClip && !isMask) {this.addLink();}
-        this.drawContent(isClip, isMask);
+
+        // parse object styles and apply blendMode
+        const styles = getObjectStyles(obj);
+        if (styles['mix-blend-mode']) {
+          this.drawContent(isClip, isMask, parseCSSBlendMode(styles['mix-blend-mode']));
+        } else {
+          this.drawContent(isClip, isMask);
+        }
+
         doc.restore();
       };
       this.getTransformation = function() {
@@ -1842,7 +1886,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
         doc.save();
-        this.transform();
+        if (this.get('vector-effect') === 'non-scaling-stroke') {
+          this.shape.transform(this.getTransformation());
+        } else {
+          this.transform();
+        }
         this.clip();
         if (!isClip) {
           let masked = this.mask(),
@@ -1855,6 +1903,14 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               stroke = this.getStroke(isClip, isMask),
               lineWidth = this.get('stroke-width'),
               lineCap = this.get('stroke-linecap');
+
+          console.log('BasicShape', this.get('vector-effect'))
+          if (this.get('vector-effect') === 'non-scaling-stroke') {
+            let aLW = lineWidth;
+            lineWidth = lineWidth / getPageScale();
+            console.log(alw, '->', lineWidth)
+          }
+
           if (fill || stroke) {
             if (fill) {
               docFillColor(fill);
@@ -2601,5 +2657,5 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
 };
 
 if (typeof module !== 'undefined' && module && typeof module.exports !== 'undefined') {
-  module.exports = SVGtoPDF;
+module.exports = SVGtoPDF;
 }
