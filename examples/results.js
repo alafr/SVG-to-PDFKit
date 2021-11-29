@@ -4,7 +4,7 @@ var PreviousResults = {
   "additional-test-03.svg": 0,
   "additional-test-04.svg": 0,
   "additional-test-05.svg": 0,
-  "additional-test-06.svg": 0,
+  "additional-test-06.svg": 0.57,
   "additional-test-07.svg": 0,
   "additional-test-08.svg": 0,
   "additional-test-09.svg": 0.7,
