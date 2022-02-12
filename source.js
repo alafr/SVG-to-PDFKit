@@ -2327,7 +2327,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           try {
             doc.font(fontNameorLink);
           } catch(e) {
-            warningCallback('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit');
+            warningCallback('SVGElemText: failed to open font "' + fontNameorLink + '" in PDFKit: ' + e.message);
           }
           currentElem._pos = [];
           currentElem._index = 0;
