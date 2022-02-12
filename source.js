@@ -1376,7 +1376,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.clip = function() {
         if (this.get('clip-path') !== 'none') {
           let clipPath = new SvgElemClipPath(this.get('clip-path'), null);
-          clipPath.useMask(this.getBoundingBox());
+          clipPath.useMask((clipPath.attr('clipPathUnits') === 'objectBoundingBox') ? this.getBoundingBox() : null);
           return true;
         }
       };
