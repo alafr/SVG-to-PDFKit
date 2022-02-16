@@ -57,6 +57,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'marker-end':         {inherit: true, initial: 'none'},
       'opacity':            {inherit: false, initial: 1},
       'transform':          {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
+      'transform-origin':   {inherit: false, initial: [0, 0]}, // [1, 0, 0, 1, nums[0], nums[1]]
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
@@ -468,6 +469,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     }
     function isArrayLike(v) {
       return typeof v === 'object' && v !== null && typeof v.length === 'number';
+    }
+    function parseTranformOrigin(v) {
+      let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
+      
+      const matched = parser.match(/^\d*\s\d*$/, true)[0].split(' ')
+
+      const alpha = parseInt(matched[0]);
+      const beta = parseInt(matched[1]);
+
+      return [alpha, beta];
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -1248,6 +1259,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               case 'transform':
                 result = parseTranform(value);
                 break;
+              case 'transform-origin':
+                result = parseTranformOrigin(value);;
+                break;
               case 'stroke-dasharray':
                 if (value === 'none') {
                   result = [];
@@ -1484,7 +1498,13 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
-        return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
+        const [transformOriginX, transformOriginY] = this.get('transform-origin');
+
+        return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY], 
+          this.get('transform'), 
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY], 
+          [1, 0, 0, 1, x, y]);
       };
     };
 
