@@ -57,7 +57,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'marker-end':         {inherit: true, initial: 'none'},
       'opacity':            {inherit: false, initial: 1},
       'transform':          {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
-      'transform-origin':   {inherit: false, initial: [0, 0]}, // [1, 0, 0, 1, nums[0], nums[1]]
+      'transform-origin':   {inherit: false, initial: (x, y) => [0, 0]},
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
@@ -471,14 +471,31 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return typeof v === 'object' && v !== null && typeof v.length === 'number';
     }
     function parseTranformOrigin(v) {
-      let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
+      let parser = new StringParser((v || '').trim());
+
+      // check for absolute values
+      const matchedAbsolute = parser.match(/^\d*\s\d*$/, true);
+      if (matchedAbsolute){
+        const matches = matchedAbsolute[0].split(' ');
+        return (x, y) => [parseInt(matches[0]), parseInt(matches[1])];
+      }
       
-      const matched = parser.match(/^\d*\s\d*$/, true)[0].split(' ')
+      // check for percentage values
+      const matchedPercents = parser.match(/^\d*% \d*%$/, true);
+      if (matchedPercents){
+        const matches = matchedPercents[0].split(' ');
+        return (x, y) => [
+          x * (parseInt(matches[0].slice(0, -1)) / 100), 
+          y * (parseInt(matches[1].slice(0, -1)) / 100)
+        ];
+      }
 
-      const alpha = parseInt(matched[0]);
-      const beta = parseInt(matched[1]);
 
-      return [alpha, beta];
+
+      
+      
+
+      
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -1260,7 +1277,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 result = parseTranform(value);
                 break;
               case 'transform-origin':
-                result = parseTranformOrigin(value);;
+                result = parseTranformOrigin(value);
                 break;
               case 'stroke-dasharray':
                 if (value === 'none') {
@@ -1498,7 +1515,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
-        const [transformOriginX, transformOriginY] = this.get('transform-origin');
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getVWidth(),
+          this.getVHeight()
+        );
 
         return multiplyMatrix(
           [1, 0, 0, 1, transformOriginX, transformOriginY], 
