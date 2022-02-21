@@ -1564,8 +1564,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       };
       this.getTransformation = function() {
         const [transformOriginX, transformOriginY] = this.get('transform-origin')(
-          this.getLength('width', this.getVWidth(), 0),
-          this.getLength('height', this.getVHeight(), 0)
+          this.getVWidth(),
+          this.getVHeight()
         );
 
         return multiplyMatrix(
@@ -1592,6 +1592,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemSvg = function(obj, inherits) {
+      console.log('SvgElemSvg');
       SvgElemContainer.call(this, obj, inherits);
       let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
@@ -1627,8 +1628,18 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
+
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getVWidth(),
+          this.getVHeight()
+        );
+
+        console.log(this.getVWidth(), this.getVHeight());
+
         return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY],
           this.get('transform'),
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY],
           [1, 0, 0, 1, x, y],
           parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]),
           [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
