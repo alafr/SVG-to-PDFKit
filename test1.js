@@ -3,13 +3,13 @@ const SVGtoPDF = require('./source.js');
 var fs = require('fs'),
   PDFDocument = require('pdfkit');
 
-var doc = new PDFDocument(),
+var doc = new PDFDocument({compress: false}),
   stream = fs.createWriteStream('test1.pdf'),
-  svg = `<svg width="500" height="500" viewBox="0 0 500 500">
+  svg = `<svg width="500" height="500" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
   <rect width="100%" height="100%" fill="green" />
-  <g transform-origin="50% 20%" transform="scale(0.5)">
+  <g transform-origin="50% 25%" transform="scale(0.5)">
 
-    <svg  viewbox="0 0 60 60">
+    <svg  viewBox="0 0 60 60">
       <defs>
         <clipPath id="clip-path-dot-color">
           <rect x="0.3" y="18.3" width="1.8" height="1.8" transform="rotate(0,1.2,19.2)" />
@@ -559,7 +559,7 @@ var doc = new PDFDocument(),
       <rect x="0.3" y="0.3" height="59.4" width="59.4" clip-path="url(&apos;#clip-path-dot-color&apos;)" fill="#5B6233" />
     </svg>
     
-    <g transform-origin="50% 50%" transform="scale(0.3)">
+    <g  transform-origin="50% 50%" transform="scale(0.3)">
       <svg width="100%" height="100%" viewBox="0 0 206.14 203.34">
         <g id="logo Layer_2" data-name="Layer 2">
           <g id="Layer_54" data-name="Layer 54">
@@ -573,14 +573,9 @@ var doc = new PDFDocument(),
     </g>
 
   </g>
-  </svg>
-`;
+  </svg>`;
 
-SVGtoPDF(doc, svg, 0, 0);
-
-stream.on('finish', function () {
-  console.log(fs.readFileSync('file.pdf'))
-});
+SVGtoPDF(doc, svg, 0, 0, {useCSS:true});
 
 doc.pipe(stream);
 doc.end();

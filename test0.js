@@ -578,9 +578,5 @@ var doc = new PDFDocument(),
 
 SVGtoPDF(doc, svg, 0, 0);
 
-stream.on('finish', function () {
-  console.log(fs.readFileSync('file.pdf'))
-});
-
 doc.pipe(stream);
 doc.end();
