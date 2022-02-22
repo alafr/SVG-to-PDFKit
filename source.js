@@ -635,6 +635,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       return rules;
     }
     function matchesSelector(elem, selector) {
+      console.log('matchesSelector', elem.classList)
       if (elem.nodeType !== 1) {return false;}
       for (let i = 0; i < selector.tags.length; i++) {
         if (selector.tags[i] !== elem.nodeName) {return false;}
@@ -643,7 +644,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (selector.ids[i] !== elem.id) {return false;}
       }
       for (let i = 0; i < selector.classes.length; i++) {
-        if (!elem.classList.contains(selector.classes[i])) {return false;}
+        // if (!elem.classList.contains(selector.classes[i])) {return false;}
+        if (!elem.classList.some((klass) => klass === selector.classes[i])) {return false;}
       }
       return true;
     }
