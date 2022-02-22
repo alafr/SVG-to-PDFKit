@@ -1,14 +1,6 @@
 # SVG-to-PDFKit
 Insert SVG into a PDF document created with PDFKit.
 
---- This fork implements `transform-origin`  ---
-
-https://developer.mozilla.org/en-US/docs/Web/CSS/transform-origin
-https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/transform-origin
-https://drafts.csswg.org/css-transforms/#transform-origin-property
-https://drafts.csswg.org/css-transforms/#transformation-matrix-computation
-
-
 ## Install
 
     npm install svg-to-pdfkit --save

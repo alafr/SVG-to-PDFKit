@@ -470,17 +470,21 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function isArrayLike(v) {
       return typeof v === 'object' && v !== null && typeof v.length === 'number';
     }
+
+    // This implementation is incomplete.
+    // It can only accept absolute and percentage tuples.
+    // It CAN'T handle single values or keyword.
     function parseTranformOrigin(v) {
       let parser = new StringParser((v || '').trim());
 
-      // check for absolute values
+      // check for 2 absolute values
       const matchedAbsolute = parser.match(/^\d*\s\d*$/, true);
       if (matchedAbsolute){
         const matches = matchedAbsolute[0].split(' ');
         return (x, y) => [parseInt(matches[0]), parseInt(matches[1])];
       }
       
-      // check for percentage values
+      // check for 2 percentage values
       const matchedPercents = parser.match(/^\d*% \d*%$/, true);
       if (matchedPercents){
         const matches = matchedPercents[0].split(' ');
@@ -490,12 +494,11 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         ];
       }
 
+      console.error(`
+parseTranformOrigin failed for "${v}".
+This implementation of SVG is incomplete and can only accept 2 absolute value or 2 percentage values.
+`);
 
-
-      
-      
-
-      
     }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
@@ -643,7 +646,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (selector.ids[i] !== elem.id) {return false;}
       }
       for (let i = 0; i < selector.classes.length; i++) {
-        // if (!elem.classList.contains(selector.classes[i])) {return false;}
         if (!elem.classList.some((klass) => klass === selector.classes[i])) {return false;}
       }
       return true;
@@ -1593,7 +1595,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     };
 
     var SvgElemSvg = function(obj, inherits) {
-      console.log('SvgElemSvg');
       SvgElemContainer.call(this, obj, inherits);
       let width = this.getLength('width', this.getParentVWidth(), this.getParentVWidth()),
           height = this.getLength('height', this.getParentVHeight(), this.getParentVHeight()),
@@ -1634,8 +1635,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           this.getVWidth(),
           this.getVHeight()
         );
-
-        console.log(this.getVWidth(), this.getVHeight());
 
         return multiplyMatrix(
           [1, 0, 0, 1, transformOriginX, transformOriginY],
