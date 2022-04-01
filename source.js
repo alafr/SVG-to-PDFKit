@@ -1329,7 +1329,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 if (result != null) {
                   if (result < 0) { // fix for crbug.com/660850
                     let dasharray = this.get('stroke-dasharray');
-                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
+                    // Compute the total length of the dash array so we can add
+                    // it to result until result is non-negative
+                    let length = 0;
+                    for (let j = 0; j < dasharray.length; j++) {length += dasharray[j];}
+                    if (length > 0) {
+                      while (result < 0) {
+                        result += length;
+                      }
+                    }
                   }
                 }
                 break;
