@@ -7,7 +7,7 @@
   "repository": "https://github.com/alafr/SVG-to-PDFKit",
   "bugs": "https://github.com/alafr/SVG-to-PDFKit/issues",
   "main": "source.js",
-  "dependencies": {
+  "devDependencies": {
     "pdfkit": ">=0.8.1"
   }
 }
