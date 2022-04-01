@@ -11,6 +11,7 @@ var PreviousResults = {
   "additional-test-issue-116.svg": 0,
   "additional-test-issue-120.svg": 0,
   "additional-test-cmyk.svg": 51.46,
+  "additional-test-dasharray.svg": 0,
   "color-prop-01-b.svg": 0,
   "color-prop-02-f.svg": 0,
   "color-prop-03-t.svg": 0,
