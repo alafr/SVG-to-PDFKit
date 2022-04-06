@@ -2338,7 +2338,22 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               letterSpacing = currentElem.get('letter-spacing'),
               textAnchor = currentElem.get('text-anchor'),
               textDirection = currentElem.get('direction'),
-              baseline = getBaseline(currentElem._font.font, currentElem._font.size, currentElem.get('alignment-baseline') || currentElem.get('dominant-baseline'), currentElem.get('baseline-shift'));
+              // `alignment-baseline` and `baseline-shift` have no effect on
+              // `<text>` elements according to the SVG spec. So, detect when
+              // we're styling a `<text>` element and ignore
+              // `alignment-baseline` (only factoring in `dominant-baseline`)
+              // and `baseline-shift` (which can only have the default value of
+              // `baseline`).
+              //
+              // Note that Chrome (as of v99) incorrectly factors in
+              // `alignment-baseline` on `<text>` elements, while Firefox
+              // correctly follows the spec and ignores it. This means that our
+              // output will differ from Chrome's in these cases, but conform to
+              // SVG specification.
+              isTextElem = currentElem.name === 'text',
+              baselineAttr = isTextElem ? currentElem.get('dominant-baseline') : (currentElem.get('alignment-baseline') || currentElem.get('dominant-baseline')),
+              baselineShiftAttr = isTextElem ? 'baseline' : currentElem.get('baseline-shift'),
+              baseline = getBaseline(currentElem._font.font, currentElem._font.size, baselineAttr, baselineShiftAttr);
           if (currentElem.name === 'textPath') {
             doAnchoring();
             currentX = currentY = 0;
