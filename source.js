@@ -301,16 +301,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           dashOffset -= dashArray[1];
           dashArray[dashArray.length - 1] += dashArray[1];
           dashArray = dashArray.slice(2);
-  
-          // If we made the dash offset negative, make it positive again (because
-          // of crbug.com/660850)
-          if (dashArray.length !== 0) {
-            while (dashOffset < 0) {
-              for (let i = 0; i < dashArray.length; i++) {
-                dashOffset += dashArray[i];
-              }
-            }
-          }  
         }
         if (dashArray[dashArray.length - 1] === 0) {
           // The last space is zero-length. We fix this by combining the last dash
@@ -333,6 +323,17 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           dashArray[0] += dashArray[dashArray.length - 2];
           dashArray = dashArray.slice(0, -2);
         }  
+      }
+
+      // Ensure the dash offset is non-negative (because of crbug.com/660850).
+      // First compute the total length of the dash array so we can add it to
+      // dash offset until dash offset is non-negative.
+      let length = 0;
+      for (let i = 0; i < dashArray.length; i++) {length += dashArray[i];}
+      if (length > 0) {
+        while (dashOffset < 0) {
+          dashOffset += length;
+        }
       }
 
       doc.dash(dashArray, {phase: dashOffset});
@@ -1439,12 +1440,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 break;
               case 'stroke-dashoffset':
                 result = this.computeLength(value, this.getViewport());
-                if (result != null) {
-                  if (result < 0) { // fix for crbug.com/660850
-                    let dasharray = this.get('stroke-dasharray');
-                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
-                  }
-                }
                 break;
             }
             if (result != null) {return styleCache[key] = result;}
