@@ -224,6 +224,120 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.strokeColor(color[0], color[1]);
       }
     }
+    // PDFKit doesn't accept any 0s in the dash array, but that's perfectly
+    // valid in SVG. So this function applys a dash array and offset, detecting
+    // any 0s in the dash array and updating it and the dash offset as needed to
+    // remove the zeros, but preserve the end result.
+    //
+    // `dashArray` must have an even number of elements
+    function docApplyDash(dashArray, dashOffset) {
+      let index;
+      // Anytime there's a 0 that isn't the first or last element of the array,
+      // we can remove it by combining the previous or next value. If it's a
+      // dash, then it's a zero-length dash between two spaces, so the dash can
+      // be eliminated and spaces combined by summing them, replacing all three
+      // values with the sum of the two spaces. If the 0 value is a space, then
+      // it's a zero-length space between two dashes, and the dashes can be
+      // similarly combined. So first we run that logic iteratively to remove
+      // all the 0s from the dash array that aren't the first or last element.
+      // Note that because we replace 3 values with one value, this doesn't
+      // change the even-ness of the length of dashArray.
+      while ((index = dashArray.slice(1, -1).indexOf(0)) !== -1) {
+        let actualIndex = index + 1;
+        let replacementValue = dashArray[actualIndex - 1] + dashArray[actualIndex + 1];
+        dashArray = dashArray
+          .slice(0, actualIndex - 1)
+          .concat([replacementValue])
+          .concat(dashArray.slice(actualIndex + 2));
+      }
+
+      // The stroke array only having two elements (a dash value and space
+      // value) is a special case.
+      if (dashArray.length === 2) {
+        if (dashArray[0] === 0) {
+          // Regardless of the space value, the dash length is zero, so we're
+          // not actually drawing a stroke. We can't describe that in a
+          // doc.dash() call in a way that PDFKit will accept, so we set the
+          // stroke opacity to zero as our best approximation.
+          doc.strokeOpacity(0);
+          return;
+        } else if (dashArray[1] === 0) {
+          // Regardless of the dash value, the space value is zero, meaning
+          // we're actually drawing a solid stroke, not a dashed one. We can
+          // make this happen by just emptying out the dash array.
+          dashArray = [];
+        }
+      } else {
+        if (dashArray[0] === 0) {
+          // The first dash is zero-length. We fix this by combining the first
+          // space (just after the first dash) with the last space and updating
+          // the dash offset accordingly. For example, if we had
+          //
+          // [ 0 4 3 2 5 1 ] (dash offset 0)
+          //
+          // ␣␣␣␣---␣␣-----␣
+          // ⎸
+          //
+          // we'd end up with
+          //
+          // [ 3 2 5 5 ] (dash offset -4)
+          //
+          // ---␣␣-----␣␣␣␣␣
+          //            ⎸
+          //
+          // Another example where the dash array also ends with a 0:
+          //
+          // [ 0 4 3 2 5 0 ] (dash offset 0)
+          //
+          // ␣␣␣␣---␣␣-----
+          // ⎸
+          //
+          // we'd end up with
+          //
+          // [ 3 2 5 4 ] (dash offset -4)
+          //
+          // ---␣␣-----␣␣␣␣
+          //           ⎸
+          dashOffset -= dashArray[1];
+          dashArray[dashArray.length - 1] += dashArray[1];
+          dashArray = dashArray.slice(2);
+        }
+        if (dashArray[dashArray.length - 1] === 0) {
+          // The last space is zero-length. We fix this by combining the last dash
+          // (just before the last space) with the first dash and updating the
+          // dash offset accordingly. For example, if we had
+          //
+          // [ 1 4 3 2 5 0 ] (dash offset 0)
+          //
+          // -␣␣␣␣---␣␣-----
+          // ⎸
+          //
+          // we'd end up with
+          //
+          // [ 6 4 3 2 ] (dash offset 5)
+          //
+          // ------␣␣␣␣---␣␣
+          //      ⎸
+          //
+          dashOffset += dashArray[dashArray.length - 2];
+          dashArray[0] += dashArray[dashArray.length - 2];
+          dashArray = dashArray.slice(0, -2);
+        }  
+      }
+
+      // Ensure the dash offset is non-negative (because of crbug.com/660850).
+      // First compute the total length of the dash array so we can add it to
+      // dash offset until dash offset is non-negative.
+      let length = 0;
+      for (let i = 0; i < dashArray.length; i++) {length += dashArray[i];}
+      if (length > 0) {
+        while (dashOffset < 0) {
+          dashOffset += length;
+        }
+      }
+
+      doc.dash(dashArray, {phase: dashOffset});
+    }
     function docInsertLink(x, y, w, h, url) {
       let ref = doc.ref({
         Type: 'Annot',
@@ -1326,12 +1440,6 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                 break;
               case 'stroke-dashoffset':
                 result = this.computeLength(value, this.getViewport());
-                if (result != null) {
-                  if (result < 0) { // fix for crbug.com/660850
-                    let dasharray = this.get('stroke-dasharray');
-                    for (let j = 0; j < dasharray.length; j++) {result += dasharray[j];}
-                  }
-                }
                 break;
             }
             if (result != null) {return styleCache[key] = result;}
@@ -1904,8 +2012,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               doc.lineWidth(lineWidth)
                  .miterLimit(this.get('stroke-miterlimit'))
                  .lineJoin(this.get('stroke-linejoin'))
-                 .lineCap(lineCap)
-                 .dash(dashArray, {phase: dashOffset});
+                 .lineCap(lineCap);
+              docApplyDash(dashArray, dashOffset);
             }
             for (let j = 0; j < subPaths.length; j++) {
               if (subPaths[j].totalLength > 0) {
@@ -2194,8 +2302,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
                   doc.lineWidth(strokeWidth)
                      .miterLimit(this.get('stroke-miterlimit'))
                      .lineJoin(this.get('stroke-linejoin'))
-                     .lineCap(this.get('stroke-linecap'))
-                     .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
+                     .lineCap(this.get('stroke-linecap'));
+                  docApplyDash(this.get('stroke-dasharray'), this.get('stroke-dashoffset'));
                 }
                 docBeginText(this._font.font, this._font.size);
                 docSetTextMode(!!fill, !!stroke);
@@ -2220,8 +2328,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           doc.lineWidth(this.get('stroke-width'))
              .miterLimit(this.get('stroke-miterlimit'))
              .lineJoin(this.get('stroke-linejoin'))
-             .lineCap(this.get('stroke-linecap'))
-             .dash(this.get('stroke-dasharray'), {phase:this.get('stroke-dashoffset')});
+             .lineCap(this.get('stroke-linecap'));
+          docApplyDash(this.get('stroke-dasharray'), this.get('stroke-dashoffset'));
         }
         for (let j = 0, pos = this._pos; j < pos.length; j++) {
           if (!pos[j].hidden && isNotEqual(pos[j].width, 0)) {
