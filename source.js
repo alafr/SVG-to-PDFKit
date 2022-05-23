@@ -438,6 +438,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           return new SvgNode(null, 8, temp, error);
         } else if (temp = parser.match(/^<\?[\s\S]*?\?>/)) { // Processing instructions
           return new SvgNode(null, 7, temp, error);
+        } else if (temp = parser.match(/^<!DOCTYPE[^<\[]+?\[[\s\S]*?\]>/)) { // NESTED Doctype
+          return new SvgNode(null, 10, temp, error);
         } else if (temp = parser.match(/^<!DOCTYPE\s*([\s\S]*?)>/)) { // Doctype
           return new SvgNode(null, 10, temp, error);
         } else if (temp = parser.match(/^<!\[CDATA\[([\s\S]*?)\]\]>/, true)) { // Cdata node
