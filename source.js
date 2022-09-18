@@ -57,6 +57,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       'marker-end':         {inherit: true, initial: 'none'},
       'opacity':            {inherit: false, initial: 1},
       'transform':          {inherit: false, initial: [1, 0, 0, 1, 0, 0]},
+      'transform-origin':   {inherit: false, initial: (x, y) => [0, 0]},
       'display':            {inherit: false, initial: 'inline', values: {'none':'none', 'inline':'inline', 'block':'inline'}},
       'clip-path':          {inherit: false, initial: 'none'},
       'mask':               {inherit: false, initial: 'none'},
@@ -585,6 +586,36 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
     function isArrayLike(v) {
       return typeof v === 'object' && v !== null && typeof v.length === 'number';
     }
+
+    // This implementation is incomplete.
+    // It can only accept absolute and percentage tuples.
+    // It CAN'T handle single values or keyword.
+    function parseTranformOrigin(v) {
+      let parser = new StringParser((v || '').trim());
+
+      // check for 2 absolute values
+      const matchedAbsolute = parser.match(/^\d*\s\d*$/, true);
+      if (matchedAbsolute){
+        const matches = matchedAbsolute[0].split(' ');
+        return (x, y) => [parseInt(matches[0]), parseInt(matches[1])];
+      }
+      
+      // check for 2 percentage values
+      const matchedPercents = parser.match(/^\d*% \d*%$/, true);
+      if (matchedPercents){
+        const matches = matchedPercents[0].split(' ');
+        return (x, y) => [
+          x * (parseInt(matches[0].slice(0, -1)) / 100), 
+          y * (parseInt(matches[1].slice(0, -1)) / 100)
+        ];
+      }
+
+      console.error(`
+parseTranformOrigin failed for "${v}".
+This implementation of SVG is incomplete and can only accept 2 absolute value or 2 percentage values.
+`);
+
+    }
     function parseTranform(v) {
       let parser = new StringParser((v || '').trim()), result = [1, 0, 0, 1, 0, 0], temp;
       while (temp = parser.match(/^([A-Za-z]+)\s*[(]([^(]+)[)]/, true)) {
@@ -731,7 +762,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (selector.ids[i] !== elem.id) {return false;}
       }
       for (let i = 0; i < selector.classes.length; i++) {
-        if (!elem.classList.contains(selector.classes[i])) {return false;}
+        if (!elem.classList.some((klass) => klass === selector.classes[i])) {return false;}
       }
       return true;
     }
@@ -1364,6 +1395,9 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
               case 'transform':
                 result = parseTranform(value);
                 break;
+              case 'transform-origin':
+                result = parseTranformOrigin(value);
+                break;
               case 'stroke-dasharray':
                 if (value === 'none') {
                   result = [];
@@ -1594,7 +1628,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
-        return multiplyMatrix(this.get('transform'), [1, 0, 0, 1, x, y]);
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getVWidth(),
+          this.getVHeight()
+        );
+
+        return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY], 
+          this.get('transform'), 
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY], 
+          [1, 0, 0, 1, x, y]);
       };
     };
 
@@ -1633,7 +1676,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
-        return this.get('transform');
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getVWidth(),
+          this.getVHeight()
+        );
+
+        return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY],
+          this.get('transform'),
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY]);
       };
     };
 
@@ -1689,8 +1740,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         doc.restore();
       };
       this.getTransformation = function() {
+
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getVWidth(),
+          this.getVHeight()
+        );
+
         return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY],
           this.get('transform'),
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY],
           [1, 0, 0, 1, x, y],
           parseAspectRatio(aspectRatio, width, height, viewBox[2], viewBox[3]),
           [1, 0, 0, 1, -viewBox[0], -viewBox[1]]
@@ -1953,7 +2012,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         return this.shape;
       };
       this.getTransformation = function() {
-        return this.get('transform');
+        const [transformOriginX, transformOriginY] = this.get('transform-origin')(
+          this.getLength('width', this.getVWidth(), 0),
+          this.getLength('height', this.getVHeight(), 0)
+        );
+
+        return multiplyMatrix(
+          [1, 0, 0, 1, transformOriginX, transformOriginY],
+          this.get('transform'),
+          [1, 0, 0, 1, -transformOriginX, -transformOriginY]);
+
       };
       this.drawInDocument = function(isClip, isMask) {
         if (this.get('visibility') === 'hidden' || !this.shape) {return;}
