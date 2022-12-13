@@ -731,7 +731,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (selector.ids[i] !== elem.id) {return false;}
       }
       for (let i = 0; i < selector.classes.length; i++) {
-        const containMethod = elem.classList instanceof DOMTokenList ? 'contains' : 'includes'
+        const containMethod = typeof elem.classList.contains === 'function' ? 'contains' : 'includes'
         if (!elem.classList[containMethod](selector.classes[i])) {return false;}
       }
       return true;
