@@ -731,7 +731,8 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         if (selector.ids[i] !== elem.id) {return false;}
       }
       for (let i = 0; i < selector.classes.length; i++) {
-        if (!elem.classList.contains(selector.classes[i])) {return false;}
+        const containMethod = typeof elem.classList.contains === 'function' ? 'contains' : 'includes'
+        if (!elem.classList[containMethod](selector.classes[i])) {return false;}
       }
       return true;
     }
@@ -1324,15 +1325,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < 3; i++) {
           switch (i) {
             case 0:
-              if (key !== 'transform') { // the CSS transform behaves strangely
-                value = this.css[keyInfo.css || key];
-              }
+              value = this.attr(key);
               break;
             case 1:
               value = this.style[key];
               break;
             case 2:
-              value = this.attr(key);
+              if (key !== 'transform') { // the CSS transform behaves strangely
+                value = this.css[keyInfo.css || key];
+              }
               break;
           }
           if (value === 'inherit') {
