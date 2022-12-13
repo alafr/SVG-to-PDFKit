@@ -1324,15 +1324,15 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         for (let i = 0; i < 3; i++) {
           switch (i) {
             case 0:
-              if (key !== 'transform') { // the CSS transform behaves strangely
-                value = this.css[keyInfo.css || key];
-              }
+              value = this.attr(key);
               break;
             case 1:
               value = this.style[key];
               break;
             case 2:
-              value = this.attr(key);
+              if (key !== 'transform') { // the CSS transform behaves strangely
+                value = this.css[keyInfo.css || key];
+              }
               break;
           }
           if (value === 'inherit') {
