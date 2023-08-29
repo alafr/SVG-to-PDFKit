@@ -33,7 +33,7 @@ declare namespace SVGtoPDF {
         // function called to get the fonts, see source code
         fontCallback?: (
             family: string,
-            bold: boolean,
+            weight: string,
             italic: boolean,
             fontOptions: { fauxItalic: boolean; fauxBold: boolean },
         ) => string
