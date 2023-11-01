@@ -287,7 +287,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
         })(this);
         return result;
       };
-      let parser = new StringParser(xml.trim()), result, child, error = false; 
+      let parser = new StringParser(xml.trim()), result, child, error = false;
       let recursive = function() {
         let temp, child;
         if (temp = parser.match(/^<([\w:.-]+)\s*/, true)) { // Opening tag
@@ -1046,7 +1046,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
           }
           this.addCommand(data);
         }
-        return this;        
+        return this;
       };
       this.mergeShape = function(shape) {
         for (let i = 0; i < shape.pathCommands.length; i++) {
@@ -1782,10 +1782,10 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             nAfter = 0,
             nBefore = 0,
             nTotal = 1;
-        if (bBoxUnits) {
+        if (matrix && bBoxUnits) {
           matrix = multiplyMatrix([bBox[2] - bBox[0], 0, 0, bBox[3] - bBox[1], bBox[0], bBox[1]], matrix);
         }
-        if (matrix = validateMatrix(matrix)) {
+        if (matrix && (matrix = validateMatrix(matrix))) {
           if (this.name === 'linearGradient') {
             x1 = this.getLength('x1', (bBoxUnits ? 1 : this.getVWidth()), 0);
             x2 = this.getLength('x2', (bBoxUnits ? 1 : this.getVWidth()), (bBoxUnits ? 1 : this.getVWidth()));
