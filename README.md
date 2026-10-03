@@ -1,3 +1,11 @@
+## Note:
+This repository is not updated anymore.
+You can find a maintained fork here : https://git.fiduswriter.org/fiduswriter/SVG-for-PDFKit
+
+##
+##
+
+
 # SVG-to-PDFKit
 Insert SVG into a PDF document created with PDFKit.
 
@@ -18,6 +26,8 @@ Insert SVG into a PDF document created with PDFKit.
 &nbsp; &nbsp; And then simply call:
 
     doc.addSVG(svg, x, y, options);
+
+    To use SVGtoPDF, PDFKit version ≥0.8.1 is needed
 
 ## Parameters
 
@@ -73,10 +83,6 @@ If your fonts don't follow this pattern, or you want to register fonts at the mo
  - vector-effect (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/113">#113</a>)
  - foreignObject (<a href="https://github.com/alafr/SVG-to-PDFKit/issues/37">#37</a>)
  - other things I don't even know they exist
-
-## Warning
- - Use an updated PDFKit version (≥0.8.1): see <a href="https://github.com/alafr/pdfkit/wiki/How-to-install-and-build-a-PDFKit-branch">here</a> how to build it, or use the prebuilt file in the <a href="https://github.com/alafr/SVG-to-PDFKit/tree/master/examples">examples</a> folder.
- - There are bugs, please send issues and/or pull requests.
 
 ## License
 &nbsp; &nbsp; <a href="http://choosealicense.com/licenses/mit/">MIT</a>
