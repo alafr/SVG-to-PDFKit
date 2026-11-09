@@ -2037,7 +2037,7 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
             let markersPos = this.shape.getMarkers();
             if (markerStart !== 'none' && markersPos.length > 0) {
               let marker = new SvgElemMarker(markerStart, null);
-              marker.drawMarker(false, isMask, markersPos[0], lineWidth);
+              marker.drawMarker(false, isMask, markersPos[0], lineWidth, true);
             }
             if (markerMid !== 'none') {
               for (let i = 1; i < markersPos.length - 1; i++) {
@@ -2173,12 +2173,16 @@ var SVGtoPDF = function(doc, svg, x, y, options) {
       this.getVHeight = function() {
         return viewBox[3];
       };
-      this.drawMarker = function(isClip, isMask, posArray, strokeWidth) {
+      this.drawMarker = function(isClip, isMask, posArray, strokeWidth, isStart) {
         doc.save();
         let orient = this.attr('orient'),
             units = this.attr('markerUnits'),
-            rotate = (orient === 'auto' ? posArray[2] : (parseFloat(orient) || 0) * Math.PI / 180),
+            rotate = (orient === 'auto' || orient === 'auto-start-reverse' ? posArray[2] : (parseFloat(orient) || 0) * Math.PI / 180),
             scale = (units === 'userSpaceOnUse' ? 1 : strokeWidth);
+        if (orient === 'auto-start-reverse' && isStart) {
+          // reverse the start marker
+          rotate += Math.PI
+        }
         doc.transform(Math.cos(rotate) * scale, Math.sin(rotate) * scale, -Math.sin(rotate) * scale, Math.cos(rotate) * scale, posArray[0], posArray[1]);
         let refX = this.getLength('refX', this.getVWidth(), 0),
             refY = this.getLength('refY', this.getVHeight(), 0),
